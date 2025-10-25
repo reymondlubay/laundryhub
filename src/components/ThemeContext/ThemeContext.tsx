@@ -1,11 +1,18 @@
 // src/context/ThemeContext.tsx
-import { createContext, useContext, useMemo, useState, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 import { ThemeProvider, createTheme, CssBaseline } from "@mui/material";
 
-interface ThemeContextType {
+type ThemeContextType = {
   darkMode: boolean;
   toggleTheme: () => void;
-}
+};
 
 const ThemeContext = createContext<ThemeContextType>({
   darkMode: false,
@@ -15,11 +22,33 @@ const ThemeContext = createContext<ThemeContextType>({
 export const useThemeContext = () => useContext(ThemeContext);
 
 export const CustomThemeProvider = ({ children }: { children: ReactNode }) => {
-  const [darkMode, setDarkMode] = useState(false);
+  // ✅ Load from localStorage on initial render
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    const storedTheme = localStorage.getItem("darkMode");
+    return storedTheme === "true"; // convert string to boolean
+  });
 
-  const toggleTheme = () => setDarkMode((prev) => !prev);
+  const toggleTheme = () => {
+    setDarkMode((prev) => {
+      const newMode = !prev;
+      localStorage.setItem("darkMode", String(newMode)); // ✅ Save to localStorage
+      return newMode;
+    });
+  };
 
-  // useMemo prevents theme recreation on every render
+  // ✅ Optional: Sync with system preference if no localStorage found
+  useEffect(() => {
+    const storedTheme = localStorage.getItem("darkMode");
+    if (storedTheme === null) {
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
+      setDarkMode(prefersDark);
+      localStorage.setItem("darkMode", String(prefersDark));
+    }
+  }, []);
+
+  // ✅ Prevent theme recreation on every render
   const theme = useMemo(
     () =>
       createTheme({
