@@ -18,27 +18,20 @@ import {
   InputAdornment,
   Stack,
   Typography,
+  DialogTitle,
 } from "@mui/material";
 import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DemoContainer } from "@mui/x-date-pickers/internals/demo";
 import dayjs, { Dayjs } from "dayjs";
-import React from "react";
+import React, { useEffect } from "react";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { MenuItem } from "react-pro-sidebar";
-import { PlusOne, RemoveCircle } from "@mui/icons-material";
+import { RemoveCircle } from "@mui/icons-material";
+import type { LaundryItem, LaundryType } from "../../services/apiTypes";
 
 type TransactionModalProps = {
   isOpen: boolean;
   handleClose: () => void;
-};
-
-type LaundryItem = {
-  type: string;
-  kg: string;
-  loads: string;
-  price: string;
 };
 
 type Customer = {
@@ -59,13 +52,23 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   );
 
   const [items, setItems] = React.useState<LaundryItem[]>([
-    { type: "Clothes", kg: "", loads: "", price: "" },
+    { type: "Clothes", kg: 0, loads: 0, price: 0 },
   ]);
+
+  const [customer, setCustomer] = React.useState<string>("");
+  const [whitePrice, setWhitePrice] = React.useState<number>(0);
+  const [fabcon, setFabcon] = React.useState<number>(0);
+  const [detergent, setDetergent] = React.useState<number>(0);
+  const [cs, setCS] = React.useState<number>(0);
+
+  const [releaseBy, setReleaseBy] = React.useState<string>("");
+  const [dateLoaded, setDateLoaded] = React.useState<Dayjs | null>(dayjs());
+  const [datePickup, setDatePickup] = React.useState<Dayjs | null>(dayjs());
 
   const handleAddRow = () => {
     setItems((prev) => [
       ...prev,
-      { type: "Clothes", kg: "", loads: "", price: "" },
+      { type: "Clothes", kg: 0, loads: 0, price: 0 },
     ]);
   };
 
@@ -73,15 +76,54 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleChange = (
+  useEffect(() => {
+    updatePaymentDetails();
+  }, [items]);
+
+  const handleChange = <K extends keyof LaundryItem>(
     index: number,
-    field: keyof LaundryItem,
-    value: string
+    field: K,
+    value: LaundryItem[K]
   ) => {
     const updated = [...items];
     updated[index][field] = value;
     setItems(updated);
   };
+
+  const updatePaymentDetails = () => {
+    const totalsByType: Record<LaundryType, number> = {
+      Clothes: 0,
+      Beddings: 0,
+      Comforter: 0,
+    };
+
+    items.forEach((item) => {
+      totalsByType[item.type] += Number(item.price);
+    });
+
+    console.log("Totals:", totalsByType);
+  };
+
+  const handleSave = () => {
+    const payload = {
+      customer,
+      receiveDate,
+      dateLoaded,
+      datePickup,
+      items,
+      adOns: {
+        whitePrice,
+        fabcon,
+        detergent,
+        cs,
+      },
+      releaseBy,
+    };
+
+    console.log("SAVE PAYLOAD:", payload);
+  };
+
+  console.log(items);
 
   return (
     <Dialog
@@ -91,15 +133,21 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       aria-labelledby="modal-modal-title"
       aria-describedby="modal-modal-description"
     >
+      <DialogTitle sx={{ m: 0 }} id="customized-dialog-title">
+        Transaction
+      </DialogTitle>
       <Grid container spacing={0}>
-        <Grid size={8} sx={{ p: 2, pr: 0 }}>
-          <Paper elevation={1} sx={{ p: 2 }}>
+        <Grid size={8} sx={{ pl: 2, pr: 0 }}>
+          <Paper elevation={1} sx={{ p: 4 }}>
             <Grid container spacing={2}>
               <Grid size={6}>
                 <Autocomplete
                   id="customer"
                   freeSolo
                   size="small"
+                  value={customer}
+                  onChange={(_, newValue) => setCustomer(newValue || "")}
+                  onInputChange={(_, newValue) => setCustomer(newValue)}
                   options={customers.map((option) => option.name)}
                   renderInput={(params) => (
                     <TextField {...params} label="Customer" />
@@ -126,14 +174,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <DateTimePicker
                     label="Date Loaded"
-                    value={receiveDate}
-                    onChange={(newValue) => setReceiveDate(newValue)}
+                    value={dateLoaded}
+                    onChange={(newValue) => setDateLoaded(newValue)}
                     slotProps={{
                       textField: { size: "small", fullWidth: true },
-
-                      actionBar: {
-                        actions: ["today", "cancel", "accept"],
-                      },
+                      actionBar: { actions: ["today", "cancel", "accept"] },
                     }}
                   />
                 </LocalizationProvider>
@@ -172,7 +217,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                             handleChange(
                               index,
                               "type",
-                              e.target.value as string
+                              e.target.value as LaundryType
                             )
                           }
                           label="Type"
@@ -190,7 +235,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         label="KG"
                         value={item.kg}
                         onChange={(e) =>
-                          handleChange(index, "kg", e.target.value)
+                          handleChange(index, "kg", Number(e.target.value))
                         }
                         fullWidth
                         size="small"
@@ -214,7 +259,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         label="Loads"
                         value={item.loads}
                         onChange={(e) =>
-                          handleChange(index, "loads", e.target.value)
+                          handleChange(index, "loads", Number(e.target.value))
                         }
                         fullWidth
                         size="small"
@@ -228,7 +273,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         label="Price"
                         value={item.price}
                         onChange={(e) =>
-                          handleChange(index, "price", e.target.value)
+                          handleChange(index, "price", Number(e.target.value))
                         }
                         fullWidth
                         size="small"
@@ -276,11 +321,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               <Grid size={3}>
                 <TextField
                   label="White Price"
-                  // value={item.price}
-                  onChange={(e) => {}}
                   fullWidth
                   size="small"
                   type="number"
+                  value={whitePrice}
+                  onChange={(e) => setWhitePrice(Number(e.target.value))}
                   slotProps={{
                     input: {
                       startAdornment: (
@@ -291,92 +336,45 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 />
               </Grid>
               <Grid size={3}>
-                <Stack direction="row">
-                  <Tooltip title="Decrease Fabcon">
-                    <IconButton color="primary" onClick={handleAddRow}>
-                      <RemoveCircle />
-                    </IconButton>
-                  </Tooltip>
-                  <TextField
-                    disabled
-                    label="Fabcon"
-                    //value={item.loads}
-                    //onChange={(e) => handleChange(index, "loads", e.target.value)}
-                    fullWidth
-                    size="small"
-                    type="number"
-                    slotProps={{
-                      htmlInput: {
-                        min: 0,
-                        max: 5,
-                      },
-                    }}
-                  />
-                  <Tooltip title="Add Fabcon">
-                    <IconButton color="primary" onClick={handleAddRow}>
-                      <AddCircleIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
+                <TextField
+                  label="Fabcon"
+                  fullWidth
+                  size="small"
+                  type="number"
+                  value={fabcon}
+                  onChange={(e) => setFabcon(Number(e.target.value))}
+                  slotProps={{
+                    htmlInput: { min: 0, max: 5 },
+                  }}
+                />
               </Grid>
               <Grid size={3}>
-                <Stack direction="row">
-                  <Tooltip title="Decrease Detergent">
-                    <IconButton color="primary" onClick={handleAddRow}>
-                      <RemoveCircle />
-                    </IconButton>
-                  </Tooltip>
-                  <TextField
-                    disabled
-                    label="Detergent"
-                    //value={item.loads}
-                    //onChange={(e) => handleChange(index, "loads", e.target.value)}
-                    fullWidth
-                    size="small"
-                    type="number"
-                    slotProps={{
-                      htmlInput: {
-                        min: 0,
-                        max: 5,
-                      },
-                    }}
-                  />
-                  <Tooltip title="Add Detergent">
-                    <IconButton color="primary" onClick={handleAddRow}>
-                      <AddCircleIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
+                <TextField
+                  label="Detergent"
+                  fullWidth
+                  size="small"
+                  type="number"
+                  value={detergent}
+                  onChange={(e) => setDetergent(Number(e.target.value))}
+                  slotProps={{
+                    htmlInput: { min: 0, max: 5 },
+                  }}
+                />
               </Grid>
               <Grid size={3}>
-                <Stack direction="row">
-                  <Tooltip title="Decrease Detergent">
-                    <IconButton color="primary" onClick={handleAddRow}>
-                      <RemoveCircle />
-                    </IconButton>
-                  </Tooltip>
-                  <TextField
-                    disabled
-                    label="CS"
-                    //value={item.loads}
-                    //onChange={(e) => handleChange(index, "loads", e.target.value)}
-                    fullWidth
-                    size="small"
-                    type="number"
-                    slotProps={{
-                      htmlInput: {
-                        min: 0,
-                        max: 5,
-                      },
-                    }}
-                  />
-                  <Tooltip title="Add Detergent">
-                    <IconButton color="primary" onClick={handleAddRow}>
-                      <AddCircleIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
+                <TextField
+                  label="CS"
+                  fullWidth
+                  size="small"
+                  type="number"
+                  value={cs}
+                  onChange={(e) => setCS(Number(e.target.value))}
+                  slotProps={{
+                    htmlInput: { min: 0, max: 5 },
+                  }}
+                />
               </Grid>
+
               <Grid size={12}>
                 <Divider>Release Details</Divider>
               </Grid>
@@ -384,14 +382,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <DateTimePicker
                     label="Date Pickup"
-                    value={receiveDate}
-                    onChange={(newValue) => setReceiveDate(newValue)}
+                    value={datePickup}
+                    onChange={(newValue) => setDatePickup(newValue)}
                     slotProps={{
                       textField: { size: "small", fullWidth: true },
-
-                      actionBar: {
-                        actions: ["today", "cancel", "accept"],
-                      },
+                      actionBar: { actions: ["today", "cancel", "accept"] },
                     }}
                   />
                 </LocalizationProvider>
@@ -399,10 +394,14 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               <Grid size={{ md: 6, xs: 12 }}>
                 <FormControl fullWidth sx={{ minWidth: 120 }} size="small">
                   <InputLabel>Release By</InputLabel>
-                  <Select label="Release By">
-                    <MUIMenuItem value="Clothes">Employee 1</MUIMenuItem>
-                    <MUIMenuItem value="Beddings">Employee 2</MUIMenuItem>
-                    <MUIMenuItem value="Comforter">Employee 3</MUIMenuItem>
+                  <Select
+                    label="Release By"
+                    value={releaseBy}
+                    onChange={(e) => setReleaseBy(e.target.value)}
+                  >
+                    <MUIMenuItem value="Employee 1">Employee 1</MUIMenuItem>
+                    <MUIMenuItem value="Employee 2">Employee 2</MUIMenuItem>
+                    <MUIMenuItem value="Employee 3">Employee 3</MUIMenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -410,7 +409,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             </Grid>
           </Paper>
         </Grid>
-        <Grid size={4} sx={{ p: 2, pl: 0.5 }}>
+        <Grid size={4} sx={{ pr: 2, pl: 0.5 }}>
           <Paper elevation={1} sx={{ p: 2 }}>
             <Typography gutterBottom align="center">
               Payment Details
@@ -431,9 +430,15 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       </Grid>
 
       <DialogActions sx={{ justifyContent: "center", pb: 4 }}>
-        <Button variant="contained" size="small" color="primary">
+        <Button
+          variant="contained"
+          size="small"
+          color="primary"
+          onClick={handleSave}
+        >
           Save
         </Button>
+
         <Button
           variant="contained"
           size="small"
