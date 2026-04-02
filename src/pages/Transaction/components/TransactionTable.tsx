@@ -21,7 +21,7 @@ import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { themeQuartz } from "ag-grid-community";
 
-import { useThemeContext } from "../../components/ThemeContext/ThemeContext";
+import { useThemeContext } from "../../../components/ThemeContext/ThemeContext";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 

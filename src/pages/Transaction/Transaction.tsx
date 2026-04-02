@@ -1,7 +1,7 @@
 import React from "react";
-import TransactionTable from "./TransactionTable";
+import TransactionTable from "./components/TransactionTable";
 import { Button, Grid } from "@mui/material";
-import TransactionModal from "./TransactionModal";
+import TransactionModal from "./components/TransactionModal/TransactionModal";
 
 const Transaction = () => {
   const [openTransaction, setOpenTransaction] = React.useState(false);
