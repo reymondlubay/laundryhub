@@ -3,12 +3,12 @@ import Box from "@mui/material/Box";
 import Toolbar from "@mui/material/Toolbar";
 import IconButton from "@mui/material/IconButton";
 import MenuIcon from "@mui/icons-material/Menu";
-import { Avatar } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
 import { useThemeContext } from "../../ThemeContext/ThemeContext";
 import { useSidebar } from "../Sidebar/SidebarContext";
+import UserMenu from "../../UserMenu/UserMenu";
 
 const AppHeader = () => {
   const { darkMode, toggleTheme } = useThemeContext();
@@ -49,7 +49,7 @@ const AppHeader = () => {
               </IconButton>
             </Grid>
 
-            {/* Right: Avatar + Theme Toggle */}
+            {/* Right: User Menu + Theme Toggle */}
             <Grid
               size={4}
               sx={{
@@ -59,18 +59,8 @@ const AppHeader = () => {
                 gap: 1.5,
               }}
             >
-              {/* Avatar */}
-              <Avatar
-                sx={{
-                  bgcolor: darkMode ? "#ffffff" : "#1976d2",
-                  color: darkMode ? "#000" : "#fff",
-                  width: 38,
-                  height: 38,
-                  fontSize: 16,
-                }}
-              >
-                H
-              </Avatar>
+              {/* User Menu with Avatar and Logout */}
+              <UserMenu />
 
               {/* Theme toggle */}
               <IconButton

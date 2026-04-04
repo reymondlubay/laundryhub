@@ -1,12 +1,13 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
-  Button,
   Tooltip,
   Chip,
   Stack,
   Divider,
   Box,
   IconButton,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PaidIcon from "@mui/icons-material/Paid";
@@ -22,10 +23,14 @@ import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { themeQuartz } from "ag-grid-community";
 
 import { useThemeContext } from "../../../components/ThemeContext/ThemeContext";
+import transactionService, {
+  type Transaction,
+} from "../../../services/transactionService";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 interface LaundryRow {
+  id: string;
   dateReceived: string | null;
   customer: string;
   kg: number;
@@ -38,11 +43,94 @@ interface LaundryRow {
   action: string;
 }
 
+/**
+ * Map transaction backend response to LaundryRow UI format
+ */
+function mapTransactionToRow(transaction: Transaction): LaundryRow {
+  const tx = transaction as Transaction & {
+    datereceived?: string;
+    datepickup?: string;
+  };
+  const loadDetails = transaction.loadDetails || [];
+  const totalKg = loadDetails.reduce(
+    (sum: number, load: { kg?: number | string | null }) =>
+      sum + Number(load.kg || 0),
+    0,
+  );
+  const totalLoads = loadDetails.reduce(
+    (sum: number, load: { loads?: number | string | null }) =>
+      sum + Number(load.loads || 0),
+    0,
+  );
+  const totalPrice = loadDetails.reduce(
+    (sum: number, load: { price?: number | string | null }) =>
+      sum + Number(load.price || 0),
+    0,
+  );
+
+  // Get latest payment date if payments exist
+  const payments = transaction.paymentDetails || [];
+  const datePaid =
+    payments.length > 0
+      ? dayjs(payments[payments.length - 1].paymentDate).toISOString()
+      : null;
+  const releasedBy = transaction.releasedByUser
+    ? [
+        transaction.releasedByUser.firstName,
+        transaction.releasedByUser.lastName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim() ||
+      transaction.releasedByUser.userName ||
+      "-"
+    : "-";
+
+  return {
+    id: transaction.id,
+    dateReceived: tx.dateReceived || tx.datereceived || null,
+    customer: transaction.customer?.name || "Unknown",
+    kg: totalKg,
+    loads: totalLoads,
+    price: totalPrice,
+    datePaid,
+    datePickup: tx.datePickup || tx.datepickup || null,
+    notes: transaction.notes || "-",
+    releasedBy,
+    action: "",
+  };
+}
+
 const TransactionTable: React.FC = () => {
   const { darkMode } = useThemeContext();
+  const [rowData, setRowData] = useState<LaundryRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch transactions on component mount
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const transactions = await transactionService.getAll();
+        const rows = transactions.map(mapTransactionToRow);
+        setRowData(rows);
+      } catch (err: unknown) {
+        console.error("Failed to fetch transactions:", err);
+        const message =
+          err instanceof Error ? err.message : "Failed to load transactions";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, []);
 
   const themeDarkWarm = themeQuartz.withPart(
-    darkMode ? colorSchemeDark : colorSchemeLightWarm
+    darkMode ? colorSchemeDark : colorSchemeLightWarm,
   );
 
   const columnDefs = useMemo<ColDef<LaundryRow>[]>(
@@ -231,26 +319,33 @@ const TransactionTable: React.FC = () => {
         ),
       },
     ],
-    []
+    [],
   );
 
-  const rowData: LaundryRow[] = Array.from({ length: 1000 }, (_, i) => {
-    const baseDate = dayjs().subtract(i, "day");
-    return {
-      dateReceived: baseDate.toISOString(),
-      customer: `Customer ${i + 1}`,
-      kg: Math.floor(Math.random() * 10) + 1, // 1–10 kg
-      loads: Math.ceil(Math.random() * 3), // 1–3 loads
-      price: Math.floor(Math.random() * 400) + 100, // ₱100–₱500
-      datePaid:
-        Math.random() > 0.3 ? baseDate.add(1, "hour").toISOString() : null,
-      datePickup:
-        Math.random() > 0.5 ? baseDate.add(8, "hour").toISOString() : null,
-      notes: Math.random() > 0.5 ? "Express" : "Fold Only",
-      releasedBy: Math.random() > 0.5 ? "Bianca" : "Reymond",
-      action: "",
-    };
-  });
+  // Show loading state
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "85vh",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Box sx={{ p: 2 }}>
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    );
+  }
 
   return (
     <div style={{ height: "85vh", width: "100%" }}>

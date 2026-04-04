@@ -1,29 +1,69 @@
-import { authGuard, unAuthGuard } from "./utils/routerGuard";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Outlet from "./components/Routes/Routes";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import Login from "./pages/Login/Login";
 import Dashboard from "./pages/Dashboard/Dashboard";
 import Transaction from "./pages/Transaction/Transaction";
+import MainLayout from "./components/MainLayout/MainLayout";
+import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
+import { isAuthenticated } from "./utils/auth";
 import route from "./constants/route";
-import { storage, storageKey } from "./utils/storage";
 
 function App() {
-  //storage.removeToken(storageKey.TOKEN);
-  storage.setToken("11111", storageKey.TOKEN);
   return (
     <Router>
       <div className="App">
         <Routes>
-          <Route path={route.ROOT} element={<Outlet guards={unAuthGuard} />}>
-            <Route index element={<Login />} />
-            <Route path={route.LOGIN} element={<Login />} />
-          </Route>
-          <Route path={route.ROOT} element={<Outlet guards={authGuard} />}>
-            <Route path={route.DASHBOARD} element={<Dashboard />} />
-            <Route path={route.TRANSACTION} element={<Transaction />} />
-          </Route>
+          {/* Public Routes - Redirect to dashboard if already authenticated */}
+          <Route
+            path={route.LOGIN}
+            element={
+              isAuthenticated() ? <Navigate to={route.DASHBOARD} /> : <Login />
+            }
+          />
+          <Route
+            path={route.ROOT}
+            element={
+              isAuthenticated() ? <Navigate to={route.DASHBOARD} /> : <Login />
+            }
+          />
 
-          <Route path="*" element={<div>Wala</div>} />
+          {/* Protected Routes - Wrapped with MainLayout */}
+          <Route
+            path={route.DASHBOARD}
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Dashboard />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={route.TRANSACTION}
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Transaction />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Catch-all: Redirect to dashboard or login */}
+          <Route
+            path="*"
+            element={
+              isAuthenticated() ? (
+                <Navigate to={route.DASHBOARD} />
+              ) : (
+                <Navigate to={route.LOGIN} />
+              )
+            }
+          />
         </Routes>
       </div>
     </Router>
