@@ -26,16 +26,21 @@ import { useThemeContext } from "../../../components/ThemeContext/ThemeContext";
 import transactionService, {
   type Transaction,
 } from "../../../services/transactionService";
+import "./TransactionTable.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-interface LaundryRow {
+interface FlatTransactionRow {
   id: string;
+  transactionId: string;
+  isFirstRow: boolean;
+  isLastRow: boolean;
   dateReceived: string | null;
   customer: string;
+  loadType: string;
   kg: number;
   loads: number;
-  price: number;
+  price: number | null;
   datePaid: string | null;
   datePickup: string | null;
   notes: string;
@@ -44,13 +49,22 @@ interface LaundryRow {
 }
 
 /**
- * Map transaction backend response to LaundryRow UI format
+ * Flatten a transaction into multiple visual rows (one row per load detail)
+ * while keeping transaction-level fields on the first row only.
  */
-function mapTransactionToRow(transaction: Transaction): LaundryRow {
+function flattenTransactionRows(
+  transaction: Transaction,
+): FlatTransactionRow[] {
   const tx = transaction as Transaction & {
     datereceived?: string;
     datepickup?: string;
   };
+
+  const transactionId = transaction.id;
+  const dateReceived = tx.dateReceived || tx.datereceived || null;
+  const datePickup = tx.datePickup || tx.datepickup || null;
+  const customerName = transaction.customer?.name || "Unknown";
+
   const loadDetails = transaction.loadDetails || [];
   const totalKg = loadDetails.reduce(
     (sum: number, load: { kg?: number | string | null }) =>
@@ -74,6 +88,7 @@ function mapTransactionToRow(transaction: Transaction): LaundryRow {
     payments.length > 0
       ? dayjs(payments[payments.length - 1].paymentDate).toISOString()
       : null;
+
   const releasedBy = transaction.releasedByUser
     ? [
         transaction.releasedByUser.firstName,
@@ -86,24 +101,55 @@ function mapTransactionToRow(transaction: Transaction): LaundryRow {
       "-"
     : "-";
 
-  return {
-    id: transaction.id,
-    dateReceived: tx.dateReceived || tx.datereceived || null,
-    customer: transaction.customer?.name || "Unknown",
-    kg: totalKg,
-    loads: totalLoads,
-    price: totalPrice,
-    datePaid,
-    datePickup: tx.datePickup || tx.datepickup || null,
-    notes: transaction.notes || "-",
-    releasedBy,
-    action: "",
-  };
+  if (loadDetails.length === 0) {
+    return [
+      {
+        id: `${transactionId}-0`,
+        transactionId,
+        isFirstRow: true,
+        isLastRow: true,
+        dateReceived,
+        customer: customerName,
+        loadType: "",
+        kg: totalKg,
+        loads: totalLoads,
+        price: totalPrice,
+        datePaid,
+        datePickup,
+        notes: transaction.notes || "-",
+        releasedBy,
+        action: "",
+      },
+    ];
+  }
+
+  return loadDetails.map((load, index) => {
+    const type = load.type || "Load";
+    const isFirstRow = index === 0;
+
+    return {
+      id: `${transactionId}-${load.id || index}`,
+      transactionId,
+      isFirstRow,
+      isLastRow: index === loadDetails.length - 1,
+      dateReceived: isFirstRow ? dateReceived : null,
+      customer: customerName,
+      loadType: type,
+      kg: Number(load.kg || 0),
+      loads: Number(load.loads || 0),
+      price: isFirstRow ? totalPrice : null,
+      datePaid: isFirstRow ? datePaid : null,
+      datePickup: isFirstRow ? datePickup : null,
+      notes: isFirstRow ? transaction.notes || "-" : "",
+      releasedBy: isFirstRow ? releasedBy : "",
+      action: "",
+    };
+  });
 }
 
 const TransactionTable: React.FC = () => {
   const { darkMode } = useThemeContext();
-  const [rowData, setRowData] = useState<LaundryRow[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,9 +159,8 @@ const TransactionTable: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const transactions = await transactionService.getAll();
-        const rows = transactions.map(mapTransactionToRow);
-        setRowData(rows);
+        const response = await transactionService.getAll();
+        setTransactions(response);
       } catch (err: unknown) {
         console.error("Failed to fetch transactions:", err);
         const message =
@@ -129,11 +174,16 @@ const TransactionTable: React.FC = () => {
     fetchTransactions();
   }, []);
 
+  const rowData = useMemo<FlatTransactionRow[]>(
+    () => transactions.flatMap(flattenTransactionRows),
+    [transactions],
+  );
+
   const themeDarkWarm = themeQuartz.withPart(
     darkMode ? colorSchemeDark : colorSchemeLightWarm,
   );
 
-  const columnDefs = useMemo<ColDef<LaundryRow>[]>(
+  const columnDefs = useMemo<ColDef<FlatTransactionRow>[]>(
     () => [
       {
         headerName: "Date Received",
@@ -142,15 +192,14 @@ const TransactionTable: React.FC = () => {
 
         sortable: false,
         suppressMovable: true,
-        wrapText: true, // Enable text wrapping and new line display
-        autoHeight: true, // Ensure row height adjusts to wrapped text
-        cellRenderer: (params: ICellRendererParams<LaundryRow>) =>
-          params.value ? (
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) =>
+          params.data?.isFirstRow && params.value ? (
             <Box
               sx={{
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
+                justifyContent: "center",
                 padding: 0.5,
                 lineHeight: 1.5,
               }}
@@ -159,7 +208,7 @@ const TransactionTable: React.FC = () => {
               <span>{dayjs(params.value).format("h:mm A")}</span>
             </Box>
           ) : (
-            "-"
+            ""
           ),
       },
       {
@@ -170,6 +219,22 @@ const TransactionTable: React.FC = () => {
         filter: true,
         sortable: false,
         suppressMovable: true,
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              lineHeight: 1.25,
+              py: 0.25,
+            }}
+          >
+            <span>{params.data?.customer || "-"}</span>
+            {params.data?.loadType ? (
+              <span style={{ opacity: 0.7 }}>({params.data.loadType})</span>
+            ) : null}
+          </Box>
+        ),
       },
       {
         headerName: "KG",
@@ -194,8 +259,10 @@ const TransactionTable: React.FC = () => {
 
         sortable: false,
         suppressMovable: true,
-        cellRenderer: (params: ICellRendererParams<LaundryRow>) =>
-          `₱${params.value}`,
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
+          if (!params.data?.isFirstRow || params.value == null) return "";
+          return `₱${Number(params.value).toFixed(2)}`;
+        },
       },
       {
         headerName: "Date Paid",
@@ -203,13 +270,14 @@ const TransactionTable: React.FC = () => {
         width: 130,
         sortable: false,
         suppressMovable: true,
-        cellRenderer: (params: ICellRendererParams<LaundryRow>) =>
-          params.value ? (
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) =>
+          params.data?.isFirstRow && params.value ? (
             <Box
               sx={{
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
+                justifyContent: "center",
                 padding: 0.5,
                 lineHeight: 1.5,
               }}
@@ -218,7 +286,7 @@ const TransactionTable: React.FC = () => {
               <span>{dayjs(params.value).format("h:mm A")}</span>
             </Box>
           ) : (
-            "-"
+            ""
           ),
       },
       {
@@ -227,13 +295,14 @@ const TransactionTable: React.FC = () => {
         sortable: false,
         width: 130,
         suppressMovable: true,
-        cellRenderer: (params: ICellRendererParams<LaundryRow>) =>
-          params.value ? (
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) =>
+          params.data?.isFirstRow && params.value ? (
             <Box
               sx={{
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
+                justifyContent: "center",
                 padding: 0.5,
                 lineHeight: 1.5,
               }}
@@ -242,7 +311,7 @@ const TransactionTable: React.FC = () => {
               <span>{dayjs(params.value).format("h:mm A")}</span>
             </Box>
           ) : (
-            "-"
+            ""
           ),
       },
       {
@@ -251,17 +320,21 @@ const TransactionTable: React.FC = () => {
         sortable: false,
         width: 150,
         suppressMovable: true,
-        cellRenderer: (params: ICellRendererParams<LaundryRow>) => (
-          <Chip
-            label={params.value}
-            color={
-              params.value?.toString().toLowerCase().includes("express")
-                ? "error"
-                : "success"
-            }
-            size="small"
-          />
-        ),
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
+          if (!params.data?.isFirstRow) return "";
+
+          return (
+            <Chip
+              label={params.value || "-"}
+              color={
+                params.value?.toString().toLowerCase().includes("express")
+                  ? "error"
+                  : "success"
+              }
+              size="small"
+            />
+          );
+        },
       },
       {
         headerName: "Released By",
@@ -269,6 +342,8 @@ const TransactionTable: React.FC = () => {
         width: 120,
         suppressMovable: true,
         sortable: false,
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) =>
+          params.data?.isFirstRow ? params.value : "",
       },
       {
         headerName: "Action",
@@ -277,50 +352,89 @@ const TransactionTable: React.FC = () => {
         pinned: "right",
         width: 250,
         suppressMovable: true,
-        cellStyle: { alignContent: "center" },
-        cellRenderer: () => (
-          <Stack
-            direction="row"
-            spacing={1}
-            justifyContent="center"
-            alignItems="center"
-            alignContent="center"
-          >
-            <Tooltip title="Mark as Loaded">
-              <IconButton aria-label="delete" color="primary">
-                <CheckCircleIcon fontSize="inherit" />
-              </IconButton>
-            </Tooltip>
+        cellStyle: {
+          alignContent: "center",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
+          if (!params.data?.isFirstRow) return "";
 
-            <Tooltip title="Mark as Paid">
-              <IconButton aria-label="mark-as-paid" color="primary">
-                <PaidIcon fontSize="inherit" />
-              </IconButton>
-            </Tooltip>
+          return (
+            <Stack
+              direction="row"
+              spacing={1}
+              justifyContent="center"
+              alignItems="center"
+              alignContent="center"
+            >
+              <Tooltip title="Mark as Loaded">
+                <IconButton aria-label="delete" color="primary">
+                  <CheckCircleIcon fontSize="inherit" />
+                </IconButton>
+              </Tooltip>
 
-            <Tooltip title="Mark as Picked Up" color="primary">
-              <IconButton aria-label="picked-up">
-                <AssignmentTurnedInIcon fontSize="inherit" />
-              </IconButton>
-            </Tooltip>
-            <Divider orientation="vertical" flexItem />
-            <Tooltip title="Edit">
-              <IconButton aria-label="edit" color="success">
-                <EditIcon fontSize="inherit" />
-              </IconButton>
-            </Tooltip>
+              <Tooltip title="Mark as Paid">
+                <IconButton aria-label="mark-as-paid" color="primary">
+                  <PaidIcon fontSize="inherit" />
+                </IconButton>
+              </Tooltip>
 
-            <Tooltip title="Delete">
-              <IconButton aria-label="delete" color="error">
-                <DeleteIcon fontSize="inherit" />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        ),
+              <Tooltip title="Mark as Picked Up" color="primary">
+                <IconButton aria-label="picked-up">
+                  <AssignmentTurnedInIcon fontSize="inherit" />
+                </IconButton>
+              </Tooltip>
+              <Divider orientation="vertical" flexItem />
+              <Tooltip title="Edit">
+                <IconButton aria-label="edit" color="success">
+                  <EditIcon fontSize="inherit" />
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title="Delete">
+                <IconButton aria-label="delete" color="error">
+                  <DeleteIcon fontSize="inherit" />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          );
+        },
       },
     ],
     [],
   );
+
+  const defaultColDef = useMemo<ColDef<FlatTransactionRow>>(
+    () => ({
+      cellStyle: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+      },
+    }),
+    [],
+  );
+
+  const getRowClass = (params: { data?: FlatTransactionRow }) => {
+    const classes: string[] = [];
+
+    if (params.data?.isFirstRow) {
+      classes.push("tx-main-row");
+    } else {
+      classes.push("tx-child-row");
+    }
+
+    if (params.data?.isLastRow) {
+      classes.push("tx-last-row");
+    }
+
+    return classes.join(" ");
+  };
+
+  const getRowHeight = () => 52;
 
   // Show loading state
   if (loading) {
@@ -348,11 +462,17 @@ const TransactionTable: React.FC = () => {
   }
 
   return (
-    <div style={{ height: "85vh", width: "100%" }}>
-      <AgGridReact<LaundryRow>
+    <div
+      className="transaction-grouped-grid"
+      style={{ height: "85vh", width: "100%" }}
+    >
+      <AgGridReact<FlatTransactionRow>
         theme={themeDarkWarm}
         rowData={rowData}
         columnDefs={columnDefs}
+        defaultColDef={defaultColDef}
+        getRowClass={getRowClass}
+        getRowHeight={getRowHeight}
         animateRows
         pagination={true}
       />
