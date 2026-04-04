@@ -1,19 +1,16 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import {
   Tooltip,
-  Chip,
   Stack,
-  Divider,
   Box,
   IconButton,
   CircularProgress,
   Alert,
 } from "@mui/material";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import PaidIcon from "@mui/icons-material/Paid";
-import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import dayjs from "dayjs";
 
 import { AgGridReact } from "ag-grid-react";
@@ -23,9 +20,8 @@ import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { themeQuartz } from "ag-grid-community";
 
 import { useThemeContext } from "../../../components/ThemeContext/ThemeContext";
-import transactionService, {
-  type Transaction,
-} from "../../../services/transactionService";
+import transactionService from "../../../services/transactionService";
+import type { Transaction } from "../../../services/transactionService";
 import "./TransactionTable.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -41,12 +37,24 @@ interface FlatTransactionRow {
   kg: number;
   loads: number;
   price: number | null;
+  totalPaid: number | null;
+  balance: number | null;
+  paymentHistory: string[];
   datePaid: string | null;
   datePickup: string | null;
   notes: string;
+  whitePrice: number;
+  fabconQty: number;
+  detergentQty: number;
+  colorSafeQty: number;
+  isDelivered: boolean;
   releasedBy: string;
   action: string;
 }
+
+const formatAmount = (amount: number): string => {
+  return Number.isInteger(amount) ? `${amount}` : amount.toFixed(2);
+};
 
 /**
  * Flatten a transaction into multiple visual rows (one row per load detail)
@@ -84,10 +92,34 @@ function flattenTransactionRows(
 
   // Get latest payment date if payments exist
   const payments = transaction.paymentDetails || [];
+  const totalPaid = payments.reduce(
+    (sum: number, payment) => sum + Number(payment.amount || 0),
+    0,
+  );
+  const balance =
+    payments.length > 0 && totalPaid < totalPrice ? totalPrice - totalPaid : 0;
+
   const datePaid =
-    payments.length > 0
-      ? dayjs(payments[payments.length - 1].paymentDate).toISOString()
-      : null;
+    payments.length > 0 ? payments[payments.length - 1].paymentDate : null;
+  const paymentHistory = payments.map((payment) => {
+    const paidAt = dayjs(payment.paymentDate).format("MM-DD-YY h:mm A");
+    return `${paidAt} - ${formatAmount(Number(payment.amount || 0))} ${payment.mode}`;
+  });
+
+  const tx2 = transaction as Transaction & {
+    whiteprice?: number;
+    fabconqty?: number;
+    detergentqty?: number;
+    colorsafeqty?: number;
+  };
+  const whitePrice = Number(transaction.whitePrice ?? tx2.whiteprice ?? 0);
+  const fabconQty = Number(transaction.fabconQty ?? tx2.fabconqty ?? 0);
+  const detergentQty = Number(
+    transaction.detergentQty ?? tx2.detergentqty ?? 0,
+  );
+  const colorSafeQty = Number(
+    transaction.colorSafeQty ?? tx2.colorsafeqty ?? 0,
+  );
 
   const releasedBy = transaction.releasedByUser
     ? [
@@ -114,9 +146,17 @@ function flattenTransactionRows(
         kg: totalKg,
         loads: totalLoads,
         price: totalPrice,
+        totalPaid,
+        balance,
+        paymentHistory,
         datePaid,
         datePickup,
         notes: transaction.notes || "-",
+        whitePrice,
+        fabconQty,
+        detergentQty,
+        colorSafeQty,
+        isDelivered: !!transaction.isDelivered,
         releasedBy,
         action: "",
       },
@@ -138,41 +178,60 @@ function flattenTransactionRows(
       kg: Number(load.kg || 0),
       loads: Number(load.loads || 0),
       price: isFirstRow ? totalPrice : null,
+      totalPaid: isFirstRow ? totalPaid : null,
+      balance: isFirstRow ? balance : null,
+      paymentHistory: isFirstRow ? paymentHistory : [],
       datePaid: isFirstRow ? datePaid : null,
       datePickup: isFirstRow ? datePickup : null,
       notes: isFirstRow ? transaction.notes || "-" : "",
+      whitePrice: isFirstRow ? whitePrice : 0,
+      fabconQty: isFirstRow ? fabconQty : 0,
+      detergentQty: isFirstRow ? detergentQty : 0,
+      colorSafeQty: isFirstRow ? colorSafeQty : 0,
+      isDelivered: isFirstRow ? !!transaction.isDelivered : false,
       releasedBy: isFirstRow ? releasedBy : "",
       action: "",
     };
   });
 }
 
-const TransactionTable: React.FC = () => {
+type TransactionTableProps = {
+  transactions: Transaction[];
+  loading: boolean;
+  error: string | null;
+  onEditTransaction?: (transaction: Transaction) => void;
+  onDeleted?: () => void;
+};
+
+const TransactionTable: React.FC<TransactionTableProps> = ({
+  transactions,
+  loading,
+  error,
+  onEditTransaction,
+  onDeleted,
+}) => {
   const { darkMode } = useThemeContext();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Fetch transactions on component mount
-  useEffect(() => {
-    const fetchTransactions = async () => {
+  const handleDeleteTransaction = useCallback(
+    async (transactionId: string) => {
+      const confirmed = window.confirm(
+        "Are you sure you want to delete this transaction?",
+      );
+
+      if (!confirmed) return;
+
       try {
-        setLoading(true);
-        setError(null);
-        const response = await transactionService.getAll();
-        setTransactions(response);
+        await transactionService.delete(transactionId);
+        onDeleted?.();
       } catch (err: unknown) {
-        console.error("Failed to fetch transactions:", err);
         const message =
-          err instanceof Error ? err.message : "Failed to load transactions";
-        setError(message);
-      } finally {
-        setLoading(false);
+          err instanceof Error ? err.message : "Failed to delete transaction";
+        setDeleteError(message);
       }
-    };
-
-    fetchTransactions();
-  }, []);
+    },
+    [onDeleted],
+  );
 
   const rowData = useMemo<FlatTransactionRow[]>(
     () => transactions.flatMap(flattenTransactionRows),
@@ -198,7 +257,7 @@ const TransactionTable: React.FC = () => {
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "center",
+                alignItems: "flex-start",
                 justifyContent: "center",
                 padding: 0.5,
                 lineHeight: 1.5,
@@ -214,7 +273,7 @@ const TransactionTable: React.FC = () => {
       {
         headerName: "Customer",
         field: "customer",
-        width: 150,
+        width: 220,
 
         filter: true,
         sortable: false,
@@ -270,24 +329,112 @@ const TransactionTable: React.FC = () => {
         width: 130,
         sortable: false,
         suppressMovable: true,
-        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) =>
-          params.data?.isFirstRow && params.value ? (
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
+          if (!params.data?.isFirstRow || !params.value) return "";
+
+          const totalPrice = Number(params.data.price || 0);
+          const totalPaid = Number(params.data.totalPaid || 0);
+          const hasBalance = totalPaid > 0 && totalPaid < totalPrice;
+          const hasPaidOrOver = totalPaid >= totalPrice;
+          const balanceAmount = Math.max(totalPrice - totalPaid, 0);
+          const overAmount = Math.max(totalPaid - totalPrice, 0);
+
+          const tooltipTitle = (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
+              {params.data.paymentHistory.map((paymentLine, index) => (
+                <span key={`${params.data?.transactionId}-payment-${index}`}>
+                  {paymentLine}
+                </span>
+              ))}
+              {hasBalance ? (
+                <span style={{ color: "#f44336", fontWeight: 600 }}>
+                  Balance - {formatAmount(balanceAmount)}
+                </span>
+              ) : null}
+              {hasPaidOrOver && overAmount > 0 ? (
+                <span style={{ color: "#4caf50", fontWeight: 600 }}>
+                  Over - {formatAmount(overAmount)}
+                </span>
+              ) : null}
+            </Box>
+          );
+
+          return (
             <Box
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "center",
+                alignItems: "flex-start",
                 justifyContent: "center",
                 padding: 0.5,
                 lineHeight: 1.5,
               }}
             >
               <span>{dayjs(params.value).format("MM-DD-YY")}</span>
-              <span>{dayjs(params.value).format("h:mm A")}</span>
+              <Stack
+                direction="row"
+                spacing={0.5}
+                alignItems="center"
+                sx={{ minHeight: 20 }}
+              >
+                <Box
+                  component="span"
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    lineHeight: 1,
+                  }}
+                >
+                  {dayjs(params.value).format("h:mm A")}
+                </Box>
+                {hasBalance ? (
+                  <Tooltip title={tooltipTitle} arrow>
+                    <Box
+                      component="span"
+                      sx={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        height: 16,
+                      }}
+                    >
+                      <WarningAmberIcon
+                        sx={{
+                          color: "#f44336",
+                          fontSize: 16,
+                          display: "block",
+                          verticalAlign: "middle",
+                        }}
+                      />
+                    </Box>
+                  </Tooltip>
+                ) : null}
+                {hasPaidOrOver ? (
+                  <Tooltip title={tooltipTitle} arrow>
+                    <Box
+                      component="span"
+                      sx={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        height: 16,
+                      }}
+                    >
+                      <InfoOutlinedIcon
+                        sx={{
+                          color: "#4caf50",
+                          fontSize: 16,
+                          display: "block",
+                          verticalAlign: "middle",
+                        }}
+                      />
+                    </Box>
+                  </Tooltip>
+                ) : null}
+              </Stack>
             </Box>
-          ) : (
-            ""
-          ),
+          );
+        },
       },
       {
         headerName: "Date Pickup",
@@ -301,7 +448,7 @@ const TransactionTable: React.FC = () => {
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "center",
+                alignItems: "flex-start",
                 justifyContent: "center",
                 padding: 0.5,
                 lineHeight: 1.5,
@@ -318,21 +465,51 @@ const TransactionTable: React.FC = () => {
         headerName: "Notes",
         field: "notes",
         sortable: false,
-        width: 150,
+        width: 200,
         suppressMovable: true,
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
           if (!params.data?.isFirstRow) return "";
+          const { whitePrice, fabconQty, detergentQty, colorSafeQty } =
+            params.data;
+          const noteText =
+            params.value && params.value !== "-" ? String(params.value) : "";
+          const details: string[] = [];
+
+          if (whitePrice > 0)
+            details.push(`Add White +${formatAmount(whitePrice)}`);
+          if (fabconQty > 0) details.push(`Fabcon x${fabconQty}`);
+          if (detergentQty > 0) details.push(`Detergent x${detergentQty}`);
+          if (colorSafeQty > 0) details.push(`Color Safe x${colorSafeQty}`);
+          if (noteText) details.push(`Notes ${noteText}`);
+
+          if (details.length === 0) return "-";
+
+          const tooltipTitle = (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
+              {details.map((line) => (
+                <span key={line}>{line}</span>
+              ))}
+            </Box>
+          );
 
           return (
-            <Chip
-              label={params.value || "-"}
-              color={
-                params.value?.toString().toLowerCase().includes("express")
-                  ? "error"
-                  : "success"
-              }
-              size="small"
-            />
+            <Tooltip title={tooltipTitle} arrow>
+              <Stack
+                direction="row"
+                spacing={0.5}
+                alignItems="center"
+                sx={{
+                  color: "#f44336",
+                  cursor: "pointer",
+                  width: "fit-content",
+                }}
+              >
+                <InfoOutlinedIcon sx={{ fontSize: 16, color: "#f44336" }} />
+                <span style={{ color: "#f44336", fontWeight: 600 }}>
+                  Read Notes
+                </span>
+              </Stack>
+            </Tooltip>
           );
         },
       },
@@ -350,13 +527,13 @@ const TransactionTable: React.FC = () => {
         field: "action",
         sortable: false,
         pinned: "right",
-        width: 250,
+        width: 120,
         suppressMovable: true,
         cellStyle: {
-          alignContent: "center",
+          alignContent: "flex-start",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: "flex-start",
         },
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
           if (!params.data?.isFirstRow) return "";
@@ -365,36 +542,38 @@ const TransactionTable: React.FC = () => {
             <Stack
               direction="row"
               spacing={1}
-              justifyContent="center"
+              justifyContent="flex-start"
               alignItems="center"
               alignContent="center"
             >
-              <Tooltip title="Mark as Loaded">
-                <IconButton aria-label="delete" color="primary">
-                  <CheckCircleIcon fontSize="inherit" />
-                </IconButton>
-              </Tooltip>
-
-              <Tooltip title="Mark as Paid">
-                <IconButton aria-label="mark-as-paid" color="primary">
-                  <PaidIcon fontSize="inherit" />
-                </IconButton>
-              </Tooltip>
-
-              <Tooltip title="Mark as Picked Up" color="primary">
-                <IconButton aria-label="picked-up">
-                  <AssignmentTurnedInIcon fontSize="inherit" />
-                </IconButton>
-              </Tooltip>
-              <Divider orientation="vertical" flexItem />
               <Tooltip title="Edit">
-                <IconButton aria-label="edit" color="success">
+                <IconButton
+                  aria-label="edit"
+                  color="success"
+                  onClick={() => {
+                    const transaction = transactions.find(
+                      (t) => t.id === params.data?.transactionId,
+                    );
+
+                    if (transaction && onEditTransaction) {
+                      onEditTransaction(transaction);
+                    }
+                  }}
+                >
                   <EditIcon fontSize="inherit" />
                 </IconButton>
               </Tooltip>
 
               <Tooltip title="Delete">
-                <IconButton aria-label="delete" color="error">
+                <IconButton
+                  aria-label="delete"
+                  color="error"
+                  onClick={() => {
+                    if (params.data?.transactionId) {
+                      handleDeleteTransaction(params.data.transactionId);
+                    }
+                  }}
+                >
                   <DeleteIcon fontSize="inherit" />
                 </IconButton>
               </Tooltip>
@@ -403,7 +582,7 @@ const TransactionTable: React.FC = () => {
         },
       },
     ],
-    [],
+    [onEditTransaction, transactions, handleDeleteTransaction],
   );
 
   const defaultColDef = useMemo<ColDef<FlatTransactionRow>>(
@@ -411,8 +590,8 @@ const TransactionTable: React.FC = () => {
       cellStyle: {
         display: "flex",
         alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
+        justifyContent: "flex-start",
+        textAlign: "left",
       },
     }),
     [],
@@ -434,29 +613,13 @@ const TransactionTable: React.FC = () => {
     return classes.join(" ");
   };
 
-  const getRowHeight = () => 52;
-
-  // Show loading state
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "85vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const getRowHeight = () => 72;
 
   // Show error state
-  if (error) {
+  if (error || deleteError) {
     return (
       <Box sx={{ p: 2 }}>
-        <Alert severity="error">{error}</Alert>
+        <Alert severity="error">{error || deleteError}</Alert>
       </Box>
     );
   }
@@ -464,18 +627,47 @@ const TransactionTable: React.FC = () => {
   return (
     <div
       className="transaction-grouped-grid"
-      style={{ height: "85vh", width: "100%" }}
+      style={{ height: "85vh", width: "100%", position: "relative" }}
     >
-      <AgGridReact<FlatTransactionRow>
-        theme={themeDarkWarm}
-        rowData={rowData}
-        columnDefs={columnDefs}
-        defaultColDef={defaultColDef}
-        getRowClass={getRowClass}
-        getRowHeight={getRowHeight}
-        animateRows
-        pagination={true}
-      />
+      {loading && (
+        <Box
+          sx={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 10,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: "rgba(0,0,0,0.15)",
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      )}
+      {!loading && rowData.length === 0 ? (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: "85vh",
+            opacity: 0.6,
+          }}
+        >
+          No transactions found.
+        </Box>
+      ) : (
+        <AgGridReact<FlatTransactionRow>
+          theme={themeDarkWarm}
+          rowData={rowData}
+          columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          getRowClass={getRowClass}
+          getRowHeight={getRowHeight}
+          animateRows
+          pagination={true}
+        />
+      )}
     </div>
   );
 };

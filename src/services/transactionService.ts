@@ -38,6 +38,10 @@ export interface Transaction {
   dateReceived: string;
   dateLoaded?: string;
   datePickup?: string;
+  whitePrice?: number;
+  fabconQty?: number;
+  detergentQty?: number;
+  colorSafeQty?: number;
   isDelivered: boolean;
   notes?: string;
   isDeleted: boolean;
@@ -84,20 +88,23 @@ export interface UpdateTransactionRequest {
 }
 
 const transactionService = {
-  // Get all transactions
-  getAll: async (): Promise<Transaction[]> => {
+  // Get all transactions, optionally filtered
+  getAll: async (params?: {
+    customer?: string;
+    fromDate?: string;
+    toDate?: string;
+    date?: string;
+  }): Promise<Transaction[]> => {
     try {
-      const response = await axiosClient.get("/transactions");
+      const response = await axiosClient.get("/transactions", { params });
       const { data } = response;
 
-      // Handle 204 No Content or empty responses
       if (!data || response.status === 204) {
         return [];
       }
 
       return data.data || data.transactions || [];
     } catch (error: any) {
-      // Handle 204 No Content gracefully
       if (error?.response?.status === 204) {
         return [];
       }

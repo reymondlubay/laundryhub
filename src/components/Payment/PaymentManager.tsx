@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Box } from "@mui/material";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import { PaymentModal } from "./PaymentModal";
@@ -8,6 +8,7 @@ import type { Payment } from "../../services/apiTypes";
 type PaymentManagerProps = {
   transactionId?: string;
   onPaymentsChange?: (payments: Payment[]) => void;
+  initialPayments?: Payment[];
 };
 
 /**
@@ -26,11 +27,16 @@ type PaymentManagerProps = {
 export const PaymentManager: React.FC<PaymentManagerProps> = ({
   transactionId,
   onPaymentsChange,
+  initialPayments = [],
 }) => {
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payments, setPayments] = useState<Payment[]>(initialPayments);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | undefined>();
   const [isEditMode, setIsEditMode] = useState(false);
+
+  useEffect(() => {
+    setPayments(initialPayments);
+  }, [initialPayments]);
 
   /**
    * Generate unique ID for new payment

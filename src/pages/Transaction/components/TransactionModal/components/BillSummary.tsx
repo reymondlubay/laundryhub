@@ -2,11 +2,16 @@ import { Divider, Paper, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import type { TransactionFormValues } from "../TransactionModal";
 import { PaymentManager } from "../../../../../components/Payment";
+import type { Payment } from "../../../../../services/apiTypes";
 
 const BillSummary = ({
   transactionFormValues,
+  payments,
+  onPaymentsChange,
 }: {
   transactionFormValues: TransactionFormValues;
+  payments: Payment[];
+  onPaymentsChange: (payments: Payment[]) => void;
 }) => {
   const [total, setTotal] = useState(0);
   const calculateTotals = (values: TransactionFormValues) => {
@@ -90,7 +95,10 @@ const BillSummary = ({
       </Typography>
 
       {/* Payment Manager */}
-      <PaymentManager />
+      <PaymentManager
+        initialPayments={payments}
+        onPaymentsChange={onPaymentsChange}
+      />
     </Paper>
   );
 };
