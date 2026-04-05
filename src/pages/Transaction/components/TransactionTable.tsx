@@ -275,9 +275,25 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
     }
   }, [deleteTransactionId, onDeleted]);
 
+  const sortedTransactions = useMemo(() => {
+    return [...transactions].sort((a, b) => {
+      const aTx = a as Transaction & { datereceived?: string };
+      const bTx = b as Transaction & { datereceived?: string };
+
+      const aDate = dayjs(a.dateReceived || aTx.datereceived);
+      const bDate = dayjs(b.dateReceived || bTx.datereceived);
+
+      if (!aDate.isValid() && !bDate.isValid()) return 0;
+      if (!aDate.isValid()) return 1;
+      if (!bDate.isValid()) return -1;
+
+      return bDate.valueOf() - aDate.valueOf();
+    });
+  }, [transactions]);
+
   const rowData = useMemo<FlatTransactionRow[]>(
-    () => transactions.flatMap(flattenTransactionRows),
-    [transactions],
+    () => sortedTransactions.flatMap(flattenTransactionRows),
+    [sortedTransactions],
   );
 
   const themeDarkWarm = themeQuartz.withPart(

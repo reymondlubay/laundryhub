@@ -459,6 +459,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 value={values[field]}
                 onChange={(val) => setFieldValue(field, val)}
                 maxDate={dayjs()} // disable future dates
+                timeSteps={{ minutes: 1 }}
                 slotProps={{
                   textField: {
                     size: "small",
