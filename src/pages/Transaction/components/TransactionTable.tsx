@@ -27,6 +27,7 @@ import {
   EMPTY_STATES,
   UI_TEXT,
 } from "../../../constants/messages";
+import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.tsx";
 import "./TransactionTable.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -251,24 +252,28 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
 }) => {
   const { darkMode } = useThemeContext();
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  const handleDeleteTransaction = useCallback(
-    async (transactionId: string) => {
-      const confirmed = window.confirm(CONFIRM_MESSAGES.DELETE_TRANSACTION);
-
-      if (!confirmed) return;
-
-      try {
-        await transactionService.delete(transactionId);
-        onDeleted?.();
-      } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : "Failed to delete transaction";
-        setDeleteError(message);
-      }
-    },
-    [onDeleted],
+  const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(
+    null,
   );
+
+  const handleDeleteTransactionClick = useCallback((transactionId: string) => {
+    setDeleteError(null);
+    setDeleteTransactionId(transactionId);
+  }, []);
+
+  const handleDeleteTransactionConfirm = useCallback(async () => {
+    if (!deleteTransactionId) return;
+
+    try {
+      await transactionService.delete(deleteTransactionId);
+      setDeleteTransactionId(null);
+      onDeleted?.();
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to delete transaction";
+      setDeleteError(message);
+    }
+  }, [deleteTransactionId, onDeleted]);
 
   const rowData = useMemo<FlatTransactionRow[]>(
     () => transactions.flatMap(flattenTransactionRows),
@@ -642,7 +647,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
                   color="error"
                   onClick={() => {
                     if (params.data?.transactionId) {
-                      handleDeleteTransaction(params.data.transactionId);
+                      handleDeleteTransactionClick(params.data.transactionId);
                     }
                   }}
                 >
@@ -654,7 +659,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
         },
       },
     ],
-    [onEditTransaction, transactions, handleDeleteTransaction],
+    [onEditTransaction, transactions, handleDeleteTransactionClick],
   );
 
   const defaultColDef = useMemo<ColDef<FlatTransactionRow>>(
@@ -697,56 +702,67 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   }
 
   return (
-    <div
-      className="transaction-grouped-grid"
-      style={{
-        height: "calc(100vh - 200px)",
-        minHeight: 400,
-        width: "100%",
-        position: "relative",
-      }}
-    >
-      {loading && (
-        <Box
-          sx={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 10,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            bgcolor: "rgba(0,0,0,0.15)",
-          }}
-        >
-          <CircularProgress />
-        </Box>
-      )}
-      {!loading && rowData.length === 0 ? (
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            height: "calc(100vh - 200px)",
-            minHeight: 400,
-            opacity: 0.6,
-          }}
-        >
-          {EMPTY_STATES.NO_TRANSACTIONS}
-        </Box>
-      ) : (
-        <AgGridReact<FlatTransactionRow>
-          theme={themeDarkWarm}
-          rowData={rowData}
-          columnDefs={columnDefs}
-          defaultColDef={defaultColDef}
-          getRowClass={getRowClass}
-          getRowHeight={getRowHeight}
-          animateRows
-          pagination={true}
-        />
-      )}
-    </div>
+    <>
+      <div
+        className="transaction-grouped-grid"
+        style={{
+          height: "calc(100vh - 200px)",
+          minHeight: 400,
+          width: "100%",
+          position: "relative",
+        }}
+      >
+        {loading && (
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(0,0,0,0.15)",
+            }}
+          >
+            <CircularProgress />
+          </Box>
+        )}
+        {!loading && rowData.length === 0 ? (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "calc(100vh - 200px)",
+              minHeight: 400,
+              opacity: 0.6,
+            }}
+          >
+            {EMPTY_STATES.NO_TRANSACTIONS}
+          </Box>
+        ) : (
+          <AgGridReact<FlatTransactionRow>
+            theme={themeDarkWarm}
+            rowData={rowData}
+            columnDefs={columnDefs}
+            defaultColDef={defaultColDef}
+            getRowClass={getRowClass}
+            getRowHeight={getRowHeight}
+            animateRows
+            pagination={true}
+          />
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTransactionId)}
+        title="Confirm Delete"
+        message={CONFIRM_MESSAGES.DELETE_TRANSACTION}
+        confirmText={UI_TEXT.DELETE}
+        onClose={() => setDeleteTransactionId(null)}
+        onConfirm={handleDeleteTransactionConfirm}
+      />
+    </>
   );
 };
 

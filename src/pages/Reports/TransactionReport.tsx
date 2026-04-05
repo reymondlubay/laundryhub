@@ -238,7 +238,13 @@ const TransactionReport: React.FC = () => {
           transactionService.getAll(),
         ]);
         setCustomers(customerData);
-        setTransactions(transactionData);
+        setTransactions(
+          transactionData.filter(
+            (t) =>
+              !t.isDeleted &&
+              !(t as Transaction & { isdeleted?: boolean }).isdeleted,
+          ),
+        );
       } catch (err: unknown) {
         setError(
           err instanceof Error ? err.message : "Failed to load reports.",

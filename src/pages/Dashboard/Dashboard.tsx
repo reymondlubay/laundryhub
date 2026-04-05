@@ -5,20 +5,27 @@ import {
   CircularProgress,
   Grid,
   Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Typography,
 } from "@mui/material";
 import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
-import PeopleOutlineOutlinedIcon from "@mui/icons-material/PeopleOutlineOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
+import LocalLaundryServiceOutlinedIcon from "@mui/icons-material/LocalLaundryServiceOutlined";
 import dayjs from "dayjs";
+import { useThemeContext } from "../../components/ThemeContext/ThemeContext";
 import transactionService, {
   type PaymentDetail,
   type Transaction,
 } from "../../services/transactionService";
-import customerService, { type Customer } from "../../services/customerService";
 
 type DashboardCard = {
   key: string;
@@ -61,6 +68,25 @@ const getPaymentDate = (payment: PaymentDetail): string | undefined => {
   return payment.paymentDate || item.paymentdate;
 };
 
+const getTransactionLoads = (transaction: Transaction): number => {
+  const tx = transaction as Transaction & {
+    loaddetails?: Array<{ loads?: number | string | null }>;
+    load_details?: Array<{ loads?: number | string | null }>;
+  };
+
+  const details =
+    (Array.isArray(transaction.loadDetails) &&
+    transaction.loadDetails.length > 0
+      ? transaction.loadDetails
+      : Array.isArray(tx.loaddetails) && tx.loaddetails.length > 0
+        ? tx.loaddetails
+        : Array.isArray(tx.load_details)
+          ? tx.load_details
+          : []) || [];
+
+  return details.reduce((sum, item) => sum + Number(item.loads || 0), 0);
+};
+
 const AnimatedCount: React.FC<{ value: number }> = ({ value }) => {
   const [displayValue, setDisplayValue] = React.useState(0);
   const previousValueRef = React.useRef(0);
@@ -92,14 +118,14 @@ const AnimatedCount: React.FC<{ value: number }> = ({ value }) => {
     return () => window.cancelAnimationFrame(animationFrame);
   }, [value]);
 
-  return <>{String(displayValue).padStart(2, "0")}</>;
+  return <>{displayValue}</>;
 };
 
 const Dashboard = () => {
+  const { darkMode } = useThemeContext();
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
-  const [customers, setCustomers] = React.useState<Customer[]>([]);
 
   React.useEffect(() => {
     const loadData = async () => {
@@ -107,13 +133,15 @@ const Dashboard = () => {
         setLoading(true);
         setError(null);
 
-        const [transactionData, customerData] = await Promise.all([
-          transactionService.getAll(),
-          customerService.getAll(),
-        ]);
+        const transactionData = await transactionService.getAll();
 
-        setTransactions(transactionData);
-        setCustomers(customerData);
+        setTransactions(
+          transactionData.filter(
+            (t) =>
+              !t.isDeleted &&
+              !(t as Transaction & { isdeleted?: boolean }).isdeleted,
+          ),
+        );
       } catch (err: unknown) {
         setError(
           err instanceof Error ? err.message : "Failed to load dashboard data.",
@@ -126,63 +154,124 @@ const Dashboard = () => {
     void loadData();
   }, []);
 
+  const activeTransactions = React.useMemo(() => {
+    return transactions.filter((t) => {
+      const tx = t as Transaction & { isdeleted?: boolean };
+      return !t.isDeleted && !tx.isdeleted;
+    });
+  }, [transactions]);
+
   const metrics = React.useMemo(() => {
-    const todaysTransactions = transactions.filter((transaction) =>
+    const todaysTransactions = activeTransactions.filter((transaction) =>
       isSameDay(getTransactionDate(transaction, "dateReceived")),
     ).length;
 
-    const todaysLoaded = transactions.filter((transaction) =>
+    const todaysLoad = activeTransactions
+      .filter((transaction) =>
+        isSameDay(getTransactionDate(transaction, "dateReceived")),
+      )
+      .reduce((sum, transaction) => sum + getTransactionLoads(transaction), 0);
+
+    const todaysLoaded = activeTransactions.filter((transaction) =>
       isSameDay(getTransactionDate(transaction, "dateLoaded")),
     ).length;
 
-    const todaysPickup = transactions.filter((transaction) =>
+    const todaysPickup = activeTransactions.filter((transaction) =>
       isSameDay(getTransactionDate(transaction, "datePickup")),
     ).length;
 
-    const todaysPending = transactions.filter((transaction) => {
-      const isTodayTransaction = isSameDay(
-        getTransactionDate(transaction, "dateReceived"),
-      );
-      const hasLoadedDate = Boolean(
-        getTransactionDate(transaction, "dateLoaded"),
-      );
-      return isTodayTransaction && !hasLoadedDate;
-    }).length;
+    const todaysPending = activeTransactions
+      .filter((transaction) => {
+        const hasLoadedDate = Boolean(
+          getTransactionDate(transaction, "dateLoaded"),
+        );
+        return !hasLoadedDate;
+      })
+      .reduce((sum, transaction) => sum + getTransactionLoads(transaction), 0);
 
-    const todaysPaid = transactions.reduce((count, transaction) => {
+    const todaysPaid = activeTransactions.reduce((count, transaction) => {
       const hasPaymentToday = (transaction.paymentDetails || []).some(
         (payment) => isSameDay(getPaymentDate(payment)),
       );
       return hasPaymentToday ? count + 1 : count;
     }, 0);
 
-    const todaysCustomer = customers.filter((customer) => {
-      const item = customer as Customer & { createdat?: string };
-      return isSameDay(customer.createdAt || item.createdat);
-    }).length;
-
     return {
       todaysTransactions,
+      todaysLoad,
       todaysLoaded,
       todaysPending,
       todaysPaid,
-      todaysCustomer,
       todaysPickup,
     };
-  }, [customers, transactions]);
+  }, [activeTransactions]);
+
+  const pendingTransactions = React.useMemo(() => {
+    return activeTransactions
+      .filter((transaction) => !getTransactionDate(transaction, "dateLoaded"))
+      .sort((a, b) => {
+        const aDate = dayjs(getTransactionDate(a, "dateReceived"));
+        const bDate = dayjs(getTransactionDate(b, "dateReceived"));
+        if (!aDate.isValid() && !bDate.isValid()) return 0;
+        if (!aDate.isValid()) return 1;
+        if (!bDate.isValid()) return -1;
+        return aDate.valueOf() - bDate.valueOf();
+      });
+  }, [activeTransactions]);
+
+  const loadedTodayTransactions = React.useMemo(() => {
+    return activeTransactions
+      .filter((transaction) =>
+        isSameDay(getTransactionDate(transaction, "dateLoaded")),
+      )
+      .sort((a, b) => {
+        const aDate = dayjs(getTransactionDate(a, "dateLoaded"));
+        const bDate = dayjs(getTransactionDate(b, "dateLoaded"));
+        if (!aDate.isValid() && !bDate.isValid()) return 0;
+        if (!aDate.isValid()) return 1;
+        if (!bDate.isValid()) return -1;
+        return aDate.valueOf() - bDate.valueOf();
+      });
+  }, [transactions]);
+
+  const pendingTotalLoads = React.useMemo(
+    () =>
+      pendingTransactions.reduce(
+        (sum, transaction) => sum + getTransactionLoads(transaction),
+        0,
+      ),
+    [pendingTransactions],
+  );
+
+  const loadedTodayTotalLoads = React.useMemo(
+    () =>
+      loadedTodayTransactions.reduce(
+        (sum, transaction) => sum + getTransactionLoads(transaction),
+        0,
+      ),
+    [loadedTodayTransactions],
+  );
 
   const cards: DashboardCard[] = [
     {
       key: "todays-transaction",
-      title: "Today's Transaction",
+      title: "Transaction",
       value: metrics.todaysTransactions,
       icon: <ShoppingBagOutlinedIcon />,
       iconBg: "#ffe7df",
       iconColor: "#ff5a2d",
     },
     {
+      key: "todays-load",
+      title: "Total Loads",
+      value: metrics.todaysLoad,
+      icon: <LocalLaundryServiceOutlinedIcon />,
+      iconBg: "#e5f2ff",
+      iconColor: "#2e7dd7",
+    },
+    {
       key: "todays-loaded",
-      title: "Today's Loaded",
+      title: "Completed Loads",
       value: metrics.todaysLoaded,
       icon: <Inventory2OutlinedIcon />,
       iconBg: "#f6efe0",
@@ -190,7 +279,7 @@ const Dashboard = () => {
     },
     {
       key: "todays-pending",
-      title: "Today's Pending",
+      title: "Pending Loads",
       value: metrics.todaysPending,
       icon: <PendingActionsOutlinedIcon />,
       iconBg: "#fff2d6",
@@ -198,23 +287,15 @@ const Dashboard = () => {
     },
     {
       key: "todays-paid",
-      title: "Today's Paid",
+      title: "Paid",
       value: metrics.todaysPaid,
       icon: <PaymentsOutlinedIcon />,
       iconBg: "#e8f7f1",
       iconColor: "#1d9a72",
     },
     {
-      key: "todays-customer",
-      title: "Today's Customer",
-      value: metrics.todaysCustomer,
-      icon: <PeopleOutlineOutlinedIcon />,
-      iconBg: "#ece8ff",
-      iconColor: "#7a6df0",
-    },
-    {
       key: "todays-pickup",
-      title: "Today's Pickup",
+      title: "Picked Up",
       value: metrics.todaysPickup,
       icon: <LocalShippingOutlinedIcon />,
       iconBg: "#edf3e0",
@@ -222,9 +303,26 @@ const Dashboard = () => {
     },
   ];
 
+  const surfaceColor = darkMode ? "#1b222c" : "#fbfcfe";
+  const borderColor = darkMode ? "#2b3440" : "#edf1f5";
+  const titleColor = darkMode ? "#c7d3e0" : "#7f95ad";
+  const valueColor = darkMode ? "#f0f6ff" : "#0d213f";
+  const headingColor = darkMode ? "#eef5ff" : "#0d213f";
+  const tableHeadBg = darkMode ? "#232d39" : "#f5f8fc";
+  const tableHeadColor = darkMode ? "#e7f0fa" : "#3b5b7a";
+  const tableCellColor = darkMode ? "#d8e2ee" : "#17304f";
+
   return (
-    <Box>
-      <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
+    <Box sx={{ width: "100%" }}>
+      <Typography
+        variant="h5"
+        sx={{
+          mb: 2,
+          fontWeight: 700,
+          color: headingColor,
+          fontSize: { xs: "1.25rem", sm: "1.5rem" },
+        }}
+      >
         Dashboard
       </Typography>
 
@@ -239,69 +337,321 @@ const Dashboard = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <Grid container spacing={2}>
-          {cards.map((card) => (
-            <Grid key={card.key} size={{ xs: 12, sm: 6, lg: 3 }}>
+        <>
+          <Grid container spacing={2}>
+            {cards.map((card) => (
+              <Grid key={card.key} size={{ xs: 12, sm: 6, lg: 3 }}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: { xs: 1.5, sm: 1.75 },
+                    borderRadius: 3,
+                    bgcolor: surfaceColor,
+                    border: `1px solid ${borderColor}`,
+                    display: "flex",
+                    alignItems: "center",
+                    minHeight: 84,
+                    gap: { xs: 1.25, sm: 1.5 },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: { xs: 40, sm: 44 },
+                      height: { xs: 40, sm: 44 },
+                      borderRadius: "50%",
+                      bgcolor: card.iconBg,
+                      color: card.iconColor,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {card.icon}
+                  </Box>
+
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        color: titleColor,
+                        fontWeight: 500,
+                        lineHeight: 1.2,
+                        mb: 0.35,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        fontSize: { xs: "0.85rem", sm: "1rem" },
+                      }}
+                    >
+                      {card.title}
+                    </Typography>
+                    <Typography
+                      variant="h4"
+                      sx={{
+                        fontWeight: 700,
+                        color: valueColor,
+                        lineHeight: 1,
+                        letterSpacing: 0.3,
+                        fontSize: { xs: "1.6rem", sm: "2rem" },
+                      }}
+                    >
+                      <AnimatedCount value={card.value} />
+                    </Typography>
+                  </Box>
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
+
+          <Grid container spacing={2} sx={{ mt: 2 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Paper
                 elevation={0}
                 sx={{
-                  p: 1.75,
+                  p: { xs: 1.25, sm: 2 },
                   borderRadius: 3,
-                  bgcolor: "#fbfcfe",
-                  border: "1px solid #edf1f5",
-                  display: "flex",
-                  alignItems: "center",
-                  minHeight: 84,
-                  gap: 1.5,
+                  bgcolor: surfaceColor,
+                  border: `1px solid ${borderColor}`,
                 }}
               >
-                <Box
-                  sx={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: "50%",
-                    bgcolor: card.iconBg,
-                    color: card.iconColor,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  sx={{ mb: 1.5 }}
                 >
-                  {card.icon}
-                </Box>
-
-                <Box sx={{ minWidth: 0 }}>
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <PendingActionsOutlinedIcon
+                      sx={{ color: "#cf8b00", fontSize: 20 }}
+                    />
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 700,
+                        color: headingColor,
+                        fontSize: { xs: "1rem", sm: "1.25rem" },
+                      }}
+                    >
+                      Current Pending
+                    </Typography>
+                  </Stack>
                   <Typography
-                    variant="subtitle1"
+                    variant="body2"
                     sx={{
-                      color: "#7f95ad",
-                      fontWeight: 500,
-                      lineHeight: 1.2,
-                      mb: 0.35,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {card.title}
-                  </Typography>
-                  <Typography
-                    variant="h4"
-                    sx={{
+                      color: titleColor,
                       fontWeight: 700,
-                      color: "#0d213f",
-                      lineHeight: 1,
-                      letterSpacing: 0.3,
+                      textAlign: "right",
                     }}
                   >
-                    <AnimatedCount value={card.value} />
+                    Total Pending: {pendingTotalLoads}
                   </Typography>
-                </Box>
+                </Stack>
+                <TableContainer sx={{ maxHeight: "25vh" }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Transaction Date
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Customer
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Loads
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {pendingTransactions.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={3}
+                            align="center"
+                            sx={{ color: tableCellColor }}
+                          >
+                            No pending transactions.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        pendingTransactions.map((transaction) => (
+                          <TableRow key={`pending-${transaction.id}`}>
+                            <TableCell sx={{ color: tableCellColor }}>
+                              {dayjs(
+                                getTransactionDate(transaction, "dateReceived"),
+                              ).isValid()
+                                ? dayjs(
+                                    getTransactionDate(
+                                      transaction,
+                                      "dateReceived",
+                                    ),
+                                  ).format("MM-DD-YY h:mm A")
+                                : "-"}
+                            </TableCell>
+                            <TableCell sx={{ color: tableCellColor }}>
+                              {transaction.customer?.name || "-"}
+                            </TableCell>
+                            <TableCell
+                              align="right"
+                              sx={{ color: tableCellColor }}
+                            >
+                              {getTransactionLoads(transaction)}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               </Paper>
             </Grid>
-          ))}
-        </Grid>
+
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 1.25, sm: 2 },
+                  borderRadius: 3,
+                  bgcolor: surfaceColor,
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  sx={{ mb: 1.5 }}
+                >
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <Inventory2OutlinedIcon
+                      sx={{ color: "#b8871b", fontSize: 20 }}
+                    />
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 700,
+                        color: headingColor,
+                        fontSize: { xs: "1rem", sm: "1.25rem" },
+                      }}
+                    >
+                      Done Today
+                    </Typography>
+                  </Stack>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: titleColor,
+                      fontWeight: 700,
+                      textAlign: "right",
+                    }}
+                  >
+                    Total Loads: {loadedTodayTotalLoads}
+                  </Typography>
+                </Stack>
+                <TableContainer sx={{ maxHeight: "25vh" }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Transaction Date
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Customer
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Loads
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {loadedTodayTransactions.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={3}
+                            align="center"
+                            sx={{ color: tableCellColor }}
+                          >
+                            No loaded transactions today.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        loadedTodayTransactions.map((transaction) => (
+                          <TableRow key={`done-${transaction.id}`}>
+                            <TableCell sx={{ color: tableCellColor }}>
+                              {dayjs(
+                                getTransactionDate(transaction, "dateLoaded"),
+                              ).isValid()
+                                ? dayjs(
+                                    getTransactionDate(
+                                      transaction,
+                                      "dateLoaded",
+                                    ),
+                                  ).format("MM-DD-YY h:mm A")
+                                : "-"}
+                            </TableCell>
+                            <TableCell sx={{ color: tableCellColor }}>
+                              {transaction.customer?.name || "-"}
+                            </TableCell>
+                            <TableCell
+                              align="right"
+                              sx={{ color: tableCellColor }}
+                            >
+                              {getTransactionLoads(transaction)}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Grid>
+          </Grid>
+        </>
       )}
     </Box>
   );

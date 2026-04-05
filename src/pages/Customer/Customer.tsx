@@ -35,6 +35,7 @@ import customerService, {
   type Customer,
   type UpdateCustomerPayload,
 } from "../../services/customerService";
+import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog.tsx";
 
 type CustomerFormState = {
   name: string;
@@ -60,6 +61,7 @@ const CustomerPage: React.FC = () => {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [deleteCustomerId, setDeleteCustomerId] = useState<string | null>(null);
   const [form, setForm] = useState<CustomerFormState>(emptyForm);
 
   const loadCustomers = useCallback(async (searchTerm = "") => {
@@ -163,13 +165,18 @@ const CustomerPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (customerId: string) => {
-    const confirmed = window.confirm(CONFIRM_MESSAGES.DELETE_CUSTOMER);
-    if (!confirmed) return;
+  const handleDeleteClick = (customerId: string) => {
+    setError(null);
+    setDeleteCustomerId(customerId);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteCustomerId) return;
 
     try {
       setError(null);
-      await customerService.delete(customerId);
+      await customerService.delete(deleteCustomerId);
+      setDeleteCustomerId(null);
       await loadCustomers(activeSearch);
     } catch (err: unknown) {
       const message =
@@ -264,7 +271,7 @@ const CustomerPage: React.FC = () => {
                         </IconButton>
                         <IconButton
                           color="error"
-                          onClick={() => handleDelete(customer.id)}
+                          onClick={() => handleDeleteClick(customer.id)}
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
@@ -277,6 +284,15 @@ const CustomerPage: React.FC = () => {
           </TableContainer>
         )}
       </Paper>
+
+      <ConfirmDialog
+        open={Boolean(deleteCustomerId)}
+        title="Confirm Delete"
+        message={CONFIRM_MESSAGES.DELETE_CUSTOMER}
+        confirmText={UI_TEXT.DELETE}
+        onClose={() => setDeleteCustomerId(null)}
+        onConfirm={handleDeleteConfirm}
+      />
 
       <Dialog
         open={dialogOpen}

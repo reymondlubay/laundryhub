@@ -51,6 +51,7 @@ import userService, {
   type UserRole,
   type UserStatus,
 } from "../../services/userService";
+import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog.tsx";
 
 type UserFormState = {
   firstName: string;
@@ -84,6 +85,7 @@ const Users: React.FC = () => {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [form, setForm] = useState<UserFormState>(emptyForm);
 
   const isAdmin = currentUser?.role === USER_ROLE_ADMIN;
@@ -211,13 +213,18 @@ const Users: React.FC = () => {
     }
   };
 
-  const handleDelete = async (userId: string) => {
-    const confirmed = window.confirm(CONFIRM_MESSAGES.DELETE_USER);
-    if (!confirmed) return;
+  const handleDeleteClick = (userId: string) => {
+    setError(null);
+    setDeleteUserId(userId);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteUserId) return;
 
     try {
       setError(null);
-      await userService.delete(userId);
+      await userService.delete(deleteUserId);
+      setDeleteUserId(null);
       await loadUsers();
     } catch (err: unknown) {
       const message =
@@ -304,7 +311,7 @@ const Users: React.FC = () => {
                         </IconButton>
                         <IconButton
                           color="error"
-                          onClick={() => handleDelete(user.id)}
+                          onClick={() => handleDeleteClick(user.id)}
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
@@ -317,6 +324,15 @@ const Users: React.FC = () => {
           </TableContainer>
         )}
       </Paper>
+
+      <ConfirmDialog
+        open={Boolean(deleteUserId)}
+        title="Confirm Delete"
+        message={CONFIRM_MESSAGES.DELETE_USER}
+        confirmText={UI_TEXT.DELETE}
+        onClose={() => setDeleteUserId(null)}
+        onConfirm={handleDeleteConfirm}
+      />
 
       <Dialog
         open={dialogOpen}

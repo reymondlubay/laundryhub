@@ -8,11 +8,6 @@ import {
   Paper,
   IconButton,
   Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
   Typography,
   Box,
 } from "@mui/material";
@@ -22,6 +17,7 @@ import { useState } from "react";
 import type { Payment } from "../../services/apiTypes";
 import dayjs from "dayjs";
 import { CONFIRM_MESSAGES, UI_TEXT } from "../../constants/messages";
+import ConfirmDialog from "../ConfirmDialog/ConfirmDialog.tsx";
 
 type PaymentTableProps = {
   payments: Payment[];
@@ -34,18 +30,18 @@ export const PaymentTable: React.FC<PaymentTableProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [selectedPaymentId, setSelectedPaymentId] = useState<string>("");
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(
+    null,
+  );
 
   const handleDeleteClick = (paymentId: string) => {
     setSelectedPaymentId(paymentId);
-    setDeleteConfirmOpen(true);
   };
 
   const handleConfirmDelete = () => {
+    if (!selectedPaymentId) return;
     onDelete(selectedPaymentId);
-    setDeleteConfirmOpen(false);
-    setSelectedPaymentId("");
+    setSelectedPaymentId(null);
   };
 
   const formatCurrency = (amount: number): string => {
@@ -165,31 +161,14 @@ export const PaymentTable: React.FC<PaymentTableProps> = ({
         </Table>
       </TableContainer>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteConfirmOpen}
-        onClose={() => setDeleteConfirmOpen(false)}
-      >
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <Typography>{CONFIRM_MESSAGES.DELETE_PAYMENT}</Typography>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button
-            variant="outlined"
-            onClick={() => setDeleteConfirmOpen(false)}
-          >
-            {UI_TEXT.CANCEL}
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={handleConfirmDelete}
-          >
-            {UI_TEXT.DELETE}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={Boolean(selectedPaymentId)}
+        title="Confirm Delete"
+        message={CONFIRM_MESSAGES.DELETE_PAYMENT}
+        confirmText={UI_TEXT.DELETE}
+        onClose={() => setSelectedPaymentId(null)}
+        onConfirm={handleConfirmDelete}
+      />
     </>
   );
 };

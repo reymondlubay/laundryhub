@@ -115,6 +115,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             value={paymentDate}
             onChange={(val) => val && setPaymentDate(val)}
             maxDate={dayjs()} // Prevent future dates
+            timeSteps={{ minutes: 1 }}
             slotProps={{
               textField: {
                 size: "small",
