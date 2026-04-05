@@ -1,5 +1,6 @@
 import {
   Dialog,
+  DialogContent,
   Grid,
   Paper,
   TextField,
@@ -25,6 +26,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { Dayjs } from "dayjs";
 import React from "react";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Formik, FieldArray, getIn } from "formik";
 import * as Yup from "yup";
@@ -38,6 +40,20 @@ import BillSummary from "./components/BillSummary";
 import type { Transaction } from "../../../../services/transactionService";
 import transactionService from "../../../../services/transactionService";
 import customerService from "../../../../services/customerService";
+import userService, { type UserItem } from "../../../../services/userService";
+import authService from "../../../../services/authService";
+import {
+  API_ERRORS,
+  FORM_ERRORS,
+  SUCCESS_MESSAGES,
+  UI_TEXT,
+} from "../../../../constants/messages";
+import { USER_ROLE_EMPLOYEE } from "../../../../constants/roles";
+import {
+  PAYMENT_MODE_CASH,
+  PAYMENT_MODE_GCASH,
+  PAYMENT_MODE_GCASH_BACKEND,
+} from "../../../../constants/payment";
 
 type TransactionModalProps = {
   isOpen: boolean;
@@ -49,13 +65,29 @@ type TransactionModalProps = {
 type Customer = {
   name: string;
   id: string;
+  mobileNumber?: string;
+  address?: string;
+  notes?: string;
+};
+
+type NewCustomerFormValues = {
+  name: string;
+  mobileNumber: string;
+  address: string;
+  notes: string;
+};
+
+type EmployeeOption = {
+  id: string;
+  name: string;
 };
 
 export type TransactionFormValues = {
   customer: string;
   receiveDate: Dayjs;
-  dateLoaded: Dayjs;
+  dateLoaded: Dayjs | null;
   datePickup: Dayjs | null;
+  isDelivered: boolean;
   items: LaundryItem[];
   whitePrice: number;
   fabcon: number;
@@ -72,7 +104,18 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   onSaved,
 }) => {
   const [customers, setCustomers] = React.useState<Customer[]>([]);
+  const [employees, setEmployees] = React.useState<EmployeeOption[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [addCustomerOpen, setAddCustomerOpen] = React.useState(false);
+  const [addingCustomer, setAddingCustomer] = React.useState(false);
+  const [newCustomerError, setNewCustomerError] = React.useState<string>("");
+  const [newCustomerForm, setNewCustomerForm] =
+    React.useState<NewCustomerFormValues>({
+      name: "",
+      mobileNumber: "",
+      address: "",
+      notes: "",
+    });
   const [payments, setPayments] = React.useState<Payment[]>([]);
   const [snackbar, setSnackbar] = React.useState<{
     open: boolean;
@@ -86,20 +129,71 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const isEditing = !!transaction;
 
+  const fetchCustomers = React.useCallback(async (): Promise<Customer[]> => {
+    const customerData = await customerService.getAll();
+    setCustomers(customerData);
+    return customerData;
+  }, []);
+
+  const resetNewCustomerForm = () => {
+    setNewCustomerForm({
+      name: "",
+      mobileNumber: "",
+      address: "",
+      notes: "",
+    });
+    setNewCustomerError("");
+  };
+
   React.useEffect(() => {
-    const fetchCustomers = async () => {
+    const fetchCustomersAndEmployees = async () => {
       try {
-        const data = await customerService.getAll();
-        setCustomers(data);
-      } catch (error) {
-        console.error("Failed to fetch customers", error);
+        const [customerData, userData] = await Promise.all([
+          fetchCustomers(),
+          userService.getAll(),
+        ]);
+
+        setCustomers(customerData);
+
+        const employeeUsers = userData
+          .filter((user) => user.role === USER_ROLE_EMPLOYEE)
+          .map((user: UserItem) => ({
+            id: user.id,
+            name:
+              [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+              user.userName ||
+              USER_ROLE_EMPLOYEE,
+          }));
+
+        setEmployees(employeeUsers);
+      } catch {
+        // Some roles may not be authorized to list users; fall back to current user if employee.
+        const currentUser = authService.getCurrentUser();
+        if (currentUser?.role === USER_ROLE_EMPLOYEE && currentUser.id) {
+          const fallbackName =
+            [currentUser.firstName, currentUser.lastName]
+              .filter(Boolean)
+              .join(" ") ||
+            currentUser.userName ||
+            USER_ROLE_EMPLOYEE;
+          setEmployees([{ id: currentUser.id, name: fallbackName }]);
+        } else {
+          setEmployees([]);
+        }
+
+        try {
+          const customerData = await fetchCustomers();
+          setCustomers(customerData);
+        } catch (customerError) {
+          console.error("Failed to fetch customers", customerError);
+        }
       }
     };
 
     if (isOpen) {
-      fetchCustomers();
+      fetchCustomersAndEmployees();
     }
-  }, [isOpen]);
+  }, [fetchCustomers, isOpen]);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -114,7 +208,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         id: payment.id,
         paymentDate: new Date(payment.paymentDate),
         amount: Number(payment.amount || 0),
-        mode: payment.mode === "Gcash" ? "GCash" : "Cash",
+        mode:
+          payment.mode === PAYMENT_MODE_GCASH_BACKEND
+            ? PAYMENT_MODE_GCASH
+            : PAYMENT_MODE_CASH,
       }),
     );
 
@@ -126,8 +223,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       return {
         customer: "",
         receiveDate: dayjs(),
-        dateLoaded: dayjs(),
+        dateLoaded: null,
         datePickup: null,
+        isDelivered: false,
         items: [{ type: "Clothes", kg: 0, loads: 0, price: 0 }],
         whitePrice: 0,
         fabcon: 0,
@@ -153,6 +251,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       releasedBy?: string;
       datereceived?: string;
       dateloaded?: string;
+      isdelivered?: boolean;
       datepickup?: string;
       whiteprice?: number;
       fabconqty?: number;
@@ -164,11 +263,15 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     return {
       customer: transaction.customerId || tx.customerid || "",
       receiveDate: dayjs(tx.dateReceived || tx.datereceived || dayjs()),
-      dateLoaded: dayjs(tx.dateLoaded || tx.dateloaded || dayjs()),
+      dateLoaded:
+        tx.dateLoaded || tx.dateloaded
+          ? dayjs(tx.dateLoaded || tx.dateloaded)
+          : null,
       datePickup:
         tx.datePickup || tx.datepickup
           ? dayjs(tx.datePickup || tx.datepickup)
           : null,
+      isDelivered: Boolean(transaction.isDelivered ?? tx.isdelivered),
       items:
         transaction.loadDetails?.length || tx.loaddetails?.length
           ? (transaction.loadDetails || tx.loaddetails || []).map((item) => ({
@@ -189,33 +292,75 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const today = dayjs().endOf("day").toDate();
   const validationSchema = Yup.object().shape({
-    customer: Yup.string().required("Customer is required"),
+    customer: Yup.string().required(FORM_ERRORS.REQUIRED_CUSTOMER),
     receiveDate: Yup.date()
-      .max(today, "Cannot select a future date")
-      .required("Date received is required"),
-    dateLoaded: Yup.date().max(today, "Cannot select a future date"),
+      .max(today, FORM_ERRORS.FUTURE_DATE_NOT_ALLOWED)
+      .required(FORM_ERRORS.DATE_RECEIVED_REQUIRED),
+    dateLoaded: Yup.date()
+      .nullable()
+      .notRequired()
+      .max(today, FORM_ERRORS.FUTURE_DATE_NOT_ALLOWED),
     datePickup: Yup.date()
       .nullable()
       .notRequired()
-      .max(today, "Cannot select a future date"),
+      .max(today, FORM_ERRORS.FUTURE_DATE_NOT_ALLOWED),
     items: Yup.array().of(
       Yup.object().shape({
         type: Yup.string().required(),
-        kg: Yup.number().min(0, "Cannot be negative"),
-        loads: Yup.number().min(0, "Cannot be negative"),
-        price: Yup.number().min(0, "Cannot be negative"),
+        kg: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+        loads: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+        price: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
       }),
     ),
-    whitePrice: Yup.number().min(0, "Cannot be negative"),
-    fabcon: Yup.number().min(0, "Cannot be negative"),
-    detergent: Yup.number().min(0, "Cannot be negative"),
-    cs: Yup.number().min(0, "Cannot be negative"),
+    whitePrice: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+    fabcon: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+    detergent: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+    cs: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
     notes: Yup.string(),
   });
 
   const sanitizeNumber = (value: string) => {
     const num = Number(value);
     return isNaN(num) || num < 0 ? 0 : num;
+  };
+
+  const handleCreateCustomer = async (
+    setFieldValue: (
+      field: string,
+      value: unknown,
+      shouldValidate?: boolean,
+    ) => Promise<unknown> | void,
+  ) => {
+    const name = newCustomerForm.name.trim();
+    if (!name) {
+      setNewCustomerError(FORM_ERRORS.REQUIRED_CUSTOMER_NAME);
+      return;
+    }
+
+    try {
+      setAddingCustomer(true);
+      setNewCustomerError("");
+
+      const created = await customerService.create({
+        name,
+        mobileNumber: newCustomerForm.mobileNumber.trim() || undefined,
+        address: newCustomerForm.address.trim() || undefined,
+        notes: newCustomerForm.notes.trim() || undefined,
+      });
+
+      await fetchCustomers();
+      await Promise.resolve(setFieldValue("customer", created.id, false));
+      setAddCustomerOpen(false);
+      resetNewCustomerForm();
+    } catch (error: unknown) {
+      setNewCustomerError(
+        error instanceof Error
+          ? error.message
+          : API_ERRORS.CREATE_CUSTOMER_FAILED,
+      );
+    } finally {
+      setAddingCustomer(false);
+    }
   };
 
   // Backend stores TIMESTAMP (without timezone), so send local datetime strings
@@ -246,10 +391,12 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               dateReceived: values.receiveDate.format("YYYY-MM-DDTHH:mm:ss"),
               dateLoaded: toLocalDateTimeString(values.dateLoaded),
               datePickup: toLocalDateTimeString(values.datePickup),
+              isDelivered: values.isDelivered,
               whitePrice: values.whitePrice,
               fabconQty: values.fabcon,
               detergentQty: values.detergent,
               colorSafeQty: values.cs,
+              releasedBy: values.releaseBy || undefined,
               notes: trimmedNotes || undefined,
               loadDetails: values.items.map((item) => ({
                 type: item.type,
@@ -262,7 +409,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                   "YYYY-MM-DDTHH:mm:ss",
                 ),
                 amount: Number(payment.amount || 0),
-                mode: payment.mode === "GCash" ? "Gcash" : "Cash",
+                mode:
+                  payment.mode === PAYMENT_MODE_GCASH
+                    ? PAYMENT_MODE_GCASH_BACKEND
+                    : PAYMENT_MODE_CASH,
               })),
             };
 
@@ -270,14 +420,14 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               await transactionService.update(transaction.id, payload);
               setSnackbar({
                 open: true,
-                message: "Transaction updated successfully",
+                message: SUCCESS_MESSAGES.TRANSACTION_UPDATED,
                 severity: "success",
               });
             } else {
               await transactionService.create(payload);
               setSnackbar({
                 open: true,
-                message: "Transaction created successfully",
+                message: SUCCESS_MESSAGES.TRANSACTION_CREATED,
                 severity: "success",
               });
             }
@@ -285,9 +435,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             onSaved?.();
           } catch (error: unknown) {
             const message =
-              error instanceof Error
-                ? error.message
-                : "Failed to save transaction";
+              error instanceof Error ? error.message : API_ERRORS.SAVE_FAILED;
             setSnackbar({ open: true, message, severity: "error" });
           } finally {
             setLoading(false);
@@ -328,34 +476,60 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                   <Paper elevation={1} sx={{ p: 4 }}>
                     <Grid container spacing={2}>
                       <Grid size={6}>
-                        <Autocomplete
-                          size="small"
-                          value={
-                            customers.find((c) => c.id === values.customer) ||
-                            null
-                          }
-                          onChange={(_, selectedCustomer) => {
-                            setFieldValue(
-                              "customer",
-                              selectedCustomer?.id || "",
-                            );
-                          }}
-                          options={customers}
-                          getOptionLabel={(option) => option.name}
-                          isOptionEqualToValue={(option, value) =>
-                            option.id === value.id
-                          }
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              label="Customer"
-                              error={!!errors.customer && !!touched.customer}
-                              helperText={
-                                touched.customer ? errors.customer : ""
+                        <Grid
+                          container
+                          spacing={1}
+                          alignItems="flex-start"
+                          wrap="nowrap"
+                        >
+                          <Grid size="grow">
+                            <Autocomplete
+                              size="small"
+                              value={
+                                customers.find(
+                                  (c) => c.id === values.customer,
+                                ) || null
                               }
+                              onChange={(_, selectedCustomer) => {
+                                setFieldValue(
+                                  "customer",
+                                  selectedCustomer?.id || "",
+                                );
+                              }}
+                              options={customers}
+                              getOptionLabel={(option) => option.name}
+                              isOptionEqualToValue={(option, value) =>
+                                option.id === value.id
+                              }
+                              renderInput={(params) => (
+                                <TextField
+                                  {...params}
+                                  label="Customer"
+                                  error={
+                                    !!errors.customer && !!touched.customer
+                                  }
+                                  helperText={
+                                    touched.customer ? errors.customer : ""
+                                  }
+                                />
+                              )}
                             />
-                          )}
-                        />
+                          </Grid>
+                          <Grid size="auto" sx={{ pt: 0.5 }}>
+                            <Tooltip title="Add New Customer">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => {
+                                  resetNewCustomerForm();
+                                  setAddCustomerOpen(true);
+                                }}
+                              >
+                                <PersonAddIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Grid>
+                        </Grid>
                       </Grid>
 
                       <Grid size={6}>
@@ -367,7 +541,15 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
                       <Grid size={6} textAlign="center">
                         <FormControlLabel
-                          control={<Checkbox size="small" />}
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={values.isDelivered}
+                              onChange={(e) =>
+                                setFieldValue("isDelivered", e.target.checked)
+                              }
+                            />
+                          }
                           label="For Delivery"
                         />
                       </Grid>
@@ -636,20 +818,20 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         <FormControl fullWidth size="small">
                           <InputLabel>Release By</InputLabel>
                           <Select
+                            label="Release By"
                             value={values.releaseBy}
                             onChange={(e) =>
                               setFieldValue("releaseBy", e.target.value)
                             }
                           >
-                            <MUIMenuItem value="Employee 1">
-                              Employee 1
-                            </MUIMenuItem>
-                            <MUIMenuItem value="Employee 2">
-                              Employee 2
-                            </MUIMenuItem>
-                            <MUIMenuItem value="Employee 3">
-                              Employee 3
-                            </MUIMenuItem>
+                            {employees.map((employee) => (
+                              <MUIMenuItem
+                                key={employee.id}
+                                value={employee.id}
+                              >
+                                {employee.name}
+                              </MUIMenuItem>
+                            ))}
                           </Select>
                         </FormControl>
                       </Grid>
@@ -682,12 +864,111 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
               <DialogActions sx={{ justifyContent: "center", pb: 4 }}>
                 <Button type="submit" variant="contained" size="small">
-                  {loading ? "Saving..." : "Save"}
+                  {loading ? UI_TEXT.SAVING : UI_TEXT.SAVE}
                 </Button>
                 <Button variant="contained" size="small" onClick={handleClose}>
-                  Cancel
+                  {UI_TEXT.CANCEL}
                 </Button>
               </DialogActions>
+
+              <Dialog
+                open={addCustomerOpen}
+                onClose={() => {
+                  if (!addingCustomer) {
+                    setAddCustomerOpen(false);
+                    resetNewCustomerForm();
+                  }
+                }}
+                fullWidth
+                maxWidth="sm"
+              >
+                <DialogTitle>Add New Customer</DialogTitle>
+                <DialogContent>
+                  <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                    <Grid size={12}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Customer Name"
+                        value={newCustomerForm.name}
+                        error={!!newCustomerError}
+                        helperText={newCustomerError || ""}
+                        onChange={(e) => {
+                          setNewCustomerForm((prev) => ({
+                            ...prev,
+                            name: e.target.value,
+                          }));
+                          if (newCustomerError) setNewCustomerError("");
+                        }}
+                      />
+                    </Grid>
+                    <Grid size={12}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Mobile Number"
+                        value={newCustomerForm.mobileNumber}
+                        onChange={(e) =>
+                          setNewCustomerForm((prev) => ({
+                            ...prev,
+                            mobileNumber: e.target.value,
+                          }))
+                        }
+                      />
+                    </Grid>
+                    <Grid size={12}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Address"
+                        value={newCustomerForm.address}
+                        onChange={(e) =>
+                          setNewCustomerForm((prev) => ({
+                            ...prev,
+                            address: e.target.value,
+                          }))
+                        }
+                      />
+                    </Grid>
+                    <Grid size={12}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Notes"
+                        multiline
+                        rows={3}
+                        value={newCustomerForm.notes}
+                        onChange={(e) =>
+                          setNewCustomerForm((prev) => ({
+                            ...prev,
+                            notes: e.target.value,
+                          }))
+                        }
+                      />
+                    </Grid>
+                  </Grid>
+                </DialogContent>
+                <DialogActions>
+                  <Button
+                    onClick={() => {
+                      setAddCustomerOpen(false);
+                      resetNewCustomerForm();
+                    }}
+                    disabled={addingCustomer}
+                  >
+                    {UI_TEXT.CANCEL}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={() => {
+                      void handleCreateCustomer(setFieldValue);
+                    }}
+                    disabled={addingCustomer}
+                  >
+                    {addingCustomer ? UI_TEXT.SAVING : UI_TEXT.SAVE}
+                  </Button>
+                </DialogActions>
+              </Dialog>
             </form>
           );
         }}

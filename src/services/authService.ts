@@ -1,5 +1,7 @@
 import axiosClient from "./axiosClient";
 import { storage, storageKey } from "../utils/storage";
+import API_ROUTES from "../constants/apiRoutes";
+import { API_ERRORS } from "../constants/messages";
 
 export interface LoginRequest {
   userName: string;
@@ -35,7 +37,7 @@ const authService = {
    */
   login: async (credentials: LoginRequest): Promise<LoginResponse> => {
     try {
-      const { data } = await axiosClient.post<LoginResponse>("/login", {
+      const { data } = await axiosClient.post<LoginResponse>(API_ROUTES.LOGIN, {
         userName: credentials.userName,
         password: credentials.password,
       });
@@ -59,10 +61,10 @@ const authService = {
         typeof (error as { response?: { data?: { message?: string } } })
           .response?.data?.message === "string"
           ? (error as { response?: { data?: { message?: string } } }).response
-              ?.data?.message || "Login failed. Please try again."
+              ?.data?.message || API_ERRORS.LOGIN_FAILED
           : error instanceof Error
             ? error.message
-            : "Login failed. Please try again.";
+            : API_ERRORS.LOGIN_FAILED;
       throw new Error(message);
     }
   },
@@ -74,7 +76,7 @@ const authService = {
     storage.removeToken(storageKey.TOKEN);
     localStorage.removeItem("user");
     // Redirect handled by axios interceptor or manually
-    window.location.href = "/login";
+    window.location.href = API_ROUTES.LOGIN;
   },
 
   /**

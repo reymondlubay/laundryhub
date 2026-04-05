@@ -4,12 +4,12 @@ import {
   FaShoppingCart,
   FaWarehouse,
   FaUsers,
-  FaUserTie,
 } from "react-icons/fa";
 import { Box, Typography } from "@mui/material";
 import { useThemeContext } from "../../ThemeContext/ThemeContext";
 import { Link, useLocation } from "react-router-dom";
 import route from "../../../constants/route";
+import authService from "../../../services/authService";
 import "./sidebar.scss";
 import { useSidebar } from "./SidebarContext";
 
@@ -17,6 +17,8 @@ export default function SidebarMenu() {
   const { darkMode } = useThemeContext();
   const { collapsed } = useSidebar();
   const location = useLocation();
+  const currentUser = authService.getCurrentUser();
+  const isAdmin = currentUser?.role === "Admin";
 
   const activePath = location.pathname;
 
@@ -147,9 +149,9 @@ export default function SidebarMenu() {
         </MenuItem>
 
         <MenuItem
-          component={<Link to={route.INVENTORY} />}
+          component={<Link to={route.SETTINGS} />}
           icon={<FaWarehouse />}
-          active={activePath === route.INVENTORY}
+          active={activePath === route.SETTINGS}
         >
           Inventory
         </MenuItem>
@@ -185,8 +187,15 @@ export default function SidebarMenu() {
           },
         }}
       >
-        <MenuItem icon={<FaUserTie />}>Employee</MenuItem>
-        <MenuItem icon={<FaUsers />}>Users</MenuItem>
+        {isAdmin ? (
+          <MenuItem
+            component={<Link to={route.USERS} />}
+            icon={<FaUsers />}
+            active={activePath === route.USERS}
+          >
+            Users
+          </MenuItem>
+        ) : null}
         <MenuItem icon={<FaWarehouse />}>Settings</MenuItem>
       </Menu>
     </Sidebar>

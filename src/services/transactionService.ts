@@ -1,4 +1,6 @@
 import axiosClient from "./axiosClient";
+import API_ROUTES from "../constants/apiRoutes";
+import { API_ERRORS } from "../constants/messages";
 
 export interface LoadDetail {
   id: string;
@@ -54,7 +56,14 @@ export interface Transaction {
 export interface CreateTransactionRequest {
   customerId: string;
   dateReceived: string;
+  dateLoaded?: string;
+  datePickup?: string;
   isDelivered?: boolean;
+  whitePrice?: number;
+  fabconQty?: number;
+  detergentQty?: number;
+  colorSafeQty?: number;
+  releasedBy?: string;
   notes?: string;
   loadDetails: Array<{
     type: string;
@@ -70,9 +79,16 @@ export interface CreateTransactionRequest {
 }
 
 export interface UpdateTransactionRequest {
+  customerId?: string;
+  dateReceived?: string;
   isDelivered?: boolean;
   dateLoaded?: string;
   datePickup?: string;
+  whitePrice?: number;
+  fabconQty?: number;
+  detergentQty?: number;
+  colorSafeQty?: number;
+  releasedBy?: string;
   notes?: string;
   loadDetails?: Array<{
     type: string;
@@ -96,7 +112,9 @@ const transactionService = {
     date?: string;
   }): Promise<Transaction[]> => {
     try {
-      const response = await axiosClient.get("/transactions", { params });
+      const response = await axiosClient.get(API_ROUTES.TRANSACTIONS, {
+        params,
+      });
       const { data } = response;
 
       if (!data || response.status === 204) {
@@ -104,12 +122,24 @@ const transactionService = {
       }
 
       return data.data || data.transactions || [];
-    } catch (error: any) {
-      if (error?.response?.status === 204) {
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        (error as { response?: { status?: number } }).response?.status === 204
+      ) {
         return [];
       }
       throw new Error(
-        error?.response?.data?.message || "Failed to fetch transactions",
+        typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { data?: { message?: string } } })
+            .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.FETCH_TRANSACTIONS_FAILED
+          : API_ERRORS.FETCH_TRANSACTIONS_FAILED,
       );
     }
   },
@@ -117,11 +147,20 @@ const transactionService = {
   // Get transaction by ID
   getById: async (id: string): Promise<Transaction> => {
     try {
-      const { data } = await axiosClient.get(`/transactions/${id}`);
+      const { data } = await axiosClient.get(
+        `${API_ROUTES.TRANSACTIONS}/${id}`,
+      );
       return data.data || data.transaction;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw new Error(
-        error?.response?.data?.message || "Failed to fetch transaction",
+        typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { data?: { message?: string } } })
+            .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.FETCH_TRANSACTION_FAILED
+          : API_ERRORS.FETCH_TRANSACTION_FAILED,
       );
     }
   },
@@ -131,11 +170,21 @@ const transactionService = {
     transaction: CreateTransactionRequest,
   ): Promise<Transaction> => {
     try {
-      const { data } = await axiosClient.post("/transactions", transaction);
+      const { data } = await axiosClient.post(
+        API_ROUTES.TRANSACTIONS,
+        transaction,
+      );
       return data.data || data.transaction;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw new Error(
-        error?.response?.data?.message || "Failed to create transaction",
+        typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { data?: { message?: string } } })
+            .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.CREATE_TRANSACTION_FAILED
+          : API_ERRORS.CREATE_TRANSACTION_FAILED,
       );
     }
   },
@@ -147,13 +196,20 @@ const transactionService = {
   ): Promise<Transaction> => {
     try {
       const { data } = await axiosClient.put(
-        `/transactions/${id}`,
+        `${API_ROUTES.TRANSACTIONS}/${id}`,
         transaction,
       );
       return data.data || data.transaction;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw new Error(
-        error?.response?.data?.message || "Failed to update transaction",
+        typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { data?: { message?: string } } })
+            .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.UPDATE_TRANSACTION_FAILED
+          : API_ERRORS.UPDATE_TRANSACTION_FAILED,
       );
     }
   },
@@ -161,10 +217,17 @@ const transactionService = {
   // Delete transaction
   delete: async (id: string): Promise<void> => {
     try {
-      await axiosClient.delete(`/transactions/${id}`);
-    } catch (error: any) {
+      await axiosClient.delete(`${API_ROUTES.TRANSACTIONS}/${id}`);
+    } catch (error: unknown) {
       throw new Error(
-        error?.response?.data?.message || "Failed to delete transaction",
+        typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { data?: { message?: string } } })
+            .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.DELETE_TRANSACTION_FAILED
+          : API_ERRORS.DELETE_TRANSACTION_FAILED,
       );
     }
   },

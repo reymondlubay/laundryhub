@@ -21,6 +21,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import { useState } from "react";
 import type { Payment } from "../../services/apiTypes";
 import dayjs from "dayjs";
+import { CONFIRM_MESSAGES, UI_TEXT } from "../../constants/messages";
 
 type PaymentTableProps = {
   payments: Payment[];
@@ -171,24 +172,21 @@ export const PaymentTable: React.FC<PaymentTableProps> = ({
       >
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
-          <Typography>
-            Are you sure you want to delete this payment? This action cannot be
-            undone.
-          </Typography>
+          <Typography>{CONFIRM_MESSAGES.DELETE_PAYMENT}</Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2, gap: 1 }}>
           <Button
             variant="outlined"
             onClick={() => setDeleteConfirmOpen(false)}
           >
-            Cancel
+            {UI_TEXT.CANCEL}
           </Button>
           <Button
             variant="contained"
             color="error"
             onClick={handleConfirmDelete}
           >
-            Delete
+            {UI_TEXT.DELETE}
           </Button>
         </DialogActions>
       </Dialog>

@@ -7,7 +7,16 @@ export type LaundryItem = {
   price: number;
 };
 
-export type PaymentMode = "Cash" | "GCash";
+import {
+  DEFAULT_PAYMENT_MODE as SHARED_DEFAULT_PAYMENT_MODE,
+  PAYMENT_MODE_GCASH,
+  PAYMENT_MODE_OPTIONS,
+} from "../constants/payment";
+
+export type PaymentMode = (typeof PAYMENT_MODE_OPTIONS)[number];
+
+export const DEFAULT_PAYMENT_MODE: PaymentMode = SHARED_DEFAULT_PAYMENT_MODE;
+export const PAYMENT_MODE_GCASH_VALUE: PaymentMode = PAYMENT_MODE_GCASH;
 
 export type Payment = {
   id: string;

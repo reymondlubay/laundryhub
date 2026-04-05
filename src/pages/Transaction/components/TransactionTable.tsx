@@ -22,6 +22,11 @@ import { themeQuartz } from "ag-grid-community";
 import { useThemeContext } from "../../../components/ThemeContext/ThemeContext";
 import transactionService from "../../../services/transactionService";
 import type { Transaction } from "../../../services/transactionService";
+import {
+  CONFIRM_MESSAGES,
+  EMPTY_STATES,
+  UI_TEXT,
+} from "../../../constants/messages";
 import "./TransactionTable.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -31,7 +36,10 @@ interface FlatTransactionRow {
   transactionId: string;
   isFirstRow: boolean;
   isLastRow: boolean;
+  hasDateLoaded: boolean;
+  hasDatePickup: boolean;
   dateReceived: string | null;
+  dateLoaded: string | null;
   customer: string;
   loadType: string;
   kg: number;
@@ -52,6 +60,24 @@ interface FlatTransactionRow {
   action: string;
 }
 
+const STATUS_CELL_STYLES = {
+  loaded: {
+    backgroundColor: "#d8f0d2",
+    color: "#111111",
+  },
+  picked: {
+    backgroundColor: "#ffe7b3",
+    color: "#111111",
+  },
+} as const;
+
+const getStatusCellStyle = (row?: FlatTransactionRow) => {
+  if (!row) return undefined;
+  if (row.hasDatePickup) return STATUS_CELL_STYLES.picked;
+  if (row.hasDateLoaded) return STATUS_CELL_STYLES.loaded;
+  return undefined;
+};
+
 const formatAmount = (amount: number): string => {
   return Number.isInteger(amount) ? `${amount}` : amount.toFixed(2);
 };
@@ -65,12 +91,19 @@ function flattenTransactionRows(
 ): FlatTransactionRow[] {
   const tx = transaction as Transaction & {
     datereceived?: string;
+    dateloaded?: string;
+    isdelivered?: boolean;
     datepickup?: string;
   };
 
+  const isDelivered = Boolean(transaction.isDelivered ?? tx.isdelivered);
+
   const transactionId = transaction.id;
   const dateReceived = tx.dateReceived || tx.datereceived || null;
+  const dateLoaded = tx.dateLoaded || tx.dateloaded || null;
   const datePickup = tx.datePickup || tx.datepickup || null;
+  const hasDateLoaded = Boolean(dateLoaded);
+  const hasDatePickup = Boolean(datePickup);
   const customerName = transaction.customer?.name || "Unknown";
 
   const loadDetails = transaction.loadDetails || [];
@@ -140,7 +173,10 @@ function flattenTransactionRows(
         transactionId,
         isFirstRow: true,
         isLastRow: true,
+        hasDateLoaded,
+        hasDatePickup,
         dateReceived,
+        dateLoaded,
         customer: customerName,
         loadType: "",
         kg: totalKg,
@@ -156,7 +192,7 @@ function flattenTransactionRows(
         fabconQty,
         detergentQty,
         colorSafeQty,
-        isDelivered: !!transaction.isDelivered,
+        isDelivered,
         releasedBy,
         action: "",
       },
@@ -172,7 +208,10 @@ function flattenTransactionRows(
       transactionId,
       isFirstRow,
       isLastRow: index === loadDetails.length - 1,
+      hasDateLoaded,
+      hasDatePickup,
       dateReceived: isFirstRow ? dateReceived : null,
+      dateLoaded: isFirstRow ? dateLoaded : null,
       customer: customerName,
       loadType: type,
       kg: Number(load.kg || 0),
@@ -188,7 +227,7 @@ function flattenTransactionRows(
       fabconQty: isFirstRow ? fabconQty : 0,
       detergentQty: isFirstRow ? detergentQty : 0,
       colorSafeQty: isFirstRow ? colorSafeQty : 0,
-      isDelivered: isFirstRow ? !!transaction.isDelivered : false,
+      isDelivered: isFirstRow ? isDelivered : false,
       releasedBy: isFirstRow ? releasedBy : "",
       action: "",
     };
@@ -215,9 +254,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
 
   const handleDeleteTransaction = useCallback(
     async (transactionId: string) => {
-      const confirmed = window.confirm(
-        "Are you sure you want to delete this transaction?",
-      );
+      const confirmed = window.confirm(CONFIRM_MESSAGES.DELETE_TRANSACTION);
 
       if (!confirmed) return;
 
@@ -255,12 +292,16 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
           params.data?.isFirstRow && params.value ? (
             <Box
               sx={{
+                ...getStatusCellStyle(params.data),
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "flex-start",
                 justifyContent: "center",
+                width: "100%",
                 padding: 0.5,
+                px: 1,
                 lineHeight: 1.5,
+                borderRadius: 1,
               }}
             >
               <span>{dayjs(params.value).format("MM-DD-YY")}</span>
@@ -322,6 +363,31 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
           if (!params.data?.isFirstRow || params.value == null) return "";
           return `₱${Number(params.value).toFixed(2)}`;
         },
+      },
+      {
+        headerName: "Date Loaded",
+        field: "dateLoaded",
+        width: 130,
+        sortable: false,
+        suppressMovable: true,
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) =>
+          params.data?.isFirstRow && params.value ? (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: 0.5,
+                lineHeight: 1.5,
+              }}
+            >
+              <span>{dayjs(params.value).format("MM-DD-YY")}</span>
+              <span>{dayjs(params.value).format("h:mm A")}</span>
+            </Box>
+          ) : (
+            ""
+          ),
       },
       {
         headerName: "Date Paid",
@@ -469,12 +535,18 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
         suppressMovable: true,
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
           if (!params.data?.isFirstRow) return "";
-          const { whitePrice, fabconQty, detergentQty, colorSafeQty } =
-            params.data;
+          const {
+            whitePrice,
+            fabconQty,
+            detergentQty,
+            colorSafeQty,
+            isDelivered,
+          } = params.data;
           const noteText =
             params.value && params.value !== "-" ? String(params.value) : "";
           const details: string[] = [];
 
+          if (isDelivered) details.push("Delivery");
           if (whitePrice > 0)
             details.push(`Add White +${formatAmount(whitePrice)}`);
           if (fabconQty > 0) details.push(`Fabcon x${fabconQty}`);
@@ -506,7 +578,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
               >
                 <InfoOutlinedIcon sx={{ fontSize: 16, color: "#f44336" }} />
                 <span style={{ color: "#f44336", fontWeight: 600 }}>
-                  Read Notes
+                  {UI_TEXT.READ_NOTES}
                 </span>
               </Stack>
             </Tooltip>
@@ -654,7 +726,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
             opacity: 0.6,
           }}
         >
-          No transactions found.
+          {EMPTY_STATES.NO_TRANSACTIONS}
         </Box>
       ) : (
         <AgGridReact<FlatTransactionRow>

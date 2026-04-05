@@ -11,6 +11,8 @@ import {
   Paper,
 } from "@mui/material";
 import authService from "../../services/authService";
+import route from "../../constants/route";
+import { API_ERRORS, FORM_ERRORS, UI_TEXT } from "../../constants/messages";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -29,7 +31,7 @@ const Login: React.FC = () => {
 
     // Validate
     if (!validateForm()) {
-      setError("Please enter both username and password");
+      setError(FORM_ERRORS.REQUIRED_USERNAME_AND_PASSWORD);
       return;
     }
 
@@ -43,9 +45,9 @@ const Login: React.FC = () => {
       });
 
       // Redirect to dashboard
-      navigate("/dashboard");
-    } catch (err: any) {
-      setError(err?.message || "Login failed. Please try again.");
+      navigate(route.DASHBOARD);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : API_ERRORS.LOGIN_FAILED);
     } finally {
       setLoading(false);
     }
@@ -56,10 +58,14 @@ const Login: React.FC = () => {
   };
 
   const userNameError =
-    touched.userName && userName.trim() === "" ? "Username is required" : "";
+    touched.userName && userName.trim() === ""
+      ? FORM_ERRORS.REQUIRED_USERNAME
+      : "";
 
   const passwordError =
-    touched.password && password.trim() === "" ? "Password is required" : "";
+    touched.password && password.trim() === ""
+      ? FORM_ERRORS.REQUIRED_PASSWORD
+      : "";
 
   return (
     <Container maxWidth="sm">
@@ -150,7 +156,7 @@ const Login: React.FC = () => {
                 position: "relative",
               }}
             >
-              {loading ? <CircularProgress size={24} /> : "Sign In"}
+              {loading ? <CircularProgress size={24} /> : UI_TEXT.SIGN_IN}
             </Button>
           </form>
 

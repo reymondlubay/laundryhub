@@ -18,6 +18,12 @@ import dayjs, { Dayjs } from "dayjs";
 import { useState, useEffect } from "react";
 import * as Yup from "yup";
 import type { Payment, PaymentMode } from "../../services/apiTypes";
+import {
+  DEFAULT_PAYMENT_MODE,
+  PAYMENT_MODE_CASH,
+  PAYMENT_MODE_GCASH,
+} from "../../constants/payment";
+import { UI_TEXT } from "../../constants/messages";
 
 type PaymentModalProps = {
   isOpen: boolean;
@@ -44,7 +50,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 }) => {
   const [paymentDate, setPaymentDate] = useState<Dayjs>(dayjs());
   const [amount, setAmount] = useState<string>("");
-  const [mode, setMode] = useState<PaymentMode>("Cash");
+  const [mode, setMode] = useState<PaymentMode>(DEFAULT_PAYMENT_MODE);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -55,7 +61,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     } else {
       setPaymentDate(dayjs());
       setAmount("");
-      setMode("Cash");
+      setMode(DEFAULT_PAYMENT_MODE);
     }
     setErrors({});
   }, [editingPayment, isEditMode, isOpen]);
@@ -142,18 +148,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             label="Payment Mode"
             onChange={(e) => setMode(e.target.value as PaymentMode)}
           >
-            <MenuItem value="Cash">Cash</MenuItem>
-            <MenuItem value="GCash">GCash</MenuItem>
+            <MenuItem value={PAYMENT_MODE_CASH}>{PAYMENT_MODE_CASH}</MenuItem>
+            <MenuItem value={PAYMENT_MODE_GCASH}>{PAYMENT_MODE_GCASH}</MenuItem>
           </Select>
         </FormControl>
       </DialogContent>
 
       <DialogActions sx={{ p: 2, gap: 1 }}>
         <Button variant="outlined" onClick={handleClose}>
-          Cancel
+          {UI_TEXT.CANCEL}
         </Button>
         <Button variant="contained" onClick={handleSave}>
-          {isEditMode ? "Update" : "Save"}
+          {isEditMode ? UI_TEXT.UPDATE : UI_TEXT.SAVE}
         </Button>
       </DialogActions>
     </Dialog>

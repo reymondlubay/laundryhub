@@ -1,9 +1,12 @@
 import React from "react";
 import TransactionTable from "./components/TransactionTable";
 import {
+  Box,
   Button,
   Grid,
+  Stack,
   TextField,
+  Typography,
   InputAdornment,
   IconButton,
 } from "@mui/material";
@@ -154,6 +157,42 @@ const Transaction = () => {
           </Button>
         </Grid>
       </Grid>
+
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5 }}>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Stack direction="row" spacing={0.75} alignItems="center">
+            <Box
+              sx={{
+                width: 10,
+                height: 10,
+                minWidth: 10,
+                borderRadius: "50%",
+                border: "1px solid rgba(0, 0, 0, 0.25)",
+                backgroundColor: "#d8f0d2",
+              }}
+            />
+            <Typography variant="caption" sx={{ fontWeight: 700 }}>
+              Loaded
+            </Typography>
+          </Stack>
+
+          <Stack direction="row" spacing={0.75} alignItems="center">
+            <Box
+              sx={{
+                width: 10,
+                height: 10,
+                minWidth: 10,
+                borderRadius: "50%",
+                border: "1px solid rgba(0, 0, 0, 0.25)",
+                backgroundColor: "#ffe7b3",
+              }}
+            />
+            <Typography variant="caption" sx={{ fontWeight: 700 }}>
+              Picked
+            </Typography>
+          </Stack>
+        </Stack>
+      </Box>
 
       <TransactionTable
         transactions={transactions}
