@@ -15,6 +15,10 @@ import route from "./constants/route";
 const TransactionPage = lazy(() => import("./pages/Transaction/Transaction"));
 const UsersPage = lazy(() => import("./pages/Users/Users"));
 const CustomerPage = lazy(() => import("./pages/Customer/Customer"));
+const TransactionReportPage = lazy(
+  () => import("./pages/Reports/TransactionReport"),
+);
+const CustomerReportPage = lazy(() => import("./pages/Reports/CustomerReport"));
 
 function App() {
   return (
@@ -77,6 +81,30 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <UsersPage />
+                  </Suspense>
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={route.REPORT_TRANSACTION}
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <TransactionReportPage />
+                  </Suspense>
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={route.REPORT_CUSTOMER}
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <CustomerReportPage />
                   </Suspense>
                 </MainLayout>
               </ProtectedRoute>
