@@ -4,6 +4,8 @@ const route = {
   CUSTOMER: "/customer",
   DASHBOARD: "/dashboard",
   TRANSACTION: "/transaction",
+  REPORT_TRANSACTION: "/reports/transaction",
+  REPORT_CUSTOMER: "/reports/customer",
   USERS: "/users",
   SETTINGS: "/settings",
   LOGS: "/logs",

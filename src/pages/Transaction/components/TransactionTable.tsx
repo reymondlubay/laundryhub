@@ -699,7 +699,12 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   return (
     <div
       className="transaction-grouped-grid"
-      style={{ height: "85vh", width: "100%", position: "relative" }}
+      style={{
+        height: "calc(100vh - 200px)",
+        minHeight: 400,
+        width: "100%",
+        position: "relative",
+      }}
     >
       {loading && (
         <Box
@@ -722,7 +727,8 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            height: "85vh",
+            height: "calc(100vh - 200px)",
+            minHeight: 400,
             opacity: 0.6,
           }}
         >

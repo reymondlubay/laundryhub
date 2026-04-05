@@ -1,6 +1,7 @@
-import { Sidebar, Menu, MenuItem } from "react-pro-sidebar";
+import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
 import {
   FaChartBar,
+  FaFileAlt,
   FaShoppingCart,
   FaWarehouse,
   FaUsers,
@@ -122,6 +123,13 @@ export default function SidebarMenu() {
               color: "#3b82f6",
             },
           }),
+          subMenuContent: {
+            backgroundColor: darkMode
+              ? "rgba(10, 10, 10, 0.55)"
+              : "rgba(245, 249, 255, 0.9)",
+            borderRadius: 8,
+            margin: "2px 8px",
+          },
         }}
       >
         <MenuItem
@@ -147,6 +155,32 @@ export default function SidebarMenu() {
         >
           Customer
         </MenuItem>
+
+        <SubMenu
+          label="Report"
+          icon={<FaFileAlt />}
+          defaultOpen={activePath.startsWith("/reports")}
+          rootStyles={{
+            color: activePath.startsWith("/reports")
+              ? "#3b82f6"
+              : darkMode
+                ? "#f3f4f6"
+                : "#1f2937",
+          }}
+        >
+          <MenuItem
+            component={<Link to={route.REPORT_TRANSACTION} />}
+            active={activePath === route.REPORT_TRANSACTION}
+          >
+            Transaction Report
+          </MenuItem>
+          <MenuItem
+            component={<Link to={route.REPORT_CUSTOMER} />}
+            active={activePath === route.REPORT_CUSTOMER}
+          >
+            Customer Report
+          </MenuItem>
+        </SubMenu>
 
         <MenuItem
           component={<Link to={route.SETTINGS} />}

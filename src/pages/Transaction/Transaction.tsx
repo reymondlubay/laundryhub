@@ -65,7 +65,7 @@ const Transaction = () => {
       {/* Toolbar */}
       <Grid container spacing={1} alignItems="center" sx={{ mb: 2 }}>
         {/* Customer search */}
-        <Grid size="auto" sx={{ minWidth: 240 }}>
+        <Grid size={{ xs: 12, sm: "auto" }} sx={{ minWidth: { sm: 240 } }}>
           <TextField
             size="small"
             fullWidth
@@ -98,7 +98,7 @@ const Transaction = () => {
         </Grid>
 
         {/* Month filter */}
-        <Grid size="auto">
+        <Grid size={{ xs: 12, sm: "auto" }}>
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DatePicker
               label="Filter by month"
@@ -146,12 +146,13 @@ const Transaction = () => {
 
         {/* Spacer + Add button */}
         <Grid size="grow" />
-        <Grid size="auto">
+        <Grid size={{ xs: 12, sm: "auto" }}>
           <Button
             onClick={handleOpenTransaction}
             variant="contained"
             color="primary"
             size="small"
+            fullWidth
           >
             Add New Transaction
           </Button>

@@ -20,6 +20,8 @@ import {
   Tooltip,
   Alert,
   Snackbar,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -103,6 +105,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   transaction,
   onSaved,
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [customers, setCustomers] = React.useState<Customer[]>([]);
   const [employees, setEmployees] = React.useState<EmployeeOption[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -371,7 +375,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   };
 
   return (
-    <Dialog open={isOpen} maxWidth="lg" fullWidth>
+    <Dialog open={isOpen} maxWidth="lg" fullWidth fullScreen={isMobile}>
       <DialogTitle>
         {isEditing ? "Edit Transaction" : "Transaction"}
       </DialogTitle>
@@ -472,10 +476,13 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             <form onSubmit={handleSubmit}>
               <Grid container spacing={0}>
                 {/* LEFT */}
-                <Grid size={8} sx={{ pl: 2, pr: 0 }}>
-                  <Paper elevation={1} sx={{ p: 4 }}>
+                <Grid
+                  size={{ xs: 12, md: 8 }}
+                  sx={{ pl: { xs: 1, md: 2 }, pr: 0 }}
+                >
+                  <Paper elevation={1} sx={{ p: { xs: 2, md: 4 } }}>
                     <Grid container spacing={2}>
-                      <Grid size={6}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
                         <Grid
                           container
                           spacing={1}
@@ -532,14 +539,14 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         </Grid>
                       </Grid>
 
-                      <Grid size={6}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
                         {renderDatePicker("receiveDate", "Date Received")}
                       </Grid>
-                      <Grid size={6}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
                         {renderDatePicker("dateLoaded", "Date Loaded")}
                       </Grid>
 
-                      <Grid size={6} textAlign="center">
+                      <Grid size={{ xs: 12, sm: 6 }} textAlign="center">
                         <FormControlLabel
                           control={
                             <Checkbox
@@ -595,7 +602,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                   alignItems="center"
                                   sx={{ mb: 1 }}
                                 >
-                                  <Grid size={3}>
+                                  <Grid size={{ xs: 12, sm: 3 }}>
                                     <FormControl fullWidth size="small">
                                       <InputLabel>Type</InputLabel>
                                       <Select
@@ -621,7 +628,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                     </FormControl>
                                   </Grid>
 
-                                  <Grid size={3}>
+                                  <Grid size={{ xs: 4, sm: 3 }}>
                                     <TextField
                                       label="KG"
                                       size="small"
@@ -650,7 +657,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                     />
                                   </Grid>
 
-                                  <Grid size={2}>
+                                  <Grid size={{ xs: 4, sm: 2 }}>
                                     <TextField
                                       label="Loads"
                                       size="small"
@@ -671,7 +678,12 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                     />
                                   </Grid>
 
-                                  <Grid size={3}>
+                                  <Grid
+                                    size={{
+                                      xs: values.items.length > 1 ? 3 : 4,
+                                      sm: 3,
+                                    }}
+                                  >
                                     <TextField
                                       label="Price"
                                       size="small"
@@ -700,7 +712,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                   </Grid>
 
                                   {values.items.length > 1 && (
-                                    <Grid size={1} textAlign="center">
+                                    <Grid
+                                      size={{ xs: 1, sm: 1 }}
+                                      textAlign="center"
+                                    >
                                       <Tooltip title="Delete Row">
                                         <IconButton
                                           color="error"
@@ -739,7 +754,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       <Grid size={12}>
                         <Divider>Ad Ons Details</Divider>
                       </Grid>
-                      <Grid size={3}>
+                      <Grid size={{ xs: 6, sm: 3 }}>
                         <TextField
                           label="White Price"
                           size="small"
@@ -773,7 +788,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           }}
                         />
                       </Grid>
-                      <Grid size={3}>
+                      <Grid size={{ xs: 6, sm: 3 }}>
                         <NumberField
                           label="Fabcon"
                           min={0}
@@ -783,7 +798,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           onValueChange={(val) => setFieldValue("fabcon", val)}
                         />
                       </Grid>
-                      <Grid size={3}>
+                      <Grid size={{ xs: 6, sm: 3 }}>
                         <NumberField
                           label="Detergent"
                           min={0}
@@ -795,7 +810,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           }
                         />
                       </Grid>
-                      <Grid size={3}>
+                      <Grid size={{ xs: 6, sm: 3 }}>
                         <NumberField
                           label="Color Safe"
                           min={0}
@@ -810,11 +825,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         <Divider>Release Details</Divider>
                       </Grid>
 
-                      <Grid size={6}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
                         {renderDatePicker("datePickup", "Date Pickup")}
                       </Grid>
 
-                      <Grid size={6}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
                         <FormControl fullWidth size="small">
                           <InputLabel>Release By</InputLabel>
                           <Select
@@ -853,7 +868,14 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 </Grid>
 
                 {/* RIGHT */}
-                <Grid size={4} sx={{ pr: 2, pl: 0.5 }}>
+                <Grid
+                  size={{ xs: 12, md: 4 }}
+                  sx={{
+                    pr: { xs: 1, md: 2 },
+                    pl: { xs: 1, md: 0.5 },
+                    pt: { xs: 1, md: 0 },
+                  }}
+                >
                   <BillSummary
                     transactionFormValues={values}
                     payments={payments}
