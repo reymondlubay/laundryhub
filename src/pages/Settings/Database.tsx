@@ -41,7 +41,7 @@ const DatabaseSettings: React.FC = () => {
   const isAdmin = currentUser?.role === "Admin";
 
   const [backups, setBackups] = React.useState<BackupItem[]>([]);
-  const [loading, setLoading] = React.useState(false);
+  const [initialLoading, setInitialLoading] = React.useState(true);
   const [creating, setCreating] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -61,9 +61,9 @@ const DatabaseSettings: React.FC = () => {
   const headColor = darkMode ? "#e7f0fa" : "#3b5b7a";
   const paperDialogBg = darkMode ? "#1d2530" : "#ffffff";
 
-  const fetchBackups = React.useCallback(async () => {
+  const fetchBackups = React.useCallback(async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) setInitialLoading(true);
       setError(null);
       const data = await backupService.getBackups();
       setBackups(data);
@@ -72,21 +72,26 @@ const DatabaseSettings: React.FC = () => {
         err instanceof Error ? err.message : "Failed to load backups.";
       setError(message);
     } finally {
-      setLoading(false);
+      if (isInitial) setInitialLoading(false);
     }
   }, []);
 
+  // Initial load
   React.useEffect(() => {
     if (!isAdmin) return;
+    void fetchBackups(true);
+  }, [fetchBackups, isAdmin]);
 
-    void fetchBackups();
+  // Poll only while a Pending operation is active
+  React.useEffect(() => {
+    if (!isAdmin || !hasPendingOperation) return;
 
     const timer = window.setInterval(() => {
       void fetchBackups();
-    }, 5000);
+    }, 3000);
 
     return () => window.clearInterval(timer);
-  }, [fetchBackups, isAdmin]);
+  }, [fetchBackups, isAdmin, hasPendingOperation]);
 
   const handleCreateBackup = async () => {
     try {
@@ -164,7 +169,7 @@ const DatabaseSettings: React.FC = () => {
         <Button
           variant="contained"
           onClick={handleCreateBackup}
-          disabled={creating || loading || hasPendingOperation}
+          disabled={creating || initialLoading || hasPendingOperation}
         >
           {creating ? "Starting..." : "Create Backup"}
         </Button>
@@ -177,7 +182,7 @@ const DatabaseSettings: React.FC = () => {
       ) : null}
 
       <Paper sx={{ bgcolor: surfaceColor, border: `1px solid ${borderColor}` }}>
-        {loading ? (
+        {initialLoading ? (
           <Box sx={{ p: 4, display: "flex", justifyContent: "center" }}>
             <CircularProgress />
           </Box>
