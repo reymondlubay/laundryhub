@@ -181,14 +181,6 @@ export default function SidebarMenu() {
             Customer Report
           </MenuItem>
         </SubMenu>
-
-        <MenuItem
-          component={<Link to={route.SETTINGS} />}
-          icon={<FaWarehouse />}
-          active={activePath === route.SETTINGS}
-        >
-          Inventory
-        </MenuItem>
       </Menu>
 
       {/* EXTRA SECTION */}
@@ -219,6 +211,13 @@ export default function SidebarMenu() {
               color: "#3b82f6",
             },
           },
+          subMenuContent: {
+            backgroundColor: darkMode
+              ? "rgba(10, 10, 10, 0.55)"
+              : "rgba(245, 249, 255, 0.9)",
+            borderRadius: 8,
+            margin: "2px 8px",
+          },
         }}
       >
         {isAdmin ? (
@@ -230,7 +229,27 @@ export default function SidebarMenu() {
             Users
           </MenuItem>
         ) : null}
-        <MenuItem icon={<FaWarehouse />}>Settings</MenuItem>
+        {isAdmin ? (
+          <SubMenu
+            label="Settings"
+            icon={<FaWarehouse />}
+            defaultOpen={activePath.startsWith("/settings")}
+            rootStyles={{
+              color: activePath.startsWith("/settings")
+                ? "#3b82f6"
+                : darkMode
+                  ? "#f3f4f6"
+                  : "#1f2937",
+            }}
+          >
+            <MenuItem
+              component={<Link to={route.SETTINGS} />}
+              active={activePath === route.SETTINGS}
+            >
+              Database
+            </MenuItem>
+          </SubMenu>
+        ) : null}
       </Menu>
     </Sidebar>
   );

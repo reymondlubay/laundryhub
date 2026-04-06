@@ -4,6 +4,9 @@ export const API_ROUTES = {
   TRANSACTIONS: "/transactions",
   USERS: "/users",
   CUSTOMERS: "/customers",
+  BACKUP: "/backup",
+  BACKUPS: "/backups",
+  RESTORE: "/restore",
 } as const;
 
 export default API_ROUTES;

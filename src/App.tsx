@@ -19,6 +19,7 @@ const TransactionReportPage = lazy(
   () => import("./pages/Reports/TransactionReport"),
 );
 const CustomerReportPage = lazy(() => import("./pages/Reports/CustomerReport"));
+const SettingsDatabasePage = lazy(() => import("./pages/Settings/Database"));
 
 function App() {
   return (
@@ -105,6 +106,18 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <CustomerReportPage />
+                  </Suspense>
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={route.SETTINGS}
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <SettingsDatabasePage />
                   </Suspense>
                 </MainLayout>
               </ProtectedRoute>

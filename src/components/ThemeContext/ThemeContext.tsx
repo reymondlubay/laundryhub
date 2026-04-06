@@ -1,12 +1,6 @@
 // src/context/ThemeContext.tsx
-import {
-  createContext,
-  useContext,
-  useMemo,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
+import { createContext, useContext, useMemo, useState, useEffect } from "react";
+import type { ReactNode } from "react";
 import { ThemeProvider, createTheme, CssBaseline } from "@mui/material";
 
 type ThemeContextType = {
@@ -41,7 +35,7 @@ export const CustomThemeProvider = ({ children }: { children: ReactNode }) => {
     const storedTheme = localStorage.getItem("darkMode");
     if (storedTheme === null) {
       const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
+        "(prefers-color-scheme: dark)",
       ).matches;
       setDarkMode(prefersDark);
       localStorage.setItem("darkMode", String(prefersDark));
@@ -56,7 +50,7 @@ export const CustomThemeProvider = ({ children }: { children: ReactNode }) => {
           mode: darkMode ? "dark" : "light",
         },
       }),
-    [darkMode]
+    [darkMode],
   );
 
   return (

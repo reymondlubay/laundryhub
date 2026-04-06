@@ -7,7 +7,7 @@ const route = {
   REPORT_TRANSACTION: "/reports/transaction",
   REPORT_CUSTOMER: "/reports/customer",
   USERS: "/users",
-  SETTINGS: "/settings",
+  SETTINGS: "/settings/database",
   LOGS: "/logs",
 };
 

@@ -25,7 +25,7 @@ type PaymentManagerProps = {
  * - onPaymentsChange: Callback function when payments list changes
  */
 export const PaymentManager: React.FC<PaymentManagerProps> = ({
-  transactionId,
+  transactionId: _transactionId,
   onPaymentsChange,
   initialPayments = [],
 }) => {
