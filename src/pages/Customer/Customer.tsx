@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -37,6 +36,10 @@ import customerService, {
   type UpdateCustomerPayload,
 } from "../../services/customerService";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog.tsx";
+import {
+  TableSkeleton,
+  TableHeaderSkeleton,
+} from "../../components/Skeletons/SkeletonComponents";
 
 type CustomerFormState = {
   name: string;
@@ -240,9 +243,12 @@ const CustomerPage: React.FC = () => {
 
       <Paper>
         {loading ? (
-          <Box sx={{ p: 4, display: "flex", justifyContent: "center" }}>
-            <CircularProgress />
-          </Box>
+          <TableContainer sx={{ maxHeight: 560 }}>
+            <Table size="small" stickyHeader>
+              <TableHeaderSkeleton columns={5} />
+              <TableSkeleton columns={5} rows={8} />
+            </Table>
+          </TableContainer>
         ) : (
           <>
             <TableContainer sx={{ maxHeight: 560 }}>

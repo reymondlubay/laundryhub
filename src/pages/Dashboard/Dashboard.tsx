@@ -2,7 +2,6 @@ import React from "react";
 import {
   Alert,
   Box,
-  CircularProgress,
   Grid,
   Paper,
   Stack,
@@ -13,6 +12,7 @@ import {
   TableHead,
   TableRow,
   Typography,
+  Skeleton,
 } from "@mui/material";
 import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
@@ -22,6 +22,11 @@ import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlin
 import LocalLaundryServiceOutlinedIcon from "@mui/icons-material/LocalLaundryServiceOutlined";
 import dayjs from "dayjs";
 import { useThemeContext } from "../../components/ThemeContext/ThemeContext";
+import {
+  DashboardCardsSkeleton,
+  TableSkeleton,
+  TableHeaderSkeleton,
+} from "../../components/Skeletons/SkeletonComponents";
 import transactionService, {
   type PaymentDetail,
   type Transaction,
@@ -337,9 +342,61 @@ const Dashboard = () => {
       ) : null}
 
       {loading ? (
-        <Box sx={{ py: 6, display: "flex", justifyContent: "center" }}>
-          <CircularProgress />
-        </Box>
+        <>
+          <DashboardCardsSkeleton count={6} />
+
+          <Grid container spacing={2} sx={{ mt: 2 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 1.25, sm: 2 },
+                  borderRadius: 3,
+                  bgcolor: surfaceColor,
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                <Skeleton
+                  variant="text"
+                  height={32}
+                  width="40%"
+                  sx={{ mb: 2 }}
+                />
+                <TableContainer sx={{ maxHeight: "25vh" }}>
+                  <Table size="small" stickyHeader>
+                    <TableHeaderSkeleton columns={3} />
+                    <TableSkeleton columns={3} rows={5} />
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 1.25, sm: 2 },
+                  borderRadius: 3,
+                  bgcolor: surfaceColor,
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                <Skeleton
+                  variant="text"
+                  height={32}
+                  width="40%"
+                  sx={{ mb: 2 }}
+                />
+                <TableContainer sx={{ maxHeight: "25vh" }}>
+                  <Table size="small" stickyHeader>
+                    <TableHeaderSkeleton columns={3} />
+                    <TableSkeleton columns={3} rows={5} />
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Grid>
+          </Grid>
+        </>
       ) : (
         <>
           <Grid container spacing={2}>

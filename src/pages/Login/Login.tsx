@@ -9,10 +9,13 @@ import {
   Typography,
   CircularProgress,
   Paper,
+  Skeleton,
+  Stack,
 } from "@mui/material";
 import authService from "../../services/authService";
 import route from "../../constants/route";
 import { API_ERRORS, FORM_ERRORS, UI_TEXT } from "../../constants/messages";
+import { FormFieldSkeleton } from "../../components/Skeletons/SkeletonComponents";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -114,51 +117,58 @@ const Login: React.FC = () => {
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit}>
-            <TextField
-              fullWidth
-              label="Username"
-              type="text"
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
-              onBlur={() => handleFieldBlur("userName")}
-              error={!!userNameError}
-              helperText={userNameError}
-              disabled={loading}
-              margin="normal"
-              autoComplete="username"
-              required
-            />
+          {loading ? (
+            <Stack spacing={2} sx={{ mt: 2 }}>
+              <FormFieldSkeleton rows={2} />
+              <Skeleton variant="rectangular" height={44} sx={{ mt: 3 }} />
+            </Stack>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              <TextField
+                fullWidth
+                label="Username"
+                type="text"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                onBlur={() => handleFieldBlur("userName")}
+                error={!!userNameError}
+                helperText={userNameError}
+                disabled={loading}
+                margin="normal"
+                autoComplete="username"
+                required
+              />
 
-            <TextField
-              fullWidth
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onBlur={() => handleFieldBlur("password")}
-              error={!!passwordError}
-              helperText={passwordError}
-              disabled={loading}
-              margin="normal"
-              autoComplete="current-password"
-              required
-            />
+              <TextField
+                fullWidth
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onBlur={() => handleFieldBlur("password")}
+                error={!!passwordError}
+                helperText={passwordError}
+                disabled={loading}
+                margin="normal"
+                autoComplete="current-password"
+                required
+              />
 
-            <Button
-              fullWidth
-              variant="contained"
-              type="submit"
-              disabled={loading}
-              sx={{
-                marginTop: 3,
-                padding: "10px 0",
-                position: "relative",
-              }}
-            >
-              {loading ? <CircularProgress size={24} /> : UI_TEXT.SIGN_IN}
-            </Button>
-          </form>
+              <Button
+                fullWidth
+                variant="contained"
+                type="submit"
+                disabled={loading}
+                sx={{
+                  marginTop: 3,
+                  padding: "10px 0",
+                  position: "relative",
+                }}
+              >
+                {loading ? <CircularProgress size={24} /> : UI_TEXT.SIGN_IN}
+              </Button>
+            </form>
+          )}
 
           <Typography
             variant="caption"

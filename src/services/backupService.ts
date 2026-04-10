@@ -27,8 +27,10 @@ const normalizeBackup = (raw: unknown): BackupItem => {
 };
 
 const backupService = {
-  createBackup: async (): Promise<void> => {
-    await axiosClient.post(API_ROUTES.BACKUP);
+  createBackup: async (folderPath?: string): Promise<void> => {
+    await axiosClient.post(API_ROUTES.BACKUP, {
+      folderPath: folderPath?.trim() || undefined,
+    });
   },
 
   getBackups: async (): Promise<BackupItem[]> => {
@@ -47,6 +49,22 @@ const backupService = {
 
   deleteBackup: async (id: string): Promise<void> => {
     await axiosClient.delete(`${API_ROUTES.BACKUP}/${id}`);
+  },
+
+  uploadBackup: async (file: File, folderPath?: string): Promise<void> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const normalizedPath = folderPath?.trim();
+    if (normalizedPath) {
+      formData.append("folderPath", normalizedPath);
+    }
+
+    await axiosClient.post(API_ROUTES.BACKUP_UPLOAD, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
   },
 };
 

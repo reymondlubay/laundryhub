@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -18,11 +17,18 @@ import {
   TableRow,
   TextField,
   Typography,
+  InputAdornment,
+  IconButton,
 } from "@mui/material";
+import ClearIcon from "@mui/icons-material/Clear";
 import dayjs from "dayjs";
 import authService from "../../services/authService";
 import backupService, { type BackupItem } from "../../services/backupService";
 import { useThemeContext } from "../../components/ThemeContext/ThemeContext";
+import {
+  TableSkeleton,
+  TableHeaderSkeleton,
+} from "../../components/Skeletons/SkeletonComponents";
 
 const formatSize = (bytes: number): string => {
   if (!bytes || bytes < 1) return "0 B";
@@ -43,6 +49,9 @@ const DatabaseSettings: React.FC = () => {
   const [backups, setBackups] = React.useState<BackupItem[]>([]);
   const [initialLoading, setInitialLoading] = React.useState(true);
   const [creating, setCreating] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const [backupFolderPath, setBackupFolderPath] = React.useState("");
+  const [uploadFile, setUploadFile] = React.useState<File | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   const [restoreId, setRestoreId] = React.useState<string | null>(null);
@@ -97,7 +106,7 @@ const DatabaseSettings: React.FC = () => {
     try {
       setCreating(true);
       setError(null);
-      await backupService.createBackup();
+      await backupService.createBackup(backupFolderPath);
       await fetchBackups();
     } catch (err: unknown) {
       const message =
@@ -105,6 +114,32 @@ const DatabaseSettings: React.FC = () => {
       setError(message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleUploadBackupFile = async () => {
+    if (!uploadFile) {
+      setError("Please select a .sql backup file to upload.");
+      return;
+    }
+
+    if (!uploadFile.name.toLowerCase().endsWith(".sql")) {
+      setError("Only .sql backup files are supported.");
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setError(null);
+      await backupService.uploadBackup(uploadFile, backupFolderPath);
+      setUploadFile(null);
+      await fetchBackups();
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to upload backup file.";
+      setError(message);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -169,11 +204,79 @@ const DatabaseSettings: React.FC = () => {
         <Button
           variant="contained"
           onClick={handleCreateBackup}
-          disabled={creating || initialLoading || hasPendingOperation}
+          disabled={
+            creating || uploading || initialLoading || hasPendingOperation
+          }
         >
           {creating ? "Starting..." : "Create Backup"}
         </Button>
       </Stack>
+
+      <Paper
+        sx={{
+          mb: 2,
+          p: 2,
+          bgcolor: surfaceColor,
+          border: `1px solid ${borderColor}`,
+        }}
+      >
+        <Stack spacing={1.5}>
+          <TextField
+            label="Backup Folder Path (optional)"
+            size="small"
+            fullWidth
+            value={backupFolderPath}
+            onChange={(e) => setBackupFolderPath(e.target.value)}
+            placeholder="e.g. D:/Backups"
+            helperText="Type path manually. Leave empty to use default backend backups folder."
+            slotProps={{
+              input: {
+                endAdornment: backupFolderPath ? (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="clear backup folder path"
+                      size="small"
+                      onClick={() => setBackupFolderPath("")}
+                    >
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ) : null,
+              },
+            }}
+          />
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <Button variant="outlined" component="label" disabled={uploading}>
+              {uploadFile ? uploadFile.name : "Select Backup File (.sql)"}
+              <input
+                hidden
+                type="file"
+                accept=".sql"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  setUploadFile(file);
+                }}
+              />
+            </Button>
+
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleUploadBackupFile}
+              disabled={
+                !uploadFile ||
+                uploading ||
+                creating ||
+                initialLoading ||
+                hasPendingOperation
+              }
+            >
+              {uploading ? "Uploading..." : "Upload Backup File"}
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
 
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -183,9 +286,12 @@ const DatabaseSettings: React.FC = () => {
 
       <Paper sx={{ bgcolor: surfaceColor, border: `1px solid ${borderColor}` }}>
         {initialLoading ? (
-          <Box sx={{ p: 4, display: "flex", justifyContent: "center" }}>
-            <CircularProgress />
-          </Box>
+          <TableContainer>
+            <Table size="small">
+              <TableHeaderSkeleton columns={5} />
+              <TableSkeleton columns={5} rows={5} />
+            </Table>
+          </TableContainer>
         ) : (
           <TableContainer>
             <Table size="small">

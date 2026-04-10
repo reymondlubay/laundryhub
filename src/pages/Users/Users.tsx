@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -53,6 +52,10 @@ import userService, {
   type UserStatus,
 } from "../../services/userService";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog.tsx";
+import {
+  TableSkeleton,
+  TableHeaderSkeleton,
+} from "../../components/Skeletons/SkeletonComponents";
 
 type UserFormState = {
   firstName: string;
@@ -266,9 +269,12 @@ const Users: React.FC = () => {
 
       <Paper>
         {loading ? (
-          <Box sx={{ p: 4, display: "flex", justifyContent: "center" }}>
-            <CircularProgress />
-          </Box>
+          <TableContainer sx={{ maxHeight: 560 }}>
+            <Table size="small" stickyHeader>
+              <TableHeaderSkeleton columns={7} />
+              <TableSkeleton columns={7} rows={8} />
+            </Table>
+          </TableContainer>
         ) : (
           <>
             <TableContainer sx={{ maxHeight: 560 }}>

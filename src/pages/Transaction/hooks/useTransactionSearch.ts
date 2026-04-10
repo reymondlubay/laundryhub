@@ -17,6 +17,12 @@ export interface TransactionSearchState {
   clearFilters: () => void;
 }
 
+type TransactionQueryParams = {
+  customer?: string;
+  fromDate?: string;
+  toDate?: string;
+};
+
 function defaultParams() {
   return {
     fromDate: dayjs().subtract(3, "month").format("YYYY-MM-DD"),
@@ -32,13 +38,10 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+  const appliedParamsRef = useRef<TransactionQueryParams>(defaultParams());
 
   const fetchTransactions = useCallback(
-    async (params?: {
-      customer?: string;
-      fromDate?: string;
-      toDate?: string;
-    }) => {
+    async (params?: TransactionQueryParams) => {
       if (abortRef.current) {
         abortRef.current.abort();
       }
@@ -61,9 +64,9 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
     [],
   );
 
-  // Initial load and refreshKey-triggered reload — always use current month default
+  // Initial load and refreshKey-triggered reload using the last applied params.
   useEffect(() => {
-    fetchTransactions(defaultParams());
+    fetchTransactions(appliedParamsRef.current);
   }, [refreshKey, fetchTransactions]);
 
   // Explicit search triggered by the Search button
@@ -72,11 +75,13 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
     const hasMonth = !!selectedMonth;
 
     if (!hasText && !hasMonth) {
-      fetchTransactions(defaultParams());
+      const defaults = defaultParams();
+      appliedParamsRef.current = defaults;
+      fetchTransactions(defaults);
       return;
     }
 
-    fetchTransactions({
+    const params: TransactionQueryParams = {
       customer: hasText ? searchText.trim() : undefined,
       fromDate: hasMonth
         ? selectedMonth!.startOf("month").format("YYYY-MM-DD")
@@ -84,13 +89,18 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
       toDate: hasMonth
         ? selectedMonth!.endOf("month").format("YYYY-MM-DD")
         : undefined,
-    });
+    };
+
+    appliedParamsRef.current = params;
+    fetchTransactions(params);
   }, [searchText, selectedMonth, fetchTransactions]);
 
   const clearFilters = useCallback(() => {
     setSearchText("");
     setSelectedMonth(null);
-    fetchTransactions(defaultParams());
+    const defaults = defaultParams();
+    appliedParamsRef.current = defaults;
+    fetchTransactions(defaults);
   }, [fetchTransactions]);
 
   return {

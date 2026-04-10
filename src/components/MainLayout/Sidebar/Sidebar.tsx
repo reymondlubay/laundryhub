@@ -10,7 +10,7 @@ import { Box, Typography } from "@mui/material";
 import { useThemeContext } from "../../ThemeContext/ThemeContext";
 import { Link, useLocation } from "react-router-dom";
 import route from "../../../constants/route";
-import authService from "../../../services/authService";
+import { isAdmin } from "../../../utils/roleAccess";
 import "./sidebar.scss";
 import { useSidebar } from "./SidebarContext";
 
@@ -18,8 +18,7 @@ export default function SidebarMenu() {
   const { darkMode } = useThemeContext();
   const { collapsed } = useSidebar();
   const location = useLocation();
-  const currentUser = authService.getCurrentUser();
-  const isAdmin = currentUser?.role === "Admin";
+  const isAdminUser = isAdmin();
 
   const activePath = location.pathname;
 
@@ -156,31 +155,33 @@ export default function SidebarMenu() {
           Customer
         </MenuItem>
 
-        <SubMenu
-          label="Report"
-          icon={<FaFileAlt />}
-          defaultOpen={activePath.startsWith("/reports")}
-          rootStyles={{
-            color: activePath.startsWith("/reports")
-              ? "#3b82f6"
-              : darkMode
-                ? "#f3f4f6"
-                : "#1f2937",
-          }}
-        >
-          <MenuItem
-            component={<Link to={route.REPORT_TRANSACTION} />}
-            active={activePath === route.REPORT_TRANSACTION}
+        {isAdminUser && (
+          <SubMenu
+            label="Report"
+            icon={<FaFileAlt />}
+            defaultOpen={activePath.startsWith("/reports")}
+            rootStyles={{
+              color: activePath.startsWith("/reports")
+                ? "#3b82f6"
+                : darkMode
+                  ? "#f3f4f6"
+                  : "#1f2937",
+            }}
           >
-            Transaction Report
-          </MenuItem>
-          <MenuItem
-            component={<Link to={route.REPORT_CUSTOMER} />}
-            active={activePath === route.REPORT_CUSTOMER}
-          >
-            Customer Report
-          </MenuItem>
-        </SubMenu>
+            <MenuItem
+              component={<Link to={route.REPORT_TRANSACTION} />}
+              active={activePath === route.REPORT_TRANSACTION}
+            >
+              Transaction Report
+            </MenuItem>
+            <MenuItem
+              component={<Link to={route.REPORT_CUSTOMER} />}
+              active={activePath === route.REPORT_CUSTOMER}
+            >
+              Customer Report
+            </MenuItem>
+          </SubMenu>
+        )}
       </Menu>
 
       {/* EXTRA SECTION */}
@@ -220,7 +221,7 @@ export default function SidebarMenu() {
           },
         }}
       >
-        {isAdmin ? (
+        {isAdminUser ? (
           <MenuItem
             component={<Link to={route.USERS} />}
             icon={<FaUsers />}
@@ -229,7 +230,7 @@ export default function SidebarMenu() {
             Users
           </MenuItem>
         ) : null}
-        {isAdmin ? (
+        {isAdminUser ? (
           <SubMenu
             label="Settings"
             icon={<FaWarehouse />}

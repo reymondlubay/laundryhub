@@ -5,6 +5,7 @@ export const API_ROUTES = {
   USERS: "/users",
   CUSTOMERS: "/customers",
   BACKUP: "/backup",
+  BACKUP_UPLOAD: "/backup/upload",
   BACKUPS: "/backups",
   RESTORE: "/restore",
   ADDONS_PRICING: "/addons-pricing",

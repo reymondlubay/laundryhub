@@ -8,7 +8,7 @@ import { Suspense, lazy } from "react";
 import Login from "./pages/Login/Login";
 import Dashboard from "./pages/Dashboard/Dashboard";
 import MainLayout from "./components/MainLayout/MainLayout";
-import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
+import RoleProtectedRoute from "./components/RoleProtectedRoute/RoleProtectedRoute";
 import { isAuthenticated } from "./utils/auth";
 import route from "./constants/route";
 
@@ -47,95 +47,95 @@ function App() {
           <Route
             path={route.DASHBOARD}
             element={
-              <ProtectedRoute>
+              <RoleProtectedRoute>
                 <MainLayout>
                   <Dashboard />
                 </MainLayout>
-              </ProtectedRoute>
+              </RoleProtectedRoute>
             }
           />
           <Route
             path={route.TRANSACTION}
             element={
-              <ProtectedRoute>
+              <RoleProtectedRoute>
                 <MainLayout>
                   <Suspense fallback={null}>
                     <TransactionPage />
                   </Suspense>
                 </MainLayout>
-              </ProtectedRoute>
+              </RoleProtectedRoute>
             }
           />
           <Route
             path={route.CUSTOMER}
             element={
-              <ProtectedRoute>
+              <RoleProtectedRoute>
                 <MainLayout>
                   <Suspense fallback={null}>
                     <CustomerPage />
                   </Suspense>
                 </MainLayout>
-              </ProtectedRoute>
+              </RoleProtectedRoute>
             }
           />
           <Route
             path={route.USERS}
             element={
-              <ProtectedRoute>
+              <RoleProtectedRoute>
                 <MainLayout>
                   <Suspense fallback={null}>
                     <UsersPage />
                   </Suspense>
                 </MainLayout>
-              </ProtectedRoute>
+              </RoleProtectedRoute>
             }
           />
           <Route
             path={route.REPORT_TRANSACTION}
             element={
-              <ProtectedRoute>
+              <RoleProtectedRoute>
                 <MainLayout>
                   <Suspense fallback={null}>
                     <TransactionReportPage />
                   </Suspense>
                 </MainLayout>
-              </ProtectedRoute>
+              </RoleProtectedRoute>
             }
           />
           <Route
             path={route.REPORT_CUSTOMER}
             element={
-              <ProtectedRoute>
+              <RoleProtectedRoute>
                 <MainLayout>
                   <Suspense fallback={null}>
                     <CustomerReportPage />
                   </Suspense>
                 </MainLayout>
-              </ProtectedRoute>
+              </RoleProtectedRoute>
             }
           />
           <Route
             path={route.SETTINGS}
             element={
-              <ProtectedRoute>
+              <RoleProtectedRoute>
                 <MainLayout>
                   <Suspense fallback={null}>
                     <SettingsDatabasePage />
                   </Suspense>
                 </MainLayout>
-              </ProtectedRoute>
+              </RoleProtectedRoute>
             }
           />
           <Route
             path={route.SETTINGS_ADDONS_PRICING}
             element={
-              <ProtectedRoute>
+              <RoleProtectedRoute>
                 <MainLayout>
                   <Suspense fallback={null}>
                     <SettingsAddonsPricingPage />
                   </Suspense>
                 </MainLayout>
-              </ProtectedRoute>
+              </RoleProtectedRoute>
             }
           />
 
