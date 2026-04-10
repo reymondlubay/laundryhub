@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <system.webServer>
+    <!-- URL Rewrite Rules for React SPA -->
+    <rewrite>
+      <rules>
+        <!-- Rule 1: Don't rewrite actual files and directories -->
+        <rule name="Static Files" stopProcessing="true">
+          <match url="^(.*)$" />
+          <conditions logicalGrouping="MatchAll" trackAllCaptures="false">
+            <add input="{REQUEST_FILENAME}" matchType="IsFile" />
+          </conditions>
+          <action type="None" />
+        </rule>
+
+        <!-- Rule 2: Don't rewrite directories -->
+        <rule name="Directories" stopProcessing="true">
+          <match url="^(.*)$" />
+          <conditions logicalGrouping="MatchAll" trackAllCaptures="false">
+            <add input="{REQUEST_FILENAME}" matchType="IsDirectory" />
+          </conditions>
+          <action type="None" />
+        </rule>
+
+        <!-- Rule 3: Rewrite all other requests to index.html -->
+        <rule name="React SPA Rewrite" stopProcessing="true">
+          <match url="^(.*)$" />
+          <conditions logicalGrouping="MatchAll" trackAllCaptures="false">
+            <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+            <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
+          </conditions>
+          <action type="Rewrite" url="index.html" />
+        </rule>
+      </rules>
+    </rewrite>
+
+    <!-- Static Content Settings -->
+    <staticContent>
+      <mimeType fileExtension=".js" type="application/javascript" />
+      <mimeType fileExtension=".mjs" type="application/javascript" />
+      <mimeType fileExtension=".json" type="application/json" />
+      <mimeType fileExtension=".woff" type="font/woff" />
+      <mimeType fileExtension=".woff2" type="font/woff2" />
+      <mimeType fileExtension=".ttf" type="font/ttf" />
+      <mimeType fileExtension=".eot" type="application/vnd.ms-fontobject" />
+      <mimeType fileExtension=".svg" type="image/svg+xml" />
+      <mimeType fileExtension=".map" type="application/json" />
+    </staticContent>
+
+    <!-- HTTP Compression -->
+    <urlCompression doStaticCompression="true" doDynamicCompression="true" />
+
+    <!-- Security Headers -->
+    <httpProtocol>
+      <customHeaders>
+        <!-- Prevent caching for SPA shell -->
+        <add name="Cache-Control" value="no-cache, no-store, must-revalidate" />
+        <add name="Pragma" value="no-cache" />
+        <add name="Expires" value="0" />
+        
+        <!-- Security headers -->
+        <add name="X-Content-Type-Options" value="nosniff" />
+        <add name="X-Frame-Options" value="SAMEORIGIN" />
+        <add name="X-XSS-Protection" value="1; mode=block" />
+        <add name="Referrer-Policy" value="strict-origin-when-cross-origin" />
+      </customHeaders>
+    </httpProtocol>
+
+    <!-- Default Documents -->
+    <defaultDocument>
+      <files>
+        <add value="index.html" />
+      </files>
+    </defaultDocument>
+  </system.webServer>
+</configuration>
