@@ -1,4 +1,5 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
+import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { storage, storageKey } from "../utils/storage";
 
 const baseURL =
@@ -13,20 +14,20 @@ const axiosClient = axios.create({
 
 // Add request interceptor to attach token
 axiosClient.interceptors.request.use(
-  (config) => {
+  (config: InternalAxiosRequestConfig) => {
     const token = storage.getToken(storageKey.TOKEN);
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error),
+  (error: AxiosError) => Promise.reject(error),
 );
 
 // Add response interceptor for error handling
 axiosClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response: AxiosResponse) => response,
+  (error: AxiosError) => {
     // Handle 401 unauthorized
     if (error?.response?.status === 401) {
       storage.removeToken(storageKey.TOKEN);
