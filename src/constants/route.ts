@@ -8,6 +8,7 @@ const route = {
   REPORT_CUSTOMER: "/reports/customer",
   USERS: "/users",
   SETTINGS: "/settings/database",
+  SETTINGS_ADDONS_PRICING: "/settings/addons-pricing",
   LOGS: "/logs",
 };
 

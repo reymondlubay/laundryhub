@@ -3,6 +3,8 @@ import TransactionTable from "./components/TransactionTable";
 import {
   Box,
   Button,
+  Checkbox,
+  FormControlLabel,
   Grid,
   Stack,
   TextField,
@@ -23,6 +25,7 @@ const Transaction = () => {
   const [selectedTransaction, setSelectedTransaction] =
     React.useState<Transaction | null>(null);
   const [refreshKey, setRefreshKey] = React.useState(0);
+  const [showPendingOnly, setShowPendingOnly] = React.useState(false);
 
   const {
     searchText,
@@ -56,6 +59,21 @@ const Transaction = () => {
     handleCloseTransaction();
   };
 
+  const handleClearFilters = () => {
+    setShowPendingOnly(false);
+    clearFilters();
+  };
+
+  const filteredTransactions = React.useMemo(() => {
+    if (!showPendingOnly) return transactions;
+
+    return transactions.filter((transaction) => {
+      const tx = transaction as Transaction & { dateloaded?: string | null };
+      const loadedDate = transaction.dateLoaded || tx.dateloaded || null;
+      return !loadedDate;
+    });
+  }, [showPendingOnly, transactions]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") search();
   };
@@ -63,38 +81,40 @@ const Transaction = () => {
   return (
     <div>
       {/* Toolbar */}
-      <Grid container spacing={1} alignItems="center" sx={{ mb: 2 }}>
+      <Grid container spacing={1} alignItems="flex-start" sx={{ mb: 2 }}>
         {/* Customer search */}
         <Grid size={{ xs: 12, sm: "auto" }} sx={{ minWidth: { sm: 240 } }}>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="Search customer..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={loading}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-                endAdornment: searchText ? (
-                  <InputAdornment position="end">
-                    <IconButton
-                      size="small"
-                      onClick={() => setSearchText("")}
-                      edge="end"
-                    >
-                      <ClearIcon fontSize="small" />
-                    </IconButton>
-                  </InputAdornment>
-                ) : null,
-              },
-            }}
-          />
+          <Stack spacing={0.25}>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Search customer..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={loading}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: searchText ? (
+                    <InputAdornment position="end">
+                      <IconButton
+                        size="small"
+                        onClick={() => setSearchText("")}
+                        edge="end"
+                      >
+                        <ClearIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ) : null,
+                },
+              }}
+            />
+          </Stack>
         </Grid>
 
         {/* Month filter */}
@@ -136,8 +156,10 @@ const Transaction = () => {
           <Button
             variant="outlined"
             size="small"
-            onClick={clearFilters}
-            disabled={loading || (!searchText && !selectedMonth)}
+            onClick={handleClearFilters}
+            disabled={
+              loading || (!searchText && !selectedMonth && !showPendingOnly)
+            }
             startIcon={<ClearIcon />}
           >
             Clear
@@ -159,7 +181,25 @@ const Transaction = () => {
         </Grid>
       </Grid>
 
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 1.5,
+        }}
+      >
+        <FormControlLabel
+          sx={{ m: 0 }}
+          control={
+            <Checkbox
+              size="small"
+              checked={showPendingOnly}
+              onChange={(event) => setShowPendingOnly(event.target.checked)}
+            />
+          }
+          label="Show pending"
+        />
         <Stack direction="row" spacing={2} alignItems="center">
           <Stack direction="row" spacing={0.75} alignItems="center">
             <Box
@@ -196,7 +236,7 @@ const Transaction = () => {
       </Box>
 
       <TransactionTable
-        transactions={transactions}
+        transactions={filteredTransactions}
         loading={loading}
         error={error}
         onEditTransaction={handleEditTransaction}

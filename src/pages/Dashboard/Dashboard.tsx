@@ -36,6 +36,10 @@ type DashboardCard = {
   iconColor: string;
 };
 
+const formatCount = (value: number): string => {
+  return Math.round(value).toLocaleString("en-US");
+};
+
 const isSameDay = (value?: string | null): boolean => {
   if (!value) return false;
   const date = dayjs(value);
@@ -118,7 +122,7 @@ const AnimatedCount: React.FC<{ value: number }> = ({ value }) => {
     return () => window.cancelAnimationFrame(animationFrame);
   }, [value]);
 
-  return <>{displayValue}</>;
+  return <>{formatCount(displayValue)}</>;
 };
 
 const Dashboard = () => {
@@ -444,7 +448,7 @@ const Dashboard = () => {
                       textAlign: "right",
                     }}
                   >
-                    Total Pending: {pendingTotalLoads}
+                    Total Pending: {formatCount(pendingTotalLoads)}
                   </Typography>
                 </Stack>
                 <TableContainer sx={{ maxHeight: "25vh" }}>
@@ -517,7 +521,7 @@ const Dashboard = () => {
                               align="right"
                               sx={{ color: tableCellColor }}
                             >
-                              {getTransactionLoads(transaction)}
+                              {formatCount(getTransactionLoads(transaction))}
                             </TableCell>
                           </TableRow>
                         ))
@@ -567,7 +571,7 @@ const Dashboard = () => {
                       textAlign: "right",
                     }}
                   >
-                    Total Loads: {loadedTodayTotalLoads}
+                    Total Loads: {formatCount(loadedTodayTotalLoads)}
                   </Typography>
                 </Stack>
                 <TableContainer sx={{ maxHeight: "25vh" }}>
@@ -640,7 +644,7 @@ const Dashboard = () => {
                               align="right"
                               sx={{ color: tableCellColor }}
                             >
-                              {getTransactionLoads(transaction)}
+                              {formatCount(getTransactionLoads(transaction))}
                             </TableCell>
                           </TableRow>
                         ))

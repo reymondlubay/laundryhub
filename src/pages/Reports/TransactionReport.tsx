@@ -1,16 +1,13 @@
 import React from "react";
 import dayjs, { Dayjs } from "dayjs";
 import {
+  Autocomplete,
   Alert,
   Box,
   CircularProgress,
   Divider,
-  FormControl,
   Grid,
-  InputLabel,
-  MenuItem,
   Paper,
-  Select,
   Stack,
   Table,
   TableBody,
@@ -19,6 +16,7 @@ import {
   TableHead,
   TablePagination,
   TableRow,
+  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -31,6 +29,11 @@ import transactionService, {
   type Transaction,
 } from "../../services/transactionService";
 import customerService, { type Customer } from "../../services/customerService";
+import addonsPricingService, {
+  DEFAULT_ADDONS_PRICING,
+  type AddonsPricing,
+} from "../../services/addonsPricingService";
+import { getAddonsTotal, getStoredSnapshots } from "../../utils/pricing";
 
 type PaymentModeTotals = {
   cash: number;
@@ -58,6 +61,11 @@ type TransactionWithLegacyFields = Transaction & {
   datereceived?: string;
   dateloaded?: string;
   datepickup?: string;
+  whiteprice?: number | string | null;
+  fabconqty?: number | string | null;
+  detergentqty?: number | string | null;
+  colorsafeqty?: number | string | null;
+  grandtotal?: number | string | null;
   loaddetails?: Array<{
     kg?: number | string | null;
     loads?: number | string | null;
@@ -144,8 +152,15 @@ const formatDateTime = (value?: string | null): string => {
   return dayjs(value).isValid() ? dayjs(value).format("MM-DD-YY h:mm A") : "-";
 };
 
-const formatAmount = (value: number): string => {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+const formatCount = (value: number): string => {
+  return Math.round(value).toLocaleString("en-US");
+};
+
+const formatCurrency = (value: number): string => {
+  return `₱${value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 };
 
 const sameOrAfter = (value: Dayjs, from: Dayjs) =>
@@ -165,7 +180,10 @@ const isWithinRange = (
   return sameOrAfter(date, from) && sameOrBefore(date, to);
 };
 
-const getTransactionTotals = (transaction: Transaction) => {
+const getTransactionTotals = (
+  transaction: Transaction,
+  addonsPricing: AddonsPricing,
+) => {
   const totals = getLoadDetails(transaction).reduce<{
     kg: number;
     loads: number;
@@ -187,8 +205,18 @@ const getTransactionTotals = (transaction: Transaction) => {
         )
       : null;
 
+  const tx = transaction as TransactionWithLegacyFields;
+  const stored = getStoredSnapshots({
+    grandTotal: transaction.grandTotal,
+    grandtotal: tx.grandtotal,
+  });
+  const addonsTotal = getAddonsTotal(transaction, addonsPricing);
+
   return {
     ...totals,
+    price: stored.hasGrandTotal
+      ? stored.grandTotal
+      : totals.price + addonsTotal,
     latestPaymentDate,
   };
 };
@@ -209,6 +237,9 @@ const TransactionReport: React.FC = () => {
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [addonsPricing, setAddonsPricing] = React.useState<AddonsPricing>(
+    DEFAULT_ADDONS_PRICING,
+  );
 
   const [selectedCustomer, setSelectedCustomer] = React.useState<string>("");
   const [dateFrom, setDateFrom] = React.useState<Dayjs>(dayjs());
@@ -233,11 +264,13 @@ const TransactionReport: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const [customerData, transactionData] = await Promise.all([
+        const [customerData, transactionData, pricingData] = await Promise.all([
           customerService.getAll(),
           transactionService.getAll(),
+          addonsPricingService.get(),
         ]);
         setCustomers(customerData);
+        setAddonsPricing(pricingData);
         setTransactions(
           transactionData.filter(
             (t) =>
@@ -249,6 +282,7 @@ const TransactionReport: React.FC = () => {
         setError(
           err instanceof Error ? err.message : "Failed to load reports.",
         );
+        setAddonsPricing(DEFAULT_ADDONS_PRICING);
       } finally {
         setLoading(false);
       }
@@ -278,10 +312,10 @@ const TransactionReport: React.FC = () => {
 
   const totalLoads = React.useMemo(() => {
     return loadReportRows.reduce((sum, transaction) => {
-      const totals = getTransactionTotals(transaction);
+      const totals = getTransactionTotals(transaction, addonsPricing);
       return sum + totals.loads;
     }, 0);
-  }, [loadReportRows]);
+  }, [addonsPricing, loadReportRows]);
 
   const paymentReportRows = React.useMemo(() => {
     return filteredByCustomer.filter((transaction) => {
@@ -312,7 +346,10 @@ const TransactionReport: React.FC = () => {
         0,
       );
 
-      const transactionTotals = getTransactionTotals(transaction);
+      const transactionTotals = getTransactionTotals(
+        transaction,
+        addonsPricing,
+      );
       const balanceAmount = Math.max(
         transactionTotals.price - allPaymentsTotal,
         0,
@@ -326,7 +363,7 @@ const TransactionReport: React.FC = () => {
       const paymentHistoryLines = (transaction.paymentDetails || []).map(
         (payment) => {
           const date = formatDateTime(getPaymentDate(payment));
-          const amount = formatAmount(toNumber(payment.amount));
+          const amount = formatCurrency(toNumber(payment.amount));
           const mode = String(payment.mode || "-");
           return `${amount} - ${mode} - ${date}`;
         },
@@ -341,7 +378,7 @@ const TransactionReport: React.FC = () => {
             ),
         )
         .map((payment) => {
-          const amount = formatAmount(toNumber(payment.amount));
+          const amount = formatCurrency(toNumber(payment.amount));
           const paidDate = formatDateTime(getPaymentDate(payment));
           const createdDate = formatDateTime(getPaymentCreatedDate(payment));
           return `${amount} - ${paidDate} - ${createdDate}`;
@@ -368,7 +405,7 @@ const TransactionReport: React.FC = () => {
         datePaid,
       };
     });
-  }, [dateFrom, dateTo, paymentReportRows]);
+  }, [addonsPricing, dateFrom, dateTo, paymentReportRows]);
 
   const paymentSummary = React.useMemo(() => {
     const modeTotals: PaymentModeTotals = { cash: 0, gcash: 0 };
@@ -378,7 +415,10 @@ const TransactionReport: React.FC = () => {
 
     paymentRowsWithRangePayments.forEach(
       ({ transaction, paymentsInRange, allPaymentsTotal }) => {
-        const transactionTotals = getTransactionTotals(transaction);
+        const transactionTotals = getTransactionTotals(
+          transaction,
+          addonsPricing,
+        );
         const diffAllTime = allPaymentsTotal - transactionTotals.price;
 
         if (diffAllTime < 0) {
@@ -407,7 +447,7 @@ const TransactionReport: React.FC = () => {
       totalBalance,
       totalOver,
     };
-  }, [paymentRowsWithRangePayments]);
+  }, [addonsPricing, paymentRowsWithRangePayments]);
 
   const backdatePaymentRows = React.useMemo(() => {
     const range = normalizeRange(dateFrom, dateTo);
@@ -457,21 +497,21 @@ const TransactionReport: React.FC = () => {
       <Paper sx={{ p: 2, mb: 2 }}>
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 4 }}>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Customer Filter</InputLabel>
-              <Select
-                label="Customer Filter"
-                value={selectedCustomer}
-                onChange={(e) => setSelectedCustomer(String(e.target.value))}
-              >
-                <MenuItem value="">None</MenuItem>
-                {customers.map((customer) => (
-                  <MenuItem key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              size="small"
+              options={customers}
+              value={
+                customers.find(
+                  (customer) => customer.id === selectedCustomer,
+                ) || null
+              }
+              onChange={(_, value) => setSelectedCustomer(value?.id || "")}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              getOptionLabel={(option) => option.name || ""}
+              renderInput={(params) => (
+                <TextField {...params} label="Customer Filter" />
+              )}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
@@ -542,7 +582,10 @@ const TransactionReport: React.FC = () => {
                         loadPage * loadRowsPerPage + loadRowsPerPage,
                       )
                       .map((transaction) => {
-                        const totals = getTransactionTotals(transaction);
+                        const totals = getTransactionTotals(
+                          transaction,
+                          addonsPricing,
+                        );
                         return (
                           <TableRow key={`load-${transaction.id}`}>
                             <TableCell>
@@ -556,9 +599,11 @@ const TransactionReport: React.FC = () => {
                             <TableCell>
                               {transaction.customer?.name || "-"}
                             </TableCell>
-                            <TableCell>{formatAmount(totals.kg)}</TableCell>
-                            <TableCell>{formatAmount(totals.loads)}</TableCell>
-                            <TableCell>{formatAmount(totals.price)}</TableCell>
+                            <TableCell>{formatCount(totals.kg)}</TableCell>
+                            <TableCell>{formatCount(totals.loads)}</TableCell>
+                            <TableCell>
+                              {formatCurrency(totals.price)}
+                            </TableCell>
                             <TableCell>
                               {formatDateTime(
                                 getTransactionFieldDate(
@@ -604,7 +649,7 @@ const TransactionReport: React.FC = () => {
               </Typography>
               <Divider sx={{ my: 1 }} />
               <Typography sx={{ fontWeight: 700 }}>
-                Total Loads - {formatAmount(totalLoads)}
+                Total Loads - {formatCount(totalLoads)}
               </Typography>
             </Box>
           </Paper>
@@ -652,7 +697,10 @@ const TransactionReport: React.FC = () => {
                           balanceAmount,
                           overAmount,
                         }) => {
-                          const totals = getTransactionTotals(transaction);
+                          const totals = getTransactionTotals(
+                            transaction,
+                            addonsPricing,
+                          );
 
                           const mismatchTooltipTitle = (
                             <Box
@@ -687,14 +735,14 @@ const TransactionReport: React.FC = () => {
                                 <span
                                   style={{ color: "#f44336", fontWeight: 700 }}
                                 >
-                                  Balance - {formatAmount(balanceAmount)}
+                                  Balance - {formatCurrency(balanceAmount)}
                                 </span>
                               ) : null}
                               {isFullyPaid && overAmount > 0 ? (
                                 <span
                                   style={{ color: "#4caf50", fontWeight: 700 }}
                                 >
-                                  Over - {formatAmount(overAmount)}
+                                  Over - {formatCurrency(overAmount)}
                                 </span>
                               ) : null}
                             </Box>
@@ -713,12 +761,10 @@ const TransactionReport: React.FC = () => {
                               <TableCell>
                                 {transaction.customer?.name || "-"}
                               </TableCell>
-                              <TableCell>{formatAmount(totals.kg)}</TableCell>
+                              <TableCell>{formatCount(totals.kg)}</TableCell>
+                              <TableCell>{formatCount(totals.loads)}</TableCell>
                               <TableCell>
-                                {formatAmount(totals.loads)}
-                              </TableCell>
-                              <TableCell>
-                                {formatAmount(totals.price)}
+                                {formatCurrency(totals.price)}
                               </TableCell>
                               <TableCell>
                                 {formatDateTime(
@@ -761,7 +807,9 @@ const TransactionReport: React.FC = () => {
                                   spacing={0.75}
                                   alignItems="center"
                                 >
-                                  <span>{formatAmount(amountPaidInRange)}</span>
+                                  <span>
+                                    {formatCurrency(amountPaidInRange)}
+                                  </span>
                                   <Tooltip title={tooltipTitle} arrow>
                                     <Box
                                       component="span"
@@ -817,22 +865,22 @@ const TransactionReport: React.FC = () => {
               <Divider sx={{ my: 1 }} />
               <Typography>
                 Total Payment Cash -{" "}
-                {formatAmount(paymentSummary.totalPaymentCash)}
+                {formatCurrency(paymentSummary.totalPaymentCash)}
               </Typography>
               <Typography>
                 Total Payment Gcash -{" "}
-                {formatAmount(paymentSummary.totalPaymentGcash)}
+                {formatCurrency(paymentSummary.totalPaymentGcash)}
               </Typography>
               <Typography sx={{ fontWeight: 700 }}>
-                Total Payment - {formatAmount(paymentSummary.totalPayment)}
-              </Typography>
-              <Divider sx={{ my: 1 }} />
-              <Typography sx={{ fontWeight: 700 }}>
-                Total Balance - {formatAmount(paymentSummary.totalBalance)}
+                Total Payment - {formatCurrency(paymentSummary.totalPayment)}
               </Typography>
               <Divider sx={{ my: 1 }} />
               <Typography sx={{ fontWeight: 700 }}>
-                Total over - {formatAmount(paymentSummary.totalOver)}
+                Total Balance - {formatCurrency(paymentSummary.totalBalance)}
+              </Typography>
+              <Divider sx={{ my: 1 }} />
+              <Typography sx={{ fontWeight: 700 }}>
+                Total over - {formatCurrency(paymentSummary.totalOver)}
               </Typography>
             </Box>
           </Paper>
@@ -870,7 +918,10 @@ const TransactionReport: React.FC = () => {
                           backdateRowsPerPage,
                       )
                       .map(({ transaction, payments }) => {
-                        const totals = getTransactionTotals(transaction);
+                        const totals = getTransactionTotals(
+                          transaction,
+                          addonsPricing,
+                        );
 
                         return (
                           <TableRow key={`backdate-${transaction.id}`}>
@@ -885,9 +936,11 @@ const TransactionReport: React.FC = () => {
                             <TableCell>
                               {transaction.customer?.name || "-"}
                             </TableCell>
-                            <TableCell>{formatAmount(totals.kg)}</TableCell>
-                            <TableCell>{formatAmount(totals.loads)}</TableCell>
-                            <TableCell>{formatAmount(totals.price)}</TableCell>
+                            <TableCell>{formatCount(totals.kg)}</TableCell>
+                            <TableCell>{formatCount(totals.loads)}</TableCell>
+                            <TableCell>
+                              {formatCurrency(totals.price)}
+                            </TableCell>
                             <TableCell>
                               <Stack spacing={0.5}>
                                 {payments.map((payment) => (
@@ -910,7 +963,7 @@ const TransactionReport: React.FC = () => {
                               <Stack spacing={0.5}>
                                 {payments.map((payment) => (
                                   <span key={`${payment.paymentId}-amount`}>
-                                    {formatAmount(payment.amountPaid)}
+                                    {formatCurrency(payment.amountPaid)}
                                   </span>
                                 ))}
                               </Stack>

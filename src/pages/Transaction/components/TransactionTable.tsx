@@ -22,12 +22,17 @@ import { themeQuartz } from "ag-grid-community";
 import { useThemeContext } from "../../../components/ThemeContext/ThemeContext";
 import transactionService from "../../../services/transactionService";
 import type { Transaction } from "../../../services/transactionService";
+import addonsPricingService, {
+  DEFAULT_ADDONS_PRICING,
+  type AddonsPricing,
+} from "../../../services/addonsPricingService";
 import {
   CONFIRM_MESSAGES,
   EMPTY_STATES,
   UI_TEXT,
 } from "../../../constants/messages";
 import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.tsx";
+import { getAddonsTotal, getStoredSnapshots } from "../../../utils/pricing";
 import "./TransactionTable.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -89,6 +94,7 @@ const formatAmount = (amount: number): string => {
  */
 function flattenTransactionRows(
   transaction: Transaction,
+  addonsPricing: AddonsPricing,
 ): FlatTransactionRow[] {
   const tx = transaction as Transaction & {
     datereceived?: string;
@@ -118,7 +124,7 @@ function flattenTransactionRows(
       sum + Number(load.loads || 0),
     0,
   );
-  const totalPrice = loadDetails.reduce(
+  const loadTotal = loadDetails.reduce(
     (sum: number, load: { price?: number | string | null }) =>
       sum + Number(load.price || 0),
     0,
@@ -130,21 +136,12 @@ function flattenTransactionRows(
     (sum: number, payment) => sum + Number(payment.amount || 0),
     0,
   );
-  const balance =
-    payments.length > 0 && totalPaid < totalPrice ? totalPrice - totalPaid : 0;
-
-  const datePaid =
-    payments.length > 0 ? payments[payments.length - 1].paymentDate : null;
-  const paymentHistory = payments.map((payment) => {
-    const paidAt = dayjs(payment.paymentDate).format("MM-DD-YY h:mm A");
-    return `${paidAt} - ${formatAmount(Number(payment.amount || 0))} ${payment.mode}`;
-  });
-
   const tx2 = transaction as Transaction & {
     whiteprice?: number;
     fabconqty?: number;
     detergentqty?: number;
     colorsafeqty?: number;
+    grandtotal?: number;
   };
   const whitePrice = Number(transaction.whitePrice ?? tx2.whiteprice ?? 0);
   const fabconQty = Number(transaction.fabconQty ?? tx2.fabconqty ?? 0);
@@ -154,6 +151,32 @@ function flattenTransactionRows(
   const colorSafeQty = Number(
     transaction.colorSafeQty ?? tx2.colorsafeqty ?? 0,
   );
+
+  const stored = getStoredSnapshots({
+    grandTotal: transaction.grandTotal,
+    grandtotal: tx2.grandtotal,
+  });
+  const addonsTotal = getAddonsTotal(
+    {
+      whitePrice,
+      fabconQty,
+      detergentQty,
+      colorSafeQty,
+    },
+    addonsPricing,
+  );
+  const totalPrice = stored.hasGrandTotal
+    ? stored.grandTotal
+    : loadTotal + addonsTotal;
+  const balance =
+    payments.length > 0 && totalPaid < totalPrice ? totalPrice - totalPaid : 0;
+
+  const datePaid =
+    payments.length > 0 ? payments[payments.length - 1].paymentDate : null;
+  const paymentHistory = payments.map((payment) => {
+    const paidAt = dayjs(payment.paymentDate).format("MM-DD-YY h:mm A");
+    return `${paidAt} - ${formatAmount(Number(payment.amount || 0))} ${payment.mode}`;
+  });
 
   const releasedBy = transaction.releasedByUser
     ? [
@@ -251,6 +274,9 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   onDeleted,
 }) => {
   const { darkMode } = useThemeContext();
+  const [addonsPricing, setAddonsPricing] = useState<AddonsPricing>(
+    DEFAULT_ADDONS_PRICING,
+  );
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(
     null,
@@ -291,9 +317,25 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
     });
   }, [transactions]);
 
+  React.useEffect(() => {
+    const loadPricing = async () => {
+      try {
+        const pricing = await addonsPricingService.get();
+        setAddonsPricing(pricing);
+      } catch {
+        setAddonsPricing(DEFAULT_ADDONS_PRICING);
+      }
+    };
+
+    void loadPricing();
+  }, []);
+
   const rowData = useMemo<FlatTransactionRow[]>(
-    () => sortedTransactions.flatMap(flattenTransactionRows),
-    [sortedTransactions],
+    () =>
+      sortedTransactions.flatMap((transaction) =>
+        flattenTransactionRows(transaction, addonsPricing),
+      ),
+    [addonsPricing, sortedTransactions],
   );
 
   const themeDarkWarm = themeQuartz.withPart(

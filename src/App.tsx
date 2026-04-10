@@ -20,6 +20,9 @@ const TransactionReportPage = lazy(
 );
 const CustomerReportPage = lazy(() => import("./pages/Reports/CustomerReport"));
 const SettingsDatabasePage = lazy(() => import("./pages/Settings/Database"));
+const SettingsAddonsPricingPage = lazy(
+  () => import("./pages/Settings/AddonsPricing"),
+);
 
 function App() {
   return (
@@ -118,6 +121,18 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <SettingsDatabasePage />
+                  </Suspense>
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={route.SETTINGS_ADDONS_PRICING}
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <SettingsAddonsPricingPage />
                   </Suspense>
                 </MainLayout>
               </ProtectedRoute>

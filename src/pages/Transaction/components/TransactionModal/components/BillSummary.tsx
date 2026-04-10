@@ -3,6 +3,10 @@ import { useEffect, useState } from "react";
 import type { TransactionFormValues } from "../TransactionModal";
 import { PaymentManager } from "../../../../../components/Payment";
 import type { Payment } from "../../../../../services/apiTypes";
+import addonsPricingService, {
+  DEFAULT_ADDONS_PRICING,
+  type AddonsPricing,
+} from "../../../../../services/addonsPricingService";
 
 const BillSummary = ({
   transactionFormValues,
@@ -14,6 +18,23 @@ const BillSummary = ({
   onPaymentsChange: (payments: Payment[]) => void;
 }) => {
   const [total, setTotal] = useState(0);
+  const [addonsPricing, setAddonsPricing] = useState<AddonsPricing>(
+    DEFAULT_ADDONS_PRICING,
+  );
+
+  useEffect(() => {
+    const loadPricing = async () => {
+      try {
+        const pricing = await addonsPricingService.get();
+        setAddonsPricing(pricing);
+      } catch {
+        setAddonsPricing(DEFAULT_ADDONS_PRICING);
+      }
+    };
+
+    void loadPricing();
+  }, []);
+
   const calculateTotals = (values: TransactionFormValues) => {
     const itemsTotal = values.items.reduce(
       (sum, item) => sum + Number(item.price || 0),
@@ -21,9 +42,9 @@ const BillSummary = ({
     );
     const addOnsTotal =
       values.whitePrice +
-      values.fabcon * 20 +
-      values.detergent * 20 +
-      values.cs * 20;
+      values.fabcon * addonsPricing.fabconPrice +
+      values.detergent * addonsPricing.detergentPrice +
+      values.cs * addonsPricing.colorSafePrice;
 
     return {
       itemsTotal,
@@ -34,7 +55,7 @@ const BillSummary = ({
 
   useEffect(() => {
     setTotal(calculateTotals(transactionFormValues).grandTotal);
-  }, [transactionFormValues]);
+  }, [addonsPricing, transactionFormValues]);
 
   return (
     <Paper elevation={1} sx={{ p: 2 }}>
@@ -69,20 +90,27 @@ const BillSummary = ({
           )}
           {transactionFormValues.fabcon > 0 && (
             <tr>
-              <td>Fabcon (x20)</td>
-              <td align="right">₱{transactionFormValues.fabcon * 20}</td>
+              <td>Fabcon (x{addonsPricing.fabconPrice})</td>
+              <td align="right">
+                ₱{transactionFormValues.fabcon * addonsPricing.fabconPrice}
+              </td>
             </tr>
           )}
           {transactionFormValues.detergent > 0 && (
             <tr>
-              <td>Detergent (x20)</td>
-              <td align="right">₱{transactionFormValues.detergent * 20}</td>
+              <td>Detergent (x{addonsPricing.detergentPrice})</td>
+              <td align="right">
+                ₱
+                {transactionFormValues.detergent * addonsPricing.detergentPrice}
+              </td>
             </tr>
           )}
           {transactionFormValues.cs > 0 && (
             <tr>
-              <td>CS (x20)</td>
-              <td align="right">₱{transactionFormValues.cs * 20}</td>
+              <td>CS (x{addonsPricing.colorSafePrice})</td>
+              <td align="right">
+                ₱{transactionFormValues.cs * addonsPricing.colorSafePrice}
+              </td>
             </tr>
           )}
         </tbody>

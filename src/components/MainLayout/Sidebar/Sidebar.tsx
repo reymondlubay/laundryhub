@@ -248,6 +248,12 @@ export default function SidebarMenu() {
             >
               Database
             </MenuItem>
+            <MenuItem
+              component={<Link to={route.SETTINGS_ADDONS_PRICING} />}
+              active={activePath === route.SETTINGS_ADDONS_PRICING}
+            >
+              Adons Pricing
+            </MenuItem>
           </SubMenu>
         ) : null}
       </Menu>

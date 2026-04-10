@@ -21,6 +21,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -87,6 +88,8 @@ const Users: React.FC = () => {
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [form, setForm] = useState<UserFormState>(emptyForm);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
 
   const isAdmin = currentUser?.role === USER_ROLE_ADMIN;
 
@@ -115,6 +118,10 @@ const Users: React.FC = () => {
     () => users.filter((user) => user.id !== currentUser?.id),
     [users, currentUser?.id],
   );
+
+  useEffect(() => {
+    setPage(0);
+  }, [visibleUsers.length]);
 
   const openCreate = () => {
     setEditingUser(null);
@@ -263,65 +270,85 @@ const Users: React.FC = () => {
             <CircularProgress />
           </Box>
         ) : (
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Username</TableCell>
-                  <TableCell>Mobile</TableCell>
-                  <TableCell>Role</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Date Hired</TableCell>
-                  <TableCell align="right">Action</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {visibleUsers.length === 0 ? (
+          <>
+            <TableContainer sx={{ maxHeight: 560 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
-                      {EMPTY_STATES.NO_USERS}
-                    </TableCell>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Username</TableCell>
+                    <TableCell>Mobile</TableCell>
+                    <TableCell>Role</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Date Hired</TableCell>
+                    <TableCell align="right">Action</TableCell>
                   </TableRow>
-                ) : (
-                  visibleUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        {[user.firstName, user.lastName]
-                          .filter(Boolean)
-                          .join(" ") ||
-                          user.userName ||
-                          "-"}
-                      </TableCell>
-                      <TableCell>{user.userName || "-"}</TableCell>
-                      <TableCell>{user.mobileNumber || "-"}</TableCell>
-                      <TableCell>{user.role}</TableCell>
-                      <TableCell>{user.status}</TableCell>
-                      <TableCell>
-                        {user.dateHired
-                          ? dayjs(user.dateHired).format("MM-DD-YYYY")
-                          : "-"}
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          color="success"
-                          onClick={() => openEdit(user)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          color="error"
-                          onClick={() => handleDeleteClick(user.id)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                </TableHead>
+                <TableBody>
+                  {visibleUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center">
+                        {EMPTY_STATES.NO_USERS}
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                  ) : (
+                    visibleUsers
+                      .slice(
+                        page * rowsPerPage,
+                        page * rowsPerPage + rowsPerPage,
+                      )
+                      .map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>
+                            {[user.firstName, user.lastName]
+                              .filter(Boolean)
+                              .join(" ") ||
+                              user.userName ||
+                              "-"}
+                          </TableCell>
+                          <TableCell>{user.userName || "-"}</TableCell>
+                          <TableCell>{user.mobileNumber || "-"}</TableCell>
+                          <TableCell>{user.role}</TableCell>
+                          <TableCell>{user.status}</TableCell>
+                          <TableCell>
+                            {user.dateHired
+                              ? dayjs(user.dateHired).format("MM-DD-YYYY")
+                              : "-"}
+                          </TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              color="success"
+                              onClick={() => openEdit(user)}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              color="error"
+                              onClick={() => handleDeleteClick(user.id)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <TablePagination
+              rowsPerPageOptions={[25, 50, 100, 200]}
+              component="div"
+              count={visibleUsers.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={(_, newPage) => setPage(newPage)}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(parseInt(event.target.value, 10));
+                setPage(0);
+              }}
+            />
+          </>
         )}
       </Paper>
 

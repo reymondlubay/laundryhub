@@ -44,6 +44,9 @@ export interface Transaction {
   fabconQty?: number;
   detergentQty?: number;
   colorSafeQty?: number;
+  loadSubtotal?: number;
+  addonsSubtotal?: number;
+  grandTotal?: number;
   isDelivered: boolean;
   notes?: string;
   isDeleted: boolean;

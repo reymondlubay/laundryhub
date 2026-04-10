@@ -17,6 +17,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -63,6 +64,8 @@ const CustomerPage: React.FC = () => {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deleteCustomerId, setDeleteCustomerId] = useState<string | null>(null);
   const [form, setForm] = useState<CustomerFormState>(emptyForm);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
 
   const loadCustomers = useCallback(async (searchTerm = "") => {
     try {
@@ -82,6 +85,10 @@ const CustomerPage: React.FC = () => {
   useEffect(() => {
     void loadCustomers();
   }, [loadCustomers]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [activeSearch, customers.length]);
 
   const handleSearch = () => {
     const nextSearch = searchInput.trim();
@@ -237,51 +244,71 @@ const CustomerPage: React.FC = () => {
             <CircularProgress />
           </Box>
         ) : (
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Mobile</TableCell>
-                  <TableCell>Address</TableCell>
-                  <TableCell>Notes</TableCell>
-                  <TableCell align="right">Action</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {customers.length === 0 ? (
+          <>
+            <TableContainer sx={{ maxHeight: 560 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={5} align="center">
-                      {EMPTY_STATES.NO_CUSTOMERS}
-                    </TableCell>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Mobile</TableCell>
+                    <TableCell>Address</TableCell>
+                    <TableCell>Notes</TableCell>
+                    <TableCell align="right">Action</TableCell>
                   </TableRow>
-                ) : (
-                  customers.map((customer) => (
-                    <TableRow key={customer.id}>
-                      <TableCell>{customer.name || "-"}</TableCell>
-                      <TableCell>{customer.mobileNumber || "-"}</TableCell>
-                      <TableCell>{customer.address || "-"}</TableCell>
-                      <TableCell>{customer.notes || "-"}</TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          color="success"
-                          onClick={() => openEdit(customer)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          color="error"
-                          onClick={() => handleDeleteClick(customer.id)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                </TableHead>
+                <TableBody>
+                  {customers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        {EMPTY_STATES.NO_CUSTOMERS}
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                  ) : (
+                    customers
+                      .slice(
+                        page * rowsPerPage,
+                        page * rowsPerPage + rowsPerPage,
+                      )
+                      .map((customer) => (
+                        <TableRow key={customer.id}>
+                          <TableCell>{customer.name || "-"}</TableCell>
+                          <TableCell>{customer.mobileNumber || "-"}</TableCell>
+                          <TableCell>{customer.address || "-"}</TableCell>
+                          <TableCell>{customer.notes || "-"}</TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              color="success"
+                              onClick={() => openEdit(customer)}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              color="error"
+                              onClick={() => handleDeleteClick(customer.id)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <TablePagination
+              rowsPerPageOptions={[25, 50, 100, 200]}
+              component="div"
+              count={customers.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={(_, newPage) => setPage(newPage)}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(parseInt(event.target.value, 10));
+                setPage(0);
+              }}
+            />
+          </>
         )}
       </Paper>
 
