@@ -326,8 +326,8 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
 
       const aEstimated = dayjs(a.estimatedPickup || aTx.estimatedpickup);
       const bEstimated = dayjs(b.estimatedPickup || bTx.estimatedpickup);
-      const aLoaded = Boolean(a.dateLoaded || aTx.dateloaded);
-      const bLoaded = Boolean(b.dateLoaded || bTx.dateloaded);
+      const aLoaded = Boolean(a.dateLoaded || aTx.dateLoaded);
+      const bLoaded = Boolean(b.dateLoaded || bTx.dateLoaded);
       const aPriority = !aLoaded && aEstimated.isValid();
       const bPriority = !bLoaded && bEstimated.isValid();
 
