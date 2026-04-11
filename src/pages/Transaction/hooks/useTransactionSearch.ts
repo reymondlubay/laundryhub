@@ -14,6 +14,7 @@ export interface TransactionSearchState {
   setSearchText: (value: string) => void;
   setSelectedMonth: (value: Dayjs | null) => void;
   search: () => void;
+  clearCustomerAndSearch: () => void;
   clearFilters: () => void;
 }
 
@@ -95,6 +96,27 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
     fetchTransactions(params);
   }, [searchText, selectedMonth, fetchTransactions]);
 
+  const clearCustomerAndSearch = useCallback(() => {
+    setSearchText("");
+
+    const hasMonth = !!selectedMonth;
+    if (!hasMonth) {
+      const defaults = defaultParams();
+      appliedParamsRef.current = defaults;
+      fetchTransactions(defaults);
+      return;
+    }
+
+    const params: TransactionQueryParams = {
+      customer: undefined,
+      fromDate: selectedMonth.startOf("month").format("YYYY-MM-DD"),
+      toDate: selectedMonth.endOf("month").format("YYYY-MM-DD"),
+    };
+
+    appliedParamsRef.current = params;
+    fetchTransactions(params);
+  }, [selectedMonth, fetchTransactions]);
+
   const clearFilters = useCallback(() => {
     setSearchText("");
     setSelectedMonth(null);
@@ -112,6 +134,7 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
     setSearchText,
     setSelectedMonth,
     search,
+    clearCustomerAndSearch,
     clearFilters,
   };
 }

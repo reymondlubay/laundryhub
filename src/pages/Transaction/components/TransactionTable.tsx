@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import dayjs from "dayjs";
@@ -44,8 +45,10 @@ interface FlatTransactionRow {
   isLastRow: boolean;
   hasDateLoaded: boolean;
   hasDatePickup: boolean;
+  hasEstimatedPickup: boolean;
   dateReceived: string | null;
   dateLoaded: string | null;
+  estimatedPickup: string | null;
   customer: string;
   loadType: string;
   kg: number;
@@ -99,6 +102,7 @@ function flattenTransactionRows(
   const tx = transaction as Transaction & {
     datereceived?: string;
     dateloaded?: string;
+    estimatedpickup?: string;
     isdelivered?: boolean;
     datepickup?: string;
   };
@@ -108,8 +112,10 @@ function flattenTransactionRows(
   const transactionId = transaction.id;
   const dateReceived = tx.dateReceived || tx.datereceived || null;
   const dateLoaded = tx.dateLoaded || tx.dateloaded || null;
+  const estimatedPickup = tx.estimatedPickup || tx.estimatedpickup || null;
   const datePickup = tx.datePickup || tx.datepickup || null;
   const hasDateLoaded = Boolean(dateLoaded);
+  const hasEstimatedPickup = Boolean(estimatedPickup);
   const hasDatePickup = Boolean(datePickup);
   const customerName = transaction.customer?.name || "Unknown";
 
@@ -198,9 +204,11 @@ function flattenTransactionRows(
         isFirstRow: true,
         isLastRow: true,
         hasDateLoaded,
+        hasEstimatedPickup,
         hasDatePickup,
         dateReceived,
         dateLoaded,
+        estimatedPickup,
         customer: customerName,
         loadType: "",
         kg: totalKg,
@@ -233,9 +241,11 @@ function flattenTransactionRows(
       isFirstRow,
       isLastRow: index === loadDetails.length - 1,
       hasDateLoaded,
+      hasEstimatedPickup,
       hasDatePickup,
       dateReceived: isFirstRow ? dateReceived : null,
       dateLoaded: isFirstRow ? dateLoaded : null,
+      estimatedPickup: isFirstRow ? estimatedPickup : null,
       customer: customerName,
       loadType: type,
       kg: Number(load.kg || 0),
@@ -303,8 +313,31 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
 
   const sortedTransactions = useMemo(() => {
     return [...transactions].sort((a, b) => {
-      const aTx = a as Transaction & { datereceived?: string };
-      const bTx = b as Transaction & { datereceived?: string };
+      const aTx = a as Transaction & {
+        datereceived?: string;
+        estimatedpickup?: string;
+        datepickup?: string;
+      };
+      const bTx = b as Transaction & {
+        datereceived?: string;
+        estimatedpickup?: string;
+        datepickup?: string;
+      };
+
+      const aEstimated = dayjs(a.estimatedPickup || aTx.estimatedpickup);
+      const bEstimated = dayjs(b.estimatedPickup || bTx.estimatedpickup);
+      const aLoaded = Boolean(a.dateLoaded || aTx.dateloaded);
+      const bLoaded = Boolean(b.dateLoaded || bTx.dateloaded);
+      const aPriority = !aLoaded && aEstimated.isValid();
+      const bPriority = !bLoaded && bEstimated.isValid();
+
+      if (aPriority && !bPriority) return -1;
+      if (!aPriority && bPriority) return 1;
+
+      if (aPriority && bPriority) {
+        const pickupDiff = aEstimated.valueOf() - bEstimated.valueOf();
+        if (pickupDiff !== 0) return pickupDiff;
+      }
 
       const aDate = dayjs(a.dateReceived || aTx.datereceived);
       const bDate = dayjs(b.dateReceived || bTx.datereceived);
@@ -386,15 +419,45 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
           <Box
             sx={{
               display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 1,
               lineHeight: 1.25,
               py: 0.25,
+              width: "100%",
             }}
           >
-            <span>{params.data?.customer || "-"}</span>
-            {params.data?.loadType ? (
-              <span style={{ opacity: 0.7 }}>({params.data.loadType})</span>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                minWidth: 0,
+              }}
+            >
+              <span>{params.data?.customer || "-"}</span>
+              {params.data?.loadType ? (
+                <span style={{ opacity: 0.7 }}>({params.data.loadType})</span>
+              ) : null}
+            </Box>
+            {params.data?.isFirstRow && params.data?.estimatedPickup ? (
+              <Tooltip
+                title={dayjs(params.data.estimatedPickup).format(
+                  "MM-DD-YY h:mm A",
+                )}
+                arrow
+              >
+                <Box
+                  component="span"
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    color: "#f44336",
+                  }}
+                >
+                  <AccessTimeIcon sx={{ fontSize: 16 }} />
+                </Box>
+              </Tooltip>
             ) : null}
           </Box>
         ),
@@ -497,70 +560,77 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
                 justifyContent: "center",
                 padding: 0.5,
                 lineHeight: 1.5,
+                width: "100%",
               }}
             >
               <span>{dayjs(params.value).format("MM-DD-YY")}</span>
-              <Stack
-                direction="row"
-                spacing={0.5}
-                alignItems="center"
-                sx={{ minHeight: 20 }}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  width: "100%",
+                  gap: 1,
+                  minHeight: 22,
+                }}
               >
+                <span>{dayjs(params.value).format("h:mm A")}</span>
                 <Box
                   component="span"
                   sx={{
+                    width: 20,
+                    height: 20,
                     display: "inline-flex",
                     alignItems: "center",
-                    lineHeight: 1,
+                    justifyContent: "center",
                   }}
                 >
-                  {dayjs(params.value).format("h:mm A")}
+                  {hasBalance ? (
+                    <Tooltip title={tooltipTitle} arrow>
+                      <Box
+                        component="span"
+                        sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          height: 16,
+                        }}
+                      >
+                        <WarningAmberIcon
+                          sx={{
+                            color: "#f44336",
+                            fontSize: 16,
+                            display: "block",
+                            verticalAlign: "middle",
+                          }}
+                        />
+                      </Box>
+                    </Tooltip>
+                  ) : null}
+                  {hasPaidOrOver ? (
+                    <Tooltip title={tooltipTitle} arrow>
+                      <Box
+                        component="span"
+                        sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          height: 16,
+                        }}
+                      >
+                        <InfoOutlinedIcon
+                          sx={{
+                            color: "#4caf50",
+                            fontSize: 16,
+                            display: "block",
+                            verticalAlign: "middle",
+                          }}
+                        />
+                      </Box>
+                    </Tooltip>
+                  ) : null}
                 </Box>
-                {hasBalance ? (
-                  <Tooltip title={tooltipTitle} arrow>
-                    <Box
-                      component="span"
-                      sx={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        height: 16,
-                      }}
-                    >
-                      <WarningAmberIcon
-                        sx={{
-                          color: "#f44336",
-                          fontSize: 16,
-                          display: "block",
-                          verticalAlign: "middle",
-                        }}
-                      />
-                    </Box>
-                  </Tooltip>
-                ) : null}
-                {hasPaidOrOver ? (
-                  <Tooltip title={tooltipTitle} arrow>
-                    <Box
-                      component="span"
-                      sx={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        height: 16,
-                      }}
-                    >
-                      <InfoOutlinedIcon
-                        sx={{
-                          color: "#4caf50",
-                          fontSize: 16,
-                          display: "block",
-                          verticalAlign: "middle",
-                        }}
-                      />
-                    </Box>
-                  </Tooltip>
-                ) : null}
-              </Stack>
+              </Box>
             </Box>
           );
         },

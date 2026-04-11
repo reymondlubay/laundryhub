@@ -36,6 +36,7 @@ const Transaction = () => {
     setSearchText,
     setSelectedMonth,
     search,
+    clearCustomerAndSearch,
     clearFilters,
   } = useTransactionSearch(refreshKey);
 
@@ -104,7 +105,7 @@ const Transaction = () => {
                     <InputAdornment position="end">
                       <IconButton
                         size="small"
-                        onClick={() => setSearchText("")}
+                        onClick={clearCustomerAndSearch}
                         edge="end"
                       >
                         <ClearIcon fontSize="small" />

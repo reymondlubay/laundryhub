@@ -5,6 +5,7 @@ import {
   Grid,
   Paper,
   Stack,
+  Tooltip,
   Table,
   TableBody,
   TableCell,
@@ -20,6 +21,7 @@ import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
 import LocalLaundryServiceOutlinedIcon from "@mui/icons-material/LocalLaundryServiceOutlined";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import dayjs from "dayjs";
 import { useThemeContext } from "../../components/ThemeContext/ThemeContext";
 import {
@@ -53,11 +55,12 @@ const isSameDay = (value?: string | null): boolean => {
 
 const getTransactionDate = (
   transaction: Transaction,
-  field: "dateReceived" | "dateLoaded" | "datePickup",
+  field: "dateReceived" | "dateLoaded" | "estimatedPickup" | "datePickup",
 ): string | undefined => {
   const tx = transaction as Transaction & {
     datereceived?: string;
     dateloaded?: string;
+    estimatedpickup?: string;
     datepickup?: string;
   };
 
@@ -67,6 +70,10 @@ const getTransactionDate = (
 
   if (field === "dateLoaded") {
     return transaction.dateLoaded || tx.dateloaded;
+  }
+
+  if (field === "estimatedPickup") {
+    return transaction.estimatedPickup || tx.estimatedpickup;
   }
 
   return transaction.datePickup || tx.datepickup;
@@ -219,6 +226,19 @@ const Dashboard = () => {
     return activeTransactions
       .filter((transaction) => !getTransactionDate(transaction, "dateLoaded"))
       .sort((a, b) => {
+        const aEstimated = dayjs(getTransactionDate(a, "estimatedPickup"));
+        const bEstimated = dayjs(getTransactionDate(b, "estimatedPickup"));
+        const aPriority = aEstimated.isValid();
+        const bPriority = bEstimated.isValid();
+
+        if (aPriority && !bPriority) return -1;
+        if (!aPriority && bPriority) return 1;
+
+        if (aPriority && bPriority) {
+          const pickupDiff = aEstimated.valueOf() - bEstimated.valueOf();
+          if (pickupDiff !== 0) return pickupDiff;
+        }
+
         const aDate = dayjs(getTransactionDate(a, "dateReceived"));
         const bDate = dayjs(getTransactionDate(b, "dateReceived"));
         if (!aDate.isValid() && !bDate.isValid()) return 0;
@@ -572,7 +592,47 @@ const Dashboard = () => {
                                 : "-"}
                             </TableCell>
                             <TableCell sx={{ color: tableCellColor }}>
-                              {transaction.customer?.name || "-"}
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  width: "100%",
+                                  gap: 1,
+                                }}
+                              >
+                                <span>{transaction.customer?.name || "-"}</span>
+                                {dayjs(
+                                  getTransactionDate(
+                                    transaction,
+                                    "estimatedPickup",
+                                  ),
+                                ).isValid() ? (
+                                  <Tooltip
+                                    title={dayjs(
+                                      getTransactionDate(
+                                        transaction,
+                                        "estimatedPickup",
+                                      ),
+                                    ).format("MM-DD-YY h:mm A")}
+                                    arrow
+                                  >
+                                    <Box
+                                      component="span"
+                                      sx={{
+                                        width: 18,
+                                        height: 18,
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        color: "#f44336",
+                                      }}
+                                    >
+                                      <AccessTimeIcon sx={{ fontSize: 16 }} />
+                                    </Box>
+                                  </Tooltip>
+                                ) : null}
+                              </Box>
                             </TableCell>
                             <TableCell
                               align="right"

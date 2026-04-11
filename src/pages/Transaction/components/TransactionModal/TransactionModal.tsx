@@ -88,6 +88,7 @@ export type TransactionFormValues = {
   customer: string;
   receiveDate: Dayjs;
   dateLoaded: Dayjs | null;
+  estimatedPickup: Dayjs | null;
   datePickup: Dayjs | null;
   isDelivered: boolean;
   items: LaundryItem[];
@@ -228,6 +229,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         customer: "",
         receiveDate: dayjs(),
         dateLoaded: null,
+        estimatedPickup: null,
         datePickup: null,
         isDelivered: false,
         items: [{ type: "Clothes", kg: 0, loads: 0, price: 0 }],
@@ -255,6 +257,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       releasedBy?: string;
       datereceived?: string;
       dateloaded?: string;
+      estimatedpickup?: string;
       isdelivered?: boolean;
       datepickup?: string;
       whiteprice?: number;
@@ -270,6 +273,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       dateLoaded:
         tx.dateLoaded || tx.dateloaded
           ? dayjs(tx.dateLoaded || tx.dateloaded)
+          : null,
+      estimatedPickup:
+        tx.estimatedPickup || tx.estimatedpickup
+          ? dayjs(tx.estimatedPickup || tx.estimatedpickup)
           : null,
       datePickup:
         tx.datePickup || tx.datepickup
@@ -304,6 +311,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       .nullable()
       .notRequired()
       .max(today, FORM_ERRORS.FUTURE_DATE_NOT_ALLOWED),
+    estimatedPickup: Yup.date().nullable().notRequired(),
     datePickup: Yup.date()
       .nullable()
       .notRequired()
@@ -394,6 +402,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               customerId: values.customer,
               dateReceived: values.receiveDate.format("YYYY-MM-DDTHH:mm:ss"),
               dateLoaded: toLocalDateTimeString(values.dateLoaded),
+              estimatedPickup: toLocalDateTimeString(values.estimatedPickup),
               datePickup: toLocalDateTimeString(values.datePickup),
               isDelivered: values.isDelivered,
               whitePrice: values.whitePrice,
@@ -450,7 +459,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
           //const totals = calculateTotals(values);
           //console.log("render:", values);
           const renderDatePicker = (
-            field: "receiveDate" | "dateLoaded" | "datePickup",
+            field:
+              | "receiveDate"
+              | "dateLoaded"
+              | "estimatedPickup"
+              | "datePickup",
             label: string,
           ) => (
             <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -546,8 +559,14 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       <Grid size={{ xs: 12, sm: 6 }}>
                         {renderDatePicker("dateLoaded", "Date Loaded")}
                       </Grid>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        {renderDatePicker(
+                          "estimatedPickup",
+                          "Estimated Pickup",
+                        )}
+                      </Grid>
 
-                      <Grid size={{ xs: 12, sm: 6 }} textAlign="center">
+                      <Grid size={{ xs: 12 }} textAlign="center">
                         <FormControlLabel
                           control={
                             <Checkbox
