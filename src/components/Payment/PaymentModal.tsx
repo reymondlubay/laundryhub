@@ -106,7 +106,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     <Dialog open={isOpen} maxWidth="sm" fullWidth>
       <DialogTitle>{isEditMode ? "Edit Payment" : "Add Payment"}</DialogTitle>
       <DialogContent
-        sx={{ pt: 3, display: "flex", flexDirection: "column", gap: 2 }}
+        sx={{ pt: 2.5, display: "flex", flexDirection: "column", gap: 2 }}
       >
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <DateTimePicker
@@ -116,11 +116,21 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             maxDate={dayjs()} // Prevent future dates
             timeSteps={{ minutes: 1 }}
             slotProps={{
+              actionBar: { actions: ["today", "cancel", "accept"] },
               textField: {
                 size: "small",
                 fullWidth: true,
                 error: !!errors.paymentDate,
                 helperText: errors.paymentDate || "",
+                sx: {
+                  mt: 0.5,
+                  "& .MuiInputBase-input": {
+                    color: "text.primary",
+                  },
+                  "& .MuiInputLabel-root": {
+                    color: "text.secondary",
+                  },
+                },
               },
             }}
           />

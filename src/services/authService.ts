@@ -14,6 +14,7 @@ export interface LoginResponse {
   user: {
     id: string;
     userName?: string;
+    username?: string;
     firstName?: string;
     lastName?: string;
     role: string;
@@ -24,6 +25,7 @@ export interface LoginResponse {
 export interface UserInfo {
   id: string;
   userName?: string;
+  username?: string;
   firstName?: string;
   lastName?: string;
   role: string;
@@ -48,7 +50,23 @@ const authService = {
 
         // Store user info
         if (data.user) {
-          localStorage.setItem("user", JSON.stringify(data.user));
+          const normalizedUser = {
+            ...data.user,
+            userName:
+              data.user.userName || data.user.username || credentials.userName,
+            username:
+              data.user.username || data.user.userName || credentials.userName,
+            name:
+              data.user.name ||
+              [data.user.firstName, data.user.lastName]
+                .filter(Boolean)
+                .join(" ")
+                .trim() ||
+              data.user.userName ||
+              data.user.username ||
+              credentials.userName,
+          };
+          localStorage.setItem("user", JSON.stringify(normalizedUser));
         }
       }
 
@@ -102,10 +120,14 @@ const authService = {
         return {
           id: parsed.id,
           role: parsed.role,
-          userName: parsed.userName,
+          userName: parsed.userName || parsed.username,
+          username: parsed.username || parsed.userName,
           firstName: parsed.firstName,
           lastName: parsed.lastName,
-          name: [parsed.firstName, parsed.lastName].filter(Boolean).join(" "),
+          name:
+            [parsed.firstName, parsed.lastName].filter(Boolean).join(" ") ||
+            parsed.userName ||
+            parsed.username,
         };
       } catch {
         return null;
@@ -119,7 +141,22 @@ const authService = {
         : null;
     }
     try {
-      const storedUser = JSON.parse(userStr) as UserInfo;
+      const rawStoredUser = JSON.parse(userStr) as UserInfo & {
+        username?: string;
+      };
+      const storedUser: UserInfo = {
+        ...rawStoredUser,
+        userName: rawStoredUser.userName || rawStoredUser.username,
+        username: rawStoredUser.username || rawStoredUser.userName,
+        name:
+          rawStoredUser.name ||
+          [rawStoredUser.firstName, rawStoredUser.lastName]
+            .filter(Boolean)
+            .join(" ")
+            .trim() ||
+          rawStoredUser.userName ||
+          rawStoredUser.username,
+      };
       if (storedUser.userName || storedUser.firstName || storedUser.name) {
         return storedUser;
       }

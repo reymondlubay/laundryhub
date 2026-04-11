@@ -28,8 +28,11 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error: AxiosError) => {
+    const requestUrl = error.config?.url ?? "";
+    const isLoginRequest = requestUrl.includes("/login");
+
     // Handle 401 unauthorized
-    if (error?.response?.status === 401) {
+    if (error?.response?.status === 401 && !isLoginRequest) {
       storage.removeToken(storageKey.TOKEN);
       localStorage.removeItem("user");
       window.location.href = "/login";

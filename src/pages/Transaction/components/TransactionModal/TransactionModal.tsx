@@ -465,15 +465,22 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               | "estimatedPickup"
               | "datePickup",
             label: string,
+            clearable = false,
           ) => (
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DateTimePicker
                 label={label}
                 value={values[field]}
                 onChange={(val) => setFieldValue(field, val)}
-                maxDate={dayjs()} // disable future dates
+                {...(field === "estimatedPickup"
+                  ? { disablePast: true }
+                  : { maxDate: dayjs() })}
                 timeSteps={{ minutes: 1 }}
                 slotProps={{
+                  field: {
+                    clearable,
+                    onClear: () => setFieldValue(field, null),
+                  },
                   textField: {
                     size: "small",
                     fullWidth: true,
@@ -557,12 +564,13 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         {renderDatePicker("receiveDate", "Date Received")}
                       </Grid>
                       <Grid size={{ xs: 12, sm: 6 }}>
-                        {renderDatePicker("dateLoaded", "Date Loaded")}
+                        {renderDatePicker("dateLoaded", "Date Loaded", true)}
                       </Grid>
                       <Grid size={{ xs: 12, sm: 6 }}>
                         {renderDatePicker(
                           "estimatedPickup",
                           "Estimated Pickup",
+                          true,
                         )}
                       </Grid>
 
@@ -846,7 +854,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       </Grid>
 
                       <Grid size={{ xs: 12, sm: 6 }}>
-                        {renderDatePicker("datePickup", "Date Pickup")}
+                        {renderDatePicker("datePickup", "Date Pickup", true)}
                       </Grid>
 
                       <Grid size={{ xs: 12, sm: 6 }}>

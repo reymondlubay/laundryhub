@@ -288,8 +288,8 @@ const DatabaseSettings: React.FC = () => {
         {initialLoading ? (
           <TableContainer>
             <Table size="small">
-              <TableHeaderSkeleton columns={5} />
-              <TableSkeleton columns={5} rows={5} />
+              <TableHeaderSkeleton columns={6} />
+              <TableSkeleton columns={6} rows={5} />
             </Table>
           </TableContainer>
         ) : (
@@ -301,6 +301,11 @@ const DatabaseSettings: React.FC = () => {
                     sx={{ color: headColor, borderBottomColor: borderColor }}
                   >
                     Filename
+                  </TableCell>
+                  <TableCell
+                    sx={{ color: headColor, borderBottomColor: borderColor }}
+                  >
+                    Backup Location
                   </TableCell>
                   <TableCell
                     sx={{ color: headColor, borderBottomColor: borderColor }}
@@ -329,7 +334,7 @@ const DatabaseSettings: React.FC = () => {
                 {backups.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={6}
                       align="center"
                       sx={{ color: cellColor, borderBottomColor: borderColor }}
                     >
@@ -348,6 +353,16 @@ const DatabaseSettings: React.FC = () => {
                           }}
                         >
                           {backup.filename}
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            color: cellColor,
+                            borderBottomColor: borderColor,
+                            maxWidth: 280,
+                            wordBreak: "break-all",
+                          }}
+                        >
+                          {backup.filepath || "-"}
                         </TableCell>
                         <TableCell
                           sx={{

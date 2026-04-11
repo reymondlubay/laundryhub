@@ -43,7 +43,12 @@ const UserMenu: React.FC = () => {
     .filter(Boolean)
     .join(" ")
     .trim();
-  const displayName = fullName || user?.name || user?.userName || "User";
+  const displayName =
+    fullName ||
+    user?.name ||
+    user?.userName ||
+    (user as { username?: string } | null)?.username ||
+    "User";
 
   return (
     <>
