@@ -136,6 +136,27 @@ Get-Service LaundryHubBackend
 netstat -ano | findstr :5000
 ```
 
+### PM2 Alternative (instead of NSSM)
+
+If you prefer PM2 to manage backend process startup/restart on Windows:
+
+```powershell
+cd C:\Projects\laundryhubbackend
+npm.cmd install -g pm2 pm2-windows-startup
+pm2.cmd start ecosystem.config.js --env production
+pm2-startup.cmd install
+pm2.cmd save
+pm2.cmd list
+```
+
+PowerShell policy note:
+- If you see `running scripts is disabled on this system`, use `*.cmd` commands (`npm.cmd`, `pm2.cmd`, `pm2-startup.cmd`).
+- Optional temporary bypass for current shell only:
+  `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
+- Check and restore policies after setup:
+  `Get-ExecutionPolicy -List`
+  `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Restricted`
+
 ## 7. IIS Setup
 
 Open IIS Manager (`inetmgr`).
@@ -293,6 +314,49 @@ Get-Service LaundryHubBackend
 ### Service starts then exits
 - Check logs: `C:\Logs\laundryhub-stderr.log`
 - Validate `.env` keys and values
+
+### PM2 resurrects the wrong backend path after reboot
+- Cause: PM2 is loading an old saved process list from its dump file at startup.
+- Fix by resetting PM2 state, then saving only the correct process.
+
+Run in PowerShell as the same Windows user that runs PM2 startup:
+
+```powershell
+# 1) Stop PM2 daemon and clear current process list
+pm2.cmd kill
+pm2.cmd delete all
+
+# 2) Remove stale saved dump (if PM2_HOME is not set, use default)
+$pm2Home = if ($env:PM2_HOME) { $env:PM2_HOME } else { "$env:USERPROFILE\.pm2" }
+Remove-Item "$pm2Home\dump.pm2" -Force -ErrorAction SilentlyContinue
+
+# 3) Start the correct backend from the correct folder
+cd "C:\Projects\Laundryhub Prod\laundryhubbackend"
+pm2.cmd start ecosystem.config.js --env production
+
+# 4) Verify script path and working directory
+pm2.cmd list
+pm2.cmd show 0
+
+# 5) Save this as the only startup state
+pm2.cmd save --force
+```
+
+If reboot still restores the wrong app, startup is likely running under a different account:
+- Reinstall startup under the intended account:
+
+```powershell
+pm2-startup.cmd uninstall
+pm2-startup.cmd install
+pm2.cmd save --force
+```
+
+- Confirm current account and PM2 home:
+
+```powershell
+whoami
+echo $env:PM2_HOME
+```
 
 ## 14. Post-Deployment Operations
 
