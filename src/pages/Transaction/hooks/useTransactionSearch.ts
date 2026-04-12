@@ -9,10 +9,15 @@ export interface TransactionSearchState {
   searchText: string;
   selectedMonth: Dayjs | null;
   transactions: Transaction[];
+  page: number;
+  rowsPerPage: number;
+  totalCount: number;
   loading: boolean;
   error: string | null;
   setSearchText: (value: string) => void;
   setSelectedMonth: (value: Dayjs | null) => void;
+  setPage: (value: number) => void;
+  setRowsPerPage: (value: number) => void;
   search: () => void;
   clearCustomerAndSearch: () => void;
   clearFilters: () => void;
@@ -35,6 +40,9 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
   const [searchText, setSearchText] = useState("");
   const [selectedMonth, setSelectedMonth] = useState<Dayjs | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,8 +59,13 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
       try {
         setLoading(true);
         setError(null);
-        const data = await transactionService.getAll(params);
-        setTransactions(data);
+        const result = await transactionService.getPage({
+          ...params,
+          page: page + 1,
+          pageSize: rowsPerPage,
+        });
+        setTransactions(result.items);
+        setTotalCount(result.total);
       } catch (err: unknown) {
         if (err instanceof Error && err.name === "AbortError") return;
         const message =
@@ -62,13 +75,13 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
         setLoading(false);
       }
     },
-    [],
+    [page, rowsPerPage],
   );
 
   // Initial load and refreshKey-triggered reload using the last applied params.
   useEffect(() => {
     fetchTransactions(appliedParamsRef.current);
-  }, [refreshKey, fetchTransactions]);
+  }, [refreshKey, page, rowsPerPage, fetchTransactions]);
 
   // Explicit search triggered by the Search button
   const search = useCallback(() => {
@@ -78,7 +91,11 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
     if (!hasText && !hasMonth) {
       const defaults = defaultParams();
       appliedParamsRef.current = defaults;
-      fetchTransactions(defaults);
+      if (page === 0) {
+        fetchTransactions(defaults);
+      } else {
+        setPage(0);
+      }
       return;
     }
 
@@ -93,8 +110,12 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
     };
 
     appliedParamsRef.current = params;
-    fetchTransactions(params);
-  }, [searchText, selectedMonth, fetchTransactions]);
+    if (page === 0) {
+      fetchTransactions(params);
+    } else {
+      setPage(0);
+    }
+  }, [searchText, selectedMonth, fetchTransactions, page]);
 
   const clearCustomerAndSearch = useCallback(() => {
     setSearchText("");
@@ -103,7 +124,11 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
     if (!hasMonth) {
       const defaults = defaultParams();
       appliedParamsRef.current = defaults;
-      fetchTransactions(defaults);
+      if (page === 0) {
+        fetchTransactions(defaults);
+      } else {
+        setPage(0);
+      }
       return;
     }
 
@@ -114,25 +139,38 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
     };
 
     appliedParamsRef.current = params;
-    fetchTransactions(params);
-  }, [selectedMonth, fetchTransactions]);
+    if (page === 0) {
+      fetchTransactions(params);
+    } else {
+      setPage(0);
+    }
+  }, [selectedMonth, fetchTransactions, page]);
 
   const clearFilters = useCallback(() => {
     setSearchText("");
     setSelectedMonth(null);
     const defaults = defaultParams();
     appliedParamsRef.current = defaults;
-    fetchTransactions(defaults);
-  }, [fetchTransactions]);
+    if (page === 0) {
+      fetchTransactions(defaults);
+    } else {
+      setPage(0);
+    }
+  }, [fetchTransactions, page]);
 
   return {
     searchText,
     selectedMonth,
     transactions,
+    page,
+    rowsPerPage,
+    totalCount,
     loading,
     error,
     setSearchText,
     setSelectedMonth,
+    setPage,
+    setRowsPerPage,
     search,
     clearCustomerAndSearch,
     clearFilters,

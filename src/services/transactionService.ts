@@ -109,7 +109,53 @@ export interface UpdateTransactionRequest {
   }>;
 }
 
+export interface TransactionListResponse {
+  items: Transaction[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 const transactionService = {
+  getPage: async (params: {
+    customer?: string;
+    fromDate?: string;
+    toDate?: string;
+    date?: string;
+    page: number;
+    pageSize: number;
+  }): Promise<TransactionListResponse> => {
+    try {
+      const response = await axiosClient.get(API_ROUTES.TRANSACTIONS, {
+        params,
+      });
+      const payload = response.data || {};
+      const items = Array.isArray(payload.transactions)
+        ? payload.transactions
+        : Array.isArray(payload.data)
+          ? payload.data
+          : [];
+
+      return {
+        items,
+        total: Number(payload.total || items.length || 0),
+        page: Number(payload.page || params.page || 1),
+        pageSize: Number(payload.pageSize || params.pageSize || items.length || 1),
+      };
+    } catch (error: unknown) {
+      throw new Error(
+        typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { data?: { message?: string } } })
+            .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.FETCH_TRANSACTIONS_FAILED
+          : API_ERRORS.FETCH_TRANSACTIONS_FAILED,
+      );
+    }
+  },
+
   // Get all transactions, optionally filtered
   getAll: async (params?: {
     customer?: string;

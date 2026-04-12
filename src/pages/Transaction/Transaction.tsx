@@ -11,6 +11,7 @@ import {
   Typography,
   InputAdornment,
   IconButton,
+  TablePagination,
 } from "@mui/material";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -31,10 +32,15 @@ const Transaction = () => {
     searchText,
     selectedMonth,
     transactions,
+    page,
+    rowsPerPage,
+    totalCount,
     loading,
     error,
     setSearchText,
     setSelectedMonth,
+    setPage,
+    setRowsPerPage,
     search,
     clearCustomerAndSearch,
     clearFilters,
@@ -242,6 +248,18 @@ const Transaction = () => {
         error={error}
         onEditTransaction={handleEditTransaction}
         onDeleted={() => setRefreshKey((prev) => prev + 1)}
+      />
+      <TablePagination
+        component="div"
+        rowsPerPageOptions={[20, 50, 100, 200]}
+        count={totalCount}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={(_, newPage) => setPage(newPage)}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(parseInt(event.target.value, 10));
+          setPage(0);
+        }}
       />
       <TransactionModal
         isOpen={openTransaction}

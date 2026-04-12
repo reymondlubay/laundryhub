@@ -67,15 +67,21 @@ const CustomerPage: React.FC = () => {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deleteCustomerId, setDeleteCustomerId] = useState<string | null>(null);
   const [form, setForm] = useState<CustomerFormState>(emptyForm);
+  const [totalCustomers, setTotalCustomers] = useState(0);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(50);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
 
-  const loadCustomers = useCallback(async (searchTerm = "") => {
+  const loadCustomers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await customerService.getAll(searchTerm);
-      setCustomers(data);
+      const result = await customerService.getPage({
+        search: activeSearch,
+        page: page + 1,
+        pageSize: rowsPerPage,
+      });
+      setCustomers(result.items);
+      setTotalCustomers(result.total);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : API_ERRORS.LOAD_CUSTOMERS_FAILED;
@@ -83,7 +89,7 @@ const CustomerPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeSearch, page, rowsPerPage]);
 
   useEffect(() => {
     void loadCustomers();
@@ -91,18 +97,16 @@ const CustomerPage: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [activeSearch, customers.length]);
+  }, [activeSearch]);
 
   const handleSearch = () => {
     const nextSearch = searchInput.trim();
     setActiveSearch(nextSearch);
-    void loadCustomers(nextSearch);
   };
 
   const handleClearSearch = () => {
     setSearchInput("");
     setActiveSearch("");
-    void loadCustomers();
   };
 
   const openCreate = () => {
@@ -165,7 +169,7 @@ const CustomerPage: React.FC = () => {
       }
 
       closeDialog();
-      await loadCustomers(activeSearch);
+      await loadCustomers();
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : API_ERRORS.SAVE_FAILED;
@@ -187,7 +191,7 @@ const CustomerPage: React.FC = () => {
       setError(null);
       await customerService.delete(deleteCustomerId);
       setDeleteCustomerId(null);
-      await loadCustomers(activeSearch);
+      await loadCustomers();
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : API_ERRORS.DELETE_CUSTOMER_FAILED;
@@ -270,12 +274,7 @@ const CustomerPage: React.FC = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    customers
-                      .slice(
-                        page * rowsPerPage,
-                        page * rowsPerPage + rowsPerPage,
-                      )
-                      .map((customer) => (
+                    customers.map((customer) => (
                         <TableRow key={customer.id}>
                           <TableCell>{customer.name || "-"}</TableCell>
                           <TableCell>{customer.mobileNumber || "-"}</TableCell>
@@ -303,9 +302,9 @@ const CustomerPage: React.FC = () => {
             </TableContainer>
 
             <TablePagination
-              rowsPerPageOptions={[25, 50, 100, 200]}
+              rowsPerPageOptions={[20, 50, 100, 200]}
               component="div"
-              count={customers.length}
+              count={totalCustomers}
               rowsPerPage={rowsPerPage}
               page={page}
               onPageChange={(_, newPage) => setPage(newPage)}
