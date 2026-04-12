@@ -140,7 +140,9 @@ const transactionService = {
         items,
         total: Number(payload.total || items.length || 0),
         page: Number(payload.page || params.page || 1),
-        pageSize: Number(payload.pageSize || params.pageSize || items.length || 1),
+        pageSize: Number(
+          payload.pageSize || params.pageSize || items.length || 1,
+        ),
       };
     } catch (error: unknown) {
       throw new Error(

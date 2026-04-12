@@ -275,27 +275,27 @@ const CustomerPage: React.FC = () => {
                     </TableRow>
                   ) : (
                     customers.map((customer) => (
-                        <TableRow key={customer.id}>
-                          <TableCell>{customer.name || "-"}</TableCell>
-                          <TableCell>{customer.mobileNumber || "-"}</TableCell>
-                          <TableCell>{customer.address || "-"}</TableCell>
-                          <TableCell>{customer.notes || "-"}</TableCell>
-                          <TableCell align="right">
-                            <IconButton
-                              color="success"
-                              onClick={() => openEdit(customer)}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              color="error"
-                              onClick={() => handleDeleteClick(customer.id)}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      <TableRow key={customer.id}>
+                        <TableCell>{customer.name || "-"}</TableCell>
+                        <TableCell>{customer.mobileNumber || "-"}</TableCell>
+                        <TableCell>{customer.address || "-"}</TableCell>
+                        <TableCell>{customer.notes || "-"}</TableCell>
+                        <TableCell align="right">
+                          <IconButton
+                            color="success"
+                            onClick={() => openEdit(customer)}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            color="error"
+                            onClick={() => handleDeleteClick(customer.id)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
                 </TableBody>
               </Table>
