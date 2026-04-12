@@ -51,6 +51,7 @@ export interface Transaction {
   isDelivered: boolean;
   notes?: string;
   isDeleted: boolean;
+  deleteReason?: string;
   createdAt: string;
   updatedAt: string;
   loadDetails: LoadDetail[];
@@ -116,6 +117,7 @@ const transactionService = {
     fromDate?: string;
     toDate?: string;
     date?: string;
+    includeDeleted?: boolean;
   }): Promise<Transaction[]> => {
     try {
       const response = await axiosClient.get(API_ROUTES.TRANSACTIONS, {
@@ -221,9 +223,11 @@ const transactionService = {
   },
 
   // Delete transaction
-  delete: async (id: string): Promise<void> => {
+  delete: async (id: string, deleteReason?: string): Promise<void> => {
     try {
-      await axiosClient.delete(`${API_ROUTES.TRANSACTIONS}/${id}`);
+      await axiosClient.delete(`${API_ROUTES.TRANSACTIONS}/${id}`, {
+        data: { deleteReason },
+      });
     } catch (error: unknown) {
       throw new Error(
         typeof error === "object" &&

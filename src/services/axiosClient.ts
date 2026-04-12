@@ -2,8 +2,13 @@ import axios, { AxiosError } from "axios";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { storage, storageKey } from "../utils/storage";
 
-const baseURL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5001/api";
+const baseURL = import.meta.env.VITE_API_BASE_URL;
+
+if (!baseURL) {
+  throw new Error(
+    "Missing VITE_API_BASE_URL. Set it in frontend .env (e.g. VITE_API_BASE_URL=/api).",
+  );
+}
 
 const axiosClient = axios.create({
   baseURL,

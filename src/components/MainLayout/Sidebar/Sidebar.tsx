@@ -175,6 +175,12 @@ export default function SidebarMenu() {
               Transaction Report
             </MenuItem>
             <MenuItem
+              component={<Link to={route.REPORT_TRANSACTION_SUMMARY} />}
+              active={activePath === route.REPORT_TRANSACTION_SUMMARY}
+            >
+              Transaction Summary
+            </MenuItem>
+            <MenuItem
               component={<Link to={route.REPORT_CUSTOMER} />}
               active={activePath === route.REPORT_CUSTOMER}
             >

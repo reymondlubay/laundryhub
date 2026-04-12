@@ -27,12 +27,10 @@ import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../../services/addonsPricingService";
-import {
-  CONFIRM_MESSAGES,
-  EMPTY_STATES,
-  UI_TEXT,
-} from "../../../constants/messages";
-import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.tsx";
+import { EMPTY_STATES, UI_TEXT } from "../../../constants/messages";
+import TransactionDeleteDialog, {
+  type DeleteReason,
+} from "../../../components/TransactionDeleteDialog/TransactionDeleteDialog";
 import { getAddonsTotal, getStoredSnapshots } from "../../../utils/pricing";
 import "./TransactionTable.css";
 
@@ -297,19 +295,22 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
     setDeleteTransactionId(transactionId);
   }, []);
 
-  const handleDeleteTransactionConfirm = useCallback(async () => {
-    if (!deleteTransactionId) return;
+  const handleDeleteTransactionConfirm = useCallback(
+    async (deleteReason: DeleteReason) => {
+      if (!deleteTransactionId) return;
 
-    try {
-      await transactionService.delete(deleteTransactionId);
-      setDeleteTransactionId(null);
-      onDeleted?.();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to delete transaction";
-      setDeleteError(message);
-    }
-  }, [deleteTransactionId, onDeleted]);
+      try {
+        await transactionService.delete(deleteTransactionId, deleteReason);
+        setDeleteTransactionId(null);
+        onDeleted?.();
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : "Failed to delete transaction";
+        setDeleteError(message);
+      }
+    },
+    [deleteTransactionId, onDeleted],
+  );
 
   const sortedTransactions = useMemo(() => {
     return [...transactions].sort((a, b) => {
@@ -882,11 +883,8 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
         )}
       </div>
 
-      <ConfirmDialog
+      <TransactionDeleteDialog
         open={Boolean(deleteTransactionId)}
-        title="Confirm Delete"
-        message={CONFIRM_MESSAGES.DELETE_TRANSACTION}
-        confirmText={UI_TEXT.DELETE}
         onClose={() => setDeleteTransactionId(null)}
         onConfirm={handleDeleteTransactionConfirm}
       />

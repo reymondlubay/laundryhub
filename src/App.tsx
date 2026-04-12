@@ -18,6 +18,9 @@ const CustomerPage = lazy(() => import("./pages/Customer/Customer"));
 const TransactionReportPage = lazy(
   () => import("./pages/Reports/TransactionReport"),
 );
+const TransactionSummaryPage = lazy(
+  () => import("./pages/Reports/TransactionSummary"),
+);
 const CustomerReportPage = lazy(() => import("./pages/Reports/CustomerReport"));
 const SettingsDatabasePage = lazy(() => import("./pages/Settings/Database"));
 const SettingsAddonsPricingPage = lazy(
@@ -97,6 +100,18 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <TransactionReportPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.REPORT_TRANSACTION_SUMMARY}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <TransactionSummaryPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>

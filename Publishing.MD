@@ -11,8 +11,8 @@ LaundryHub is a full-stack app:
 
 Recommended production layout:
 - IIS serves the frontend static build
-- Node backend runs as a Windows service on port `5000`
-- IIS proxies `/api/*` to `http://localhost:5000`
+- Node backend runs as a Windows service on the port set in backend `.env` (`PORT`)
+- IIS proxies `/api/*` to `http://localhost:<backend PORT>`
 
 ## 2. Prerequisites
 
@@ -57,7 +57,7 @@ Output: `C:\Projects\laundryhubbackend\dist`
 Create `C:\Projects\laundryhubbackend\.env`:
 
 ```env
-PORT=5000
+PORT=50001
 NODE_ENV=production
 API_PREFIX=/api
 
@@ -264,7 +264,7 @@ In IIS Site Bindings:
 
 Recommended:
 - Force HTTPS redirect
-- Keep backend private (`localhost:5000`) and only expose through IIS
+- Keep backend private (`localhost:<backend PORT>`) and only expose through IIS
 
 ## 11. Firewall
 

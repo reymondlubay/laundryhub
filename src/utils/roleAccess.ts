@@ -13,6 +13,7 @@ const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
     "/transaction",
     "/customer",
     "/reports/transaction",
+    "/reports/transaction-summary",
     "/reports/customer",
     "/users",
     "/settings/database",
