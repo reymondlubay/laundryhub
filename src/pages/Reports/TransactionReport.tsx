@@ -50,6 +50,12 @@ type BackdatePaymentRow = {
   }>;
 };
 
+type BackdatePickupRow = {
+  transaction: Transaction;
+  datePickup: string | undefined;
+  datePickupModifiedAt: string | undefined;
+};
+
 type LoadLike = {
   kg?: number | string | null;
   loads?: number | string | null;
@@ -251,12 +257,16 @@ const TransactionReport: React.FC = () => {
   const [payRowsPerPage, setPayRowsPerPage] = React.useState(50);
   const [backdatePage, setBackdatePage] = React.useState(0);
   const [backdateRowsPerPage, setBackdateRowsPerPage] = React.useState(50);
+  const [backdatePickupPage, setBackdatePickupPage] = React.useState(0);
+  const [backdatePickupRowsPerPage, setBackdatePickupRowsPerPage] =
+    React.useState(50);
 
   // Reset pages when filters change
   React.useEffect(() => {
     setLoadPage(0);
     setPayPage(0);
     setBackdatePage(0);
+    setBackdatePickupPage(0);
   }, [selectedCustomer, dateFrom, dateTo]);
 
   React.useEffect(() => {
@@ -482,6 +492,73 @@ const TransactionReport: React.FC = () => {
         };
       })
       .filter((row): row is BackdatePaymentRow => row !== null);
+  }, [dateFrom, dateTo, filteredByCustomer]);
+
+  const backdatePickupRows = React.useMemo(() => {
+    const range = normalizeRange(dateFrom, dateTo);
+    console.log(
+      "Date range:",
+      range.from.format("YYYY-MM-DD"),
+      "to",
+      range.to.format("YYYY-MM-DD"),
+    );
+
+    return filteredByCustomer
+      .map<BackdatePickupRow | null>((transaction) => {
+        const datePickup = getTransactionFieldDate(transaction, "datePickup");
+        const datePickupModifiedAt = transaction.datePickupModifiedAt;
+
+        console.log(`Transaction ${transaction.id}:`, {
+          datePickup,
+          datePickupModifiedAt,
+          hasBoth: !!(datePickup && datePickupModifiedAt),
+          datePickupType: typeof datePickup,
+          datePickupModifiedAtType: typeof datePickupModifiedAt,
+        });
+
+        // Check if date pickup modified date is within range
+        const isInRange = isWithinRange(
+          datePickupModifiedAt,
+          range.from,
+          range.to,
+        );
+        console.log(
+          `Transaction ${transaction.id}: isWithinRange(${datePickupModifiedAt}, ${range.from.format("YYYY-MM-DD")}, ${range.to.format("YYYY-MM-DD")}) = ${isInRange}`,
+        );
+        if (!isInRange) {
+          console.log(
+            `Transaction ${transaction.id}: datePickupModifiedAt not in range`,
+          );
+          return null;
+        }
+
+        // Both datePickup and datePickupModifiedAt must exist
+        if (!datePickup || !datePickupModifiedAt) {
+          console.log(
+            `Transaction ${transaction.id}: missing datePickup or datePickupModifiedAt`,
+          );
+          return null;
+        }
+
+        // Check if pickup date is before the modified date (comparing dates only)
+        const pickupDate = dayjs(datePickup).startOf("day");
+        const modifiedDate = dayjs(datePickupModifiedAt).startOf("day");
+        const isBefore = pickupDate.isBefore(modifiedDate);
+        console.log(
+          `Transaction ${transaction.id}: pickupDate=${pickupDate.format("YYYY-MM-DD")}, modifiedDate=${modifiedDate.format("YYYY-MM-DD")}, isBefore=${isBefore}`,
+        );
+
+        if (!isBefore) {
+          return null;
+        }
+
+        return {
+          transaction,
+          datePickup,
+          datePickupModifiedAt,
+        };
+      })
+      .filter((row): row is BackdatePickupRow => row !== null);
   }, [dateFrom, dateTo, filteredByCustomer]);
 
   const normalizedRange = normalizeRange(dateFrom, dateTo);
@@ -944,18 +1021,24 @@ const TransactionReport: React.FC = () => {
                             <TableCell>
                               <Stack spacing={0.5}>
                                 {payments.map((payment) => (
-                                  <span key={`${payment.paymentId}-paid`}>
+                                  <Box
+                                    key={`${payment.paymentId}-paid`}
+                                    sx={{ color: "#f57c00", fontWeight: 700 }}
+                                  >
                                     {formatDateTime(payment.paymentDate)}
-                                  </span>
+                                  </Box>
                                 ))}
                               </Stack>
                             </TableCell>
                             <TableCell>
                               <Stack spacing={0.5}>
                                 {payments.map((payment) => (
-                                  <span key={`${payment.paymentId}-created`}>
+                                  <Box
+                                    key={`${payment.paymentId}-created`}
+                                    sx={{ color: "#2196f3", fontWeight: 700 }}
+                                  >
                                     {formatDateTime(payment.createdPaymentDate)}
-                                  </span>
+                                  </Box>
                                 ))}
                               </Stack>
                             </TableCell>
@@ -985,6 +1068,106 @@ const TransactionReport: React.FC = () => {
               onRowsPerPageChange={(e) => {
                 setBackdateRowsPerPage(parseInt(e.target.value, 10));
                 setBackdatePage(0);
+              }}
+            />
+          </Paper>
+
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
+              Backdate Date Pickup Report
+            </Typography>
+            <TableContainer sx={{ maxHeight: 450 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date Receive</TableCell>
+                    <TableCell>Customer</TableCell>
+                    <TableCell>kg</TableCell>
+                    <TableCell>load</TableCell>
+                    <TableCell>price</TableCell>
+                    <TableCell>Date loaded</TableCell>
+                    <TableCell>Date Pickup</TableCell>
+                    <TableCell>Date Pickup Modified</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {backdatePickupRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center">
+                        No records found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    backdatePickupRows
+                      .slice(
+                        backdatePickupPage * backdatePickupRowsPerPage,
+                        backdatePickupPage * backdatePickupRowsPerPage +
+                          backdatePickupRowsPerPage,
+                      )
+                      .map(
+                        ({ transaction, datePickup, datePickupModifiedAt }) => {
+                          const totals = getTransactionTotals(
+                            transaction,
+                            addonsPricing,
+                          );
+
+                          return (
+                            <TableRow
+                              key={`backdate-pickup-${transaction.id}`}
+                              sx={{ backgroundColor: "#fff3e0" }}
+                            >
+                              <TableCell>
+                                {formatDateTime(
+                                  getTransactionFieldDate(
+                                    transaction,
+                                    "dateReceived",
+                                  ),
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {transaction.customer?.name || "-"}
+                              </TableCell>
+                              <TableCell>{formatCount(totals.kg)}</TableCell>
+                              <TableCell>{formatCount(totals.loads)}</TableCell>
+                              <TableCell>
+                                {formatCurrency(totals.price)}
+                              </TableCell>
+                              <TableCell>
+                                {formatDateTime(
+                                  getTransactionFieldDate(
+                                    transaction,
+                                    "dateLoaded",
+                                  ),
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Box sx={{ color: "#f57c00", fontWeight: 700 }}>
+                                  {formatDateTime(datePickup)}
+                                </Box>
+                              </TableCell>
+                              <TableCell>
+                                <Box sx={{ color: "#2196f3", fontWeight: 700 }}>
+                                  {formatDateTime(datePickupModifiedAt)}
+                                </Box>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        },
+                      )
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              rowsPerPageOptions={[25, 50, 100, 200]}
+              component="div"
+              count={backdatePickupRows.length}
+              rowsPerPage={backdatePickupRowsPerPage}
+              page={backdatePickupPage}
+              onPageChange={(_, newPage) => setBackdatePickupPage(newPage)}
+              onRowsPerPageChange={(e) => {
+                setBackdatePickupRowsPerPage(parseInt(e.target.value, 10));
+                setBackdatePickupPage(0);
               }}
             />
           </Paper>

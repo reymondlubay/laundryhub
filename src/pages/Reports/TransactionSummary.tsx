@@ -4,7 +4,6 @@ import {
   Autocomplete,
   Alert,
   Box,
-  Button,
   CircularProgress,
   FormControl,
   Grid,
@@ -47,6 +46,8 @@ type PaymentWithLegacyFields = {
   mode?: string;
   paymentDate?: string;
   paymentdate?: string;
+  createdAt?: string;
+  createdat?: string;
 };
 
 const getTransactionFieldDate = (
@@ -72,7 +73,9 @@ type TransactionStatus =
   | "with-balance"
   | "unpaid"
   | "not-picked"
-  | "withdrawn";
+  | "withdrawn"
+  | "backdate-payment"
+  | "backdate-pickup";
 
 const formatDateTime = (value?: string | null): string => {
   if (!value) return "-";
@@ -83,6 +86,20 @@ const getPaymentDate = (
   payment: PaymentWithLegacyFields,
 ): string | undefined => {
   return payment.paymentDate || payment.paymentdate;
+};
+
+const getPaymentCreatedDate = (
+  payment: PaymentWithLegacyFields,
+): string | undefined => {
+  return payment.createdAt || payment.createdat || getPaymentDate(payment);
+};
+
+const isSameCalendarDay = (first?: string, second?: string): boolean => {
+  if (!first || !second) return true;
+  const firstDate = dayjs(first);
+  const secondDate = dayjs(second);
+  if (!firstDate.isValid() || !secondDate.isValid()) return true;
+  return firstDate.format("YYYY-MM-DD") === secondDate.format("YYYY-MM-DD");
 };
 
 const formatAmount = (amount: number): string => {
@@ -176,6 +193,27 @@ const getTotalPaid = (transaction: Transaction): number => {
   );
 };
 
+const hasBackdatePayment = (transaction: Transaction): boolean => {
+  const payments = transaction.paymentDetails || [];
+  return payments.some((payment) => {
+    const datePaid = getPaymentDate(payment as PaymentWithLegacyFields);
+    const createdDate = getPaymentCreatedDate(
+      payment as PaymentWithLegacyFields,
+    );
+    if (!datePaid || !createdDate) return false;
+    return !isSameCalendarDay(datePaid, createdDate);
+  });
+};
+
+const hasBackdatePickup = (transaction: Transaction): boolean => {
+  const datePickup = getTransactionFieldDate(transaction, "datePickup");
+  const modifiedAt = transaction.datePickupModifiedAt;
+  if (!datePickup || !modifiedAt) return false;
+  const pickupDate = dayjs(datePickup).startOf("day");
+  const modifiedDate = dayjs(modifiedAt).startOf("day");
+  return pickupDate.isBefore(modifiedDate);
+};
+
 const matchesFilter = (
   transaction: Transaction,
   status: TransactionStatus,
@@ -200,6 +238,10 @@ const matchesFilter = (
       return totalPaid === 0;
     case "not-picked":
       return !datePickup;
+    case "backdate-payment":
+      return hasBackdatePayment(transaction);
+    case "backdate-pickup":
+      return hasBackdatePickup(transaction);
     case "withdrawn":
       return getDeleteReason(transaction).toLowerCase() === "withdrawn";
     default:
@@ -393,18 +435,6 @@ const TransactionSummary = () => {
                 />
               </LocalizationProvider>
             </Grid>
-
-            {/* Search Button */}
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <Button
-                variant="contained"
-                fullWidth
-                sx={{ height: "40px" }}
-                disabled={loading}
-              >
-                Search
-              </Button>
-            </Grid>
           </Grid>
 
           {/* Status Filter - Standalone */}
@@ -427,6 +457,8 @@ const TransactionSummary = () => {
                 <MenuItem value="with-balance">With balance</MenuItem>
                 <MenuItem value="unpaid">Unpaid</MenuItem>
                 <MenuItem value="not-picked">Not picked up</MenuItem>
+                <MenuItem value="backdate-payment">Backdate payment</MenuItem>
+                <MenuItem value="backdate-pickup">Backdate pickup</MenuItem>
                 <MenuItem value="withdrawn">Withdrawn</MenuItem>
               </Select>
             </FormControl>

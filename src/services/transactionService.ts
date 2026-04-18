@@ -41,6 +41,7 @@ export interface Transaction {
   dateLoaded?: string;
   estimatedPickup?: string;
   datePickup?: string;
+  datePickupModifiedAt?: string;
   whitePrice?: number;
   fabconQty?: number;
   detergentQty?: number;
@@ -61,9 +62,9 @@ export interface Transaction {
 export interface CreateTransactionRequest {
   customerId: string;
   dateReceived: string;
-  dateLoaded?: string;
-  estimatedPickup?: string;
-  datePickup?: string;
+  dateLoaded?: string | null;
+  estimatedPickup?: string | null;
+  datePickup?: string | null;
   isDelivered?: boolean;
   whitePrice?: number;
   fabconQty?: number;
@@ -88,9 +89,9 @@ export interface UpdateTransactionRequest {
   customerId?: string;
   dateReceived?: string;
   isDelivered?: boolean;
-  dateLoaded?: string;
-  estimatedPickup?: string;
-  datePickup?: string;
+  dateLoaded?: string | null;
+  estimatedPickup?: string | null;
+  datePickup?: string | null;
   whitePrice?: number;
   fabconQty?: number;
   detergentQty?: number;

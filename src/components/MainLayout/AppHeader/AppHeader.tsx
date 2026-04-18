@@ -19,8 +19,6 @@ const AppHeader = () => {
       <AppBar
         position="static"
         sx={{
-          backgroundColor: darkMode ? "#121212" : "#ffffff",
-          color: darkMode ? "#ffffff" : "#000000",
           boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
         }}
       >
@@ -66,9 +64,7 @@ const AppHeader = () => {
               <IconButton
                 onClick={toggleTheme}
                 sx={{
-                  backgroundColor: darkMode
-                    ? "rgba(255, 255, 255, 0.12)"
-                    : "rgba(0, 0, 0, 0.05)",
+                  backgroundColor: "action.hover",
                   borderRadius: "12px",
                   width: 40,
                   height: 40,
@@ -77,9 +73,7 @@ const AppHeader = () => {
                   justifyContent: "center",
                   transition: "all 0.3s ease",
                   "&:hover": {
-                    backgroundColor: darkMode
-                      ? "rgba(255, 255, 255, 0.2)"
-                      : "rgba(0, 0, 0, 0.08)",
+                    backgroundColor: "action.selected",
                     transform: "scale(1.05)",
                   },
                 }}

@@ -6,13 +6,24 @@ import {
   IconButton,
   CircularProgress,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Divider,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import dayjs from "dayjs";
+import PaymentsIcon from "@mui/icons-material/Payments";
+import Inventory2Icon from "@mui/icons-material/Inventory2";
+import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs, { type Dayjs } from "dayjs";
 
 import { AgGridReact } from "ag-grid-react";
 import { colorSchemeDark, colorSchemeLightWarm } from "ag-grid-community";
@@ -23,11 +34,18 @@ import { themeQuartz } from "ag-grid-community";
 import { useThemeContext } from "../../../components/ThemeContext/ThemeContext";
 import transactionService from "../../../services/transactionService";
 import type { Transaction } from "../../../services/transactionService";
+import type { Payment } from "../../../services/apiTypes";
+import { PaymentModal } from "../../../components/Payment/PaymentModal";
 import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../../services/addonsPricingService";
 import { EMPTY_STATES, UI_TEXT } from "../../../constants/messages";
+import {
+  PAYMENT_MODE_CASH,
+  PAYMENT_MODE_GCASH,
+  PAYMENT_MODE_GCASH_BACKEND,
+} from "../../../constants/payment";
 import TransactionDeleteDialog, {
   type DeleteReason,
 } from "../../../components/TransactionDeleteDialog/TransactionDeleteDialog";
@@ -87,6 +105,29 @@ const getStatusCellStyle = (row?: FlatTransactionRow) => {
 
 const formatAmount = (amount: number): string => {
   return Number.isInteger(amount) ? `${amount}` : amount.toFixed(2);
+};
+
+const isPaymentFullySettled = (row?: FlatTransactionRow): boolean => {
+  if (!row) return false;
+  const totalPrice = Number(row.price || 0);
+  const totalPaid = Number(row.totalPaid || 0);
+  return totalPrice > 0 && totalPaid >= totalPrice;
+};
+
+const getNoteDetails = (row?: FlatTransactionRow): string[] => {
+  if (!row) return [];
+  const noteText = row.notes && row.notes !== "-" ? String(row.notes) : "";
+  const details: string[] = [];
+
+  if (row.isDelivered) details.push("Delivery");
+  if (row.whitePrice > 0)
+    details.push(`Add White +${formatAmount(row.whitePrice)}`);
+  if (row.fabconQty > 0) details.push(`Fabcon x${row.fabconQty}`);
+  if (row.detergentQty > 0) details.push(`Detergent x${row.detergentQty}`);
+  if (row.colorSafeQty > 0) details.push(`Color Safe x${row.colorSafeQty}`);
+  if (noteText) details.push(`Notes ${noteText}`);
+
+  return details;
 };
 
 /**
@@ -289,6 +330,18 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(
     null,
   );
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedTransactionForPayment, setSelectedTransactionForPayment] =
+    useState<Transaction | null>(null);
+  const [markModalOpen, setMarkModalOpen] = useState(false);
+  const [markModalType, setMarkModalType] = useState<
+    "loaded" | "pickup" | null
+  >(null);
+  const [selectedTransactionForMark, setSelectedTransactionForMark] =
+    useState<Transaction | null>(null);
+  const [markDateTime, setMarkDateTime] = useState<Dayjs>(dayjs());
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const handleDeleteTransactionClick = useCallback((transactionId: string) => {
     setDeleteError(null);
@@ -311,6 +364,112 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
     },
     [deleteTransactionId, onDeleted],
   );
+
+  const handleOpenPaymentModal = useCallback((transaction: Transaction) => {
+    setSelectedTransactionForPayment(transaction);
+    setPaymentModalOpen(true);
+  }, []);
+
+  const handleClosePaymentModal = useCallback(() => {
+    setSelectedTransactionForPayment(null);
+    setPaymentModalOpen(false);
+    setActionError(null);
+  }, []);
+
+  const handleSavePayment = useCallback(
+    async (payment: Omit<Payment, "id">) => {
+      if (!selectedTransactionForPayment) return;
+      setActionLoading(true);
+      setActionError(null);
+
+      try {
+        const existingPayments =
+          selectedTransactionForPayment.paymentDetails || [];
+        const updatedPaymentDetails = [...existingPayments, payment].map(
+          (paymentItem) => ({
+            paymentDate:
+              paymentItem.paymentDate instanceof Date
+                ? paymentItem.paymentDate.toISOString()
+                : paymentItem.paymentDate,
+            amount: paymentItem.amount,
+            mode:
+              paymentItem.mode === PAYMENT_MODE_GCASH
+                ? PAYMENT_MODE_GCASH_BACKEND
+                : PAYMENT_MODE_CASH,
+          }),
+        );
+
+        // Only send paymentDetails, no loadDetails since we're just updating payments
+        await transactionService.update(selectedTransactionForPayment.id, {
+          paymentDetails: updatedPaymentDetails,
+        });
+
+        handleClosePaymentModal();
+        onDeleted?.();
+      } catch (err: unknown) {
+        setActionError(
+          err instanceof Error ? err.message : "Failed to save payment",
+        );
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [handleClosePaymentModal, onDeleted, selectedTransactionForPayment],
+  );
+
+  const handleOpenMarkModal = useCallback(
+    (transaction: Transaction, type: "loaded" | "pickup") => {
+      setSelectedTransactionForMark(transaction);
+      setMarkModalType(type);
+      setMarkDateTime(dayjs());
+      setActionError(null);
+      setMarkModalOpen(true);
+    },
+    [],
+  );
+
+  const handleCloseMarkModal = useCallback(() => {
+    setSelectedTransactionForMark(null);
+    setMarkModalType(null);
+    setMarkModalOpen(false);
+    setActionError(null);
+  }, []);
+
+  const handleSaveMark = useCallback(async () => {
+    if (!selectedTransactionForMark || !markModalType) return;
+    setActionLoading(true);
+    setActionError(null);
+
+    try {
+      const transactionUpdate: Record<string, unknown> = {};
+
+      if (markModalType === "loaded") {
+        transactionUpdate.dateLoaded = markDateTime.toISOString();
+      } else {
+        transactionUpdate.datePickup = markDateTime.toISOString();
+      }
+
+      await transactionService.update(
+        selectedTransactionForMark.id,
+        transactionUpdate,
+      );
+
+      handleCloseMarkModal();
+      onDeleted?.();
+    } catch (err: unknown) {
+      setActionError(
+        err instanceof Error ? err.message : "Failed to save status update",
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  }, [
+    handleCloseMarkModal,
+    markDateTime,
+    markModalType,
+    onDeleted,
+    selectedTransactionForMark,
+  ]);
 
   const sortedTransactions = useMemo(() => {
     return [...transactions].sort((a, b) => {
@@ -460,6 +619,43 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
                 </Box>
               </Tooltip>
             ) : null}
+            {params.data?.isFirstRow
+              ? (() => {
+                  const details = getNoteDetails(params.data);
+                  if (details.length === 0) return null;
+
+                  return (
+                    <Tooltip
+                      title={
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 0.25,
+                          }}
+                        >
+                          {details.map((line) => (
+                            <span key={line}>{line}</span>
+                          ))}
+                        </Box>
+                      }
+                      arrow
+                    >
+                      <Box
+                        component="span"
+                        sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          color: "#f44336",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <InfoOutlinedIcon sx={{ fontSize: 16 }} />
+                      </Box>
+                    </Tooltip>
+                  );
+                })()
+              : null}
           </Box>
         ),
       },
@@ -669,24 +865,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
         suppressMovable: true,
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
           if (!params.data?.isFirstRow) return "";
-          const {
-            whitePrice,
-            fabconQty,
-            detergentQty,
-            colorSafeQty,
-            isDelivered,
-          } = params.data;
-          const noteText =
-            params.value && params.value !== "-" ? String(params.value) : "";
-          const details: string[] = [];
-
-          if (isDelivered) details.push("Delivery");
-          if (whitePrice > 0)
-            details.push(`Add White +${formatAmount(whitePrice)}`);
-          if (fabconQty > 0) details.push(`Fabcon x${fabconQty}`);
-          if (detergentQty > 0) details.push(`Detergent x${detergentQty}`);
-          if (colorSafeQty > 0) details.push(`Color Safe x${colorSafeQty}`);
-          if (noteText) details.push(`Notes ${noteText}`);
+          const details = getNoteDetails(params.data);
 
           if (details.length === 0) return "-";
 
@@ -733,7 +912,8 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
         field: "action",
         sortable: false,
         pinned: "right",
-        width: 120,
+        width: 260,
+        minWidth: 260,
         suppressMovable: true,
         cellStyle: {
           alignContent: "flex-start",
@@ -744,14 +924,84 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
           if (!params.data?.isFirstRow) return "";
 
+          const payDisabled = isPaymentFullySettled(params.data);
+          const loadDisabled = Boolean(params.data?.hasDateLoaded);
+          const pickupDisabled = Boolean(params.data?.hasDatePickup);
+
           return (
             <Stack
               direction="row"
-              spacing={1}
+              spacing={0.5}
               justifyContent="flex-start"
               alignItems="center"
               alignContent="center"
             >
+              <Tooltip
+                title={loadDisabled ? "Already loaded" : "Mark as loaded"}
+              >
+                <span>
+                  <IconButton
+                    aria-label="mark-loaded"
+                    color="secondary"
+                    disabled={loadDisabled}
+                    onClick={() => {
+                      const transaction = transactions.find(
+                        (t) => t.id === params.data?.transactionId,
+                      );
+                      if (transaction) {
+                        handleOpenMarkModal(transaction, "loaded");
+                      }
+                    }}
+                  >
+                    <Inventory2Icon fontSize="inherit" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+
+              <Tooltip title={payDisabled ? "Fully paid" : "Mark as paid"}>
+                <span>
+                  <IconButton
+                    aria-label="mark-paid"
+                    color="primary"
+                    disabled={payDisabled}
+                    onClick={() => {
+                      const transaction = transactions.find(
+                        (t) => t.id === params.data?.transactionId,
+                      );
+                      if (transaction) {
+                        handleOpenPaymentModal(transaction);
+                      }
+                    }}
+                  >
+                    <PaymentsIcon fontSize="inherit" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+
+              <Tooltip
+                title={pickupDisabled ? "Already picked up" : "Mark as pickup"}
+              >
+                <span>
+                  <IconButton
+                    aria-label="mark-pickup"
+                    color="info"
+                    disabled={pickupDisabled}
+                    onClick={() => {
+                      const transaction = transactions.find(
+                        (t) => t.id === params.data?.transactionId,
+                      );
+                      if (transaction) {
+                        handleOpenMarkModal(transaction, "pickup");
+                      }
+                    }}
+                  >
+                    <LocalShippingIcon fontSize="inherit" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+
+              <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />
+
               <Tooltip title="Edit">
                 <IconButton
                   aria-label="edit"
@@ -882,6 +1132,86 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
           />
         )}
       </div>
+
+      <PaymentModal
+        isOpen={paymentModalOpen}
+        onClose={handleClosePaymentModal}
+        onSave={handleSavePayment}
+      />
+
+      <Dialog
+        open={markModalOpen}
+        onClose={handleCloseMarkModal}
+        maxWidth="sm"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              position: "fixed",
+              top: 20,
+              margin: 0,
+              maxHeight: "calc(100vh - 40px)",
+              display: "flex",
+              flexDirection: "column",
+            },
+          },
+        }}
+      >
+        <DialogTitle>
+          {markModalType === "loaded" ? "Mark as Loaded" : "Mark as Pickup"}
+        </DialogTitle>
+        <DialogContent
+          sx={{
+            pt: 2.5,
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            overflow: "auto",
+          }}
+        >
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DateTimePicker
+              label={markModalType === "loaded" ? "Loaded Date" : "Pickup Date"}
+              value={markDateTime}
+              onChange={(value) => value && setMarkDateTime(value)}
+              maxDate={dayjs()}
+              timeSteps={{ minutes: 1 }}
+              slotProps={{
+                actionBar: { actions: ["today", "cancel", "accept"] },
+                popper: {
+                  modifiers: [
+                    {
+                      name: "flip",
+                      enabled: true,
+                    },
+                    {
+                      name: "preventOverflow",
+                      enabled: true,
+                      options: {
+                        padding: 8,
+                      },
+                    },
+                  ],
+                },
+                textField: { size: "small", fullWidth: true },
+              }}
+            />
+          </LocalizationProvider>
+          {actionError ? <Alert severity="error">{actionError}</Alert> : null}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button variant="outlined" onClick={handleCloseMarkModal}>
+            {UI_TEXT.CANCEL}
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveMark}
+            disabled={actionLoading}
+          >
+            {UI_TEXT.SAVE}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <TransactionDeleteDialog
         open={Boolean(deleteTransactionId)}

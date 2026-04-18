@@ -48,6 +48,103 @@ export const CustomThemeProvider = ({ children }: { children: ReactNode }) => {
       createTheme({
         palette: {
           mode: darkMode ? "dark" : "light",
+          ...(darkMode
+            ? {
+                // Dark mode colors
+                primary: {
+                  main: "#90caf9", // Light blue for better contrast
+                },
+                secondary: {
+                  main: "#f48fb1", // Light pink
+                },
+                background: {
+                  default: "#121212",
+                  paper: "#1e1e1e",
+                },
+                text: {
+                  primary: "#ffffff",
+                  secondary: "#b0b0b0",
+                },
+              }
+            : {
+                // Light mode colors
+                primary: {
+                  main: "#1976d2",
+                },
+                secondary: {
+                  main: "#dc004e",
+                },
+                background: {
+                  default: "#ffffff",
+                  paper: "#f5f5f5",
+                },
+                text: {
+                  primary: "#000000",
+                  secondary: "#666666",
+                },
+              }),
+        },
+        components: {
+          MuiAppBar: {
+            styleOverrides: {
+              root: {
+                backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
+                color: darkMode ? "#ffffff" : "#000000",
+                boxShadow: darkMode
+                  ? "0 2px 8px rgba(0,0,0,0.3)"
+                  : "0 2px 8px rgba(0,0,0,0.1)",
+              },
+            },
+          },
+          MuiPaper: {
+            styleOverrides: {
+              root: {
+                backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
+                color: darkMode ? "#ffffff" : "#000000",
+              },
+            },
+          },
+          MuiTableContainer: {
+            styleOverrides: {
+              root: {
+                backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
+              },
+            },
+          },
+          MuiTableHead: {
+            styleOverrides: {
+              root: {
+                backgroundColor: darkMode ? "#333333" : "#f5f5f5",
+                "& .MuiTableCell-head": {
+                  color: darkMode ? "#ffffff" : "#000000",
+                  fontWeight: 600,
+                },
+              },
+            },
+          },
+          MuiTableBody: {
+            styleOverrides: {
+              root: {
+                "& .MuiTableRow-root": {
+                  "&:nth-of-type(odd)": {
+                    backgroundColor: darkMode ? "#2a2a2a" : "#fafafa",
+                  },
+                  "&:nth-of-type(even)": {
+                    backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
+                  },
+                  "&:hover": {
+                    backgroundColor: darkMode ? "#333333" : "#f0f0f0",
+                  },
+                },
+                "& .MuiTableCell-body": {
+                  color: darkMode ? "#ffffff" : "#000000",
+                  borderBottom: darkMode
+                    ? "1px solid #333333"
+                    : "1px solid #e0e0e0",
+                },
+              },
+            },
+          },
         },
       }),
     [darkMode],

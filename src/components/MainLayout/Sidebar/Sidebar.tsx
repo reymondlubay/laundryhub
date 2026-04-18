@@ -26,14 +26,14 @@ export default function SidebarMenu() {
     <Sidebar
       collapsed={collapsed}
       backgroundColor={
-        darkMode ? "rgba(20, 20, 20, 0.85)" : "rgba(255, 255, 255, 0.9)"
+        darkMode ? "rgba(30, 30, 30, 0.95)" : "rgba(255, 255, 255, 0.95)"
       }
       className={`sidebar-container ${darkMode ? "dark" : "light"}`}
       rootStyles={{
         transition: "all 0.3s ease",
         borderRight: darkMode
-          ? "1px solid rgba(255,255,255,0.08)"
-          : "1px solid rgba(0,0,0,0.06)",
+          ? "1px solid rgba(255,255,255,0.12)"
+          : "1px solid rgba(0,0,0,0.08)",
         boxShadow: darkMode
           ? "2px 0 10px rgba(0,0,0,0.5)"
           : "2px 0 10px rgba(0,0,0,0.08)",
