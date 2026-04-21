@@ -943,11 +943,21 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               </Grid>
 
               <DialogActions sx={{ justifyContent: "center", pb: 4 }}>
-                <Button type="submit" variant="contained" size="small">
-                  {loading ? UI_TEXT.SAVING : UI_TEXT.SAVE}
-                </Button>
-                <Button variant="contained" size="small" onClick={handleClose}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleClose}
+                  sx={{ minWidth: 100 }}
+                >
                   {UI_TEXT.CANCEL}
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="small"
+                  sx={{ minWidth: 100 }}
+                >
+                  {loading ? UI_TEXT.SAVING : UI_TEXT.SAVE}
                 </Button>
               </DialogActions>
 
