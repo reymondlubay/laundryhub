@@ -22,6 +22,8 @@ import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
 import LocalLaundryServiceOutlinedIcon from "@mui/icons-material/LocalLaundryServiceOutlined";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import HistoryIcon from "@mui/icons-material/History";
 import dayjs from "dayjs";
 import { useThemeContext } from "../../components/ThemeContext/ThemeContext";
 import {
@@ -212,6 +214,16 @@ const Dashboard = () => {
       return hasPaymentToday ? count + 1 : count;
     }, 0);
 
+    const readyForPickupCount = activeTransactions.filter((transaction) => {
+      const hasLoadedDate = Boolean(
+        getTransactionDate(transaction, "dateLoaded"),
+      );
+      const hasPickupDate = Boolean(
+        getTransactionDate(transaction, "datePickup"),
+      );
+      return hasLoadedDate && !hasPickupDate;
+    }).length;
+
     return {
       todaysTransactions,
       todaysLoad,
@@ -219,6 +231,7 @@ const Dashboard = () => {
       todaysPending,
       todaysPaid,
       todaysPickup,
+      readyForPickupCount,
     };
   }, [activeTransactions]);
 
@@ -281,6 +294,51 @@ const Dashboard = () => {
     [loadedTodayTransactions],
   );
 
+  const readyForPickupTransactions = React.useMemo(() => {
+    return activeTransactions
+      .filter((transaction) => {
+        const hasLoadedDate = Boolean(
+          getTransactionDate(transaction, "dateLoaded"),
+        );
+        const hasPickupDate = Boolean(
+          getTransactionDate(transaction, "datePickup"),
+        );
+        return hasLoadedDate && !hasPickupDate;
+      })
+      .sort((a, b) => {
+        const aDate = dayjs(getTransactionDate(a, "dateLoaded"));
+        const bDate = dayjs(getTransactionDate(b, "dateLoaded"));
+        if (!aDate.isValid() && !bDate.isValid()) return 0;
+        if (!aDate.isValid()) return 1;
+        if (!bDate.isValid()) return -1;
+        return aDate.valueOf() - bDate.valueOf();
+      });
+  }, [activeTransactions]);
+
+  const pickupTodayTransactions = React.useMemo(() => {
+    return activeTransactions
+      .filter((transaction) =>
+        isSameDay(getTransactionDate(transaction, "datePickup")),
+      )
+      .sort((a, b) => {
+        const aDate = dayjs(getTransactionDate(a, "datePickup"));
+        const bDate = dayjs(getTransactionDate(b, "datePickup"));
+        if (!aDate.isValid() && !bDate.isValid()) return 0;
+        if (!aDate.isValid()) return 1;
+        if (!bDate.isValid()) return -1;
+        return aDate.valueOf() - bDate.valueOf();
+      });
+  }, [activeTransactions]);
+
+  const pickupTodayTotalLoads = React.useMemo(
+    () =>
+      pickupTodayTransactions.reduce(
+        (sum, transaction) => sum + getTransactionLoads(transaction),
+        0,
+      ),
+    [pickupTodayTransactions],
+  );
+
   const cards: DashboardCard[] = [
     {
       key: "todays-transaction",
@@ -329,6 +387,14 @@ const Dashboard = () => {
       icon: <LocalShippingOutlinedIcon />,
       iconBg: "#edf3e0",
       iconColor: "#80a93a",
+    },
+    {
+      key: "ready-for-pickup",
+      title: "Ready for Pickup",
+      value: metrics.readyForPickupCount,
+      icon: <CheckCircleOutlineIcon />,
+      iconBg: "#e8f7f1",
+      iconColor: "#1d9a72",
     },
   ];
 
@@ -411,6 +477,58 @@ const Dashboard = () => {
                   <Table size="small" stickyHeader>
                     <TableHeaderSkeleton columns={3} />
                     <TableSkeleton columns={3} rows={5} />
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Grid>
+          </Grid>
+
+          <Grid container spacing={2} sx={{ mt: 2 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 1.25, sm: 2 },
+                  borderRadius: 3,
+                  bgcolor: surfaceColor,
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                <Skeleton
+                  variant="text"
+                  height={32}
+                  width="40%"
+                  sx={{ mb: 2 }}
+                />
+                <TableContainer sx={{ maxHeight: "35vh" }}>
+                  <Table size="small" stickyHeader>
+                    <TableHeaderSkeleton columns={5} />
+                    <TableSkeleton columns={5} rows={5} />
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 1.25, sm: 2 },
+                  borderRadius: 3,
+                  bgcolor: surfaceColor,
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                <Skeleton
+                  variant="text"
+                  height={32}
+                  width="40%"
+                  sx={{ mb: 2 }}
+                />
+                <TableContainer sx={{ maxHeight: "35vh" }}>
+                  <Table size="small" stickyHeader>
+                    <TableHeaderSkeleton columns={4} />
+                    <TableSkeleton columns={4} rows={5} />
                   </Table>
                 </TableContainer>
               </Paper>
@@ -756,6 +874,397 @@ const Dashboard = () => {
                             </TableCell>
                             <TableCell sx={{ color: tableCellColor }}>
                               {transaction.customer?.name || "-"}
+                            </TableCell>
+                            <TableCell
+                              align="right"
+                              sx={{ color: tableCellColor }}
+                            >
+                              {formatCount(getTransactionLoads(transaction))}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Grid>
+          </Grid>
+
+          <Grid container spacing={2} sx={{ mt: 2 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 1.25, sm: 2 },
+                  borderRadius: 3,
+                  bgcolor: surfaceColor,
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  sx={{ mb: 1.5 }}
+                >
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <CheckCircleOutlineIcon
+                      sx={{ color: "#1d9a72", fontSize: 20 }}
+                    />
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 700,
+                        color: headingColor,
+                        fontSize: { xs: "1rem", sm: "1.25rem" },
+                      }}
+                    >
+                      Ready for Pickup
+                    </Typography>
+                  </Stack>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: titleColor,
+                      fontWeight: 700,
+                      textAlign: "right",
+                    }}
+                  >
+                    Total: {readyForPickupTransactions.length}
+                  </Typography>
+                </Stack>
+                <TableContainer sx={{ maxHeight: "35vh" }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Transaction Date
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Customer
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Loaded Date
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Date Paid
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Loads
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {readyForPickupTransactions.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={5}
+                            align="center"
+                            sx={{ color: tableCellColor }}
+                          >
+                            No transactions ready for pickup.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        readyForPickupTransactions.map((transaction) => {
+                          const payments = transaction.paymentDetails || [];
+                          const totalPaid = payments.reduce(
+                            (sum, p) => sum + (Number(p.amount) || 0),
+                            0,
+                          );
+                          const lastPaymentDate =
+                            payments.length > 0
+                              ? payments[payments.length - 1].paymentDate
+                              : null;
+                          const paymentHistoryTooltip =
+                            payments.length === 0
+                              ? "No payments"
+                              : payments
+                                  .map(
+                                    (p) =>
+                                      `${dayjs(p.paymentDate).format(
+                                        "MM-DD-YY h:mm A",
+                                      )} - ${new Intl.NumberFormat("en-PH", {
+                                        style: "currency",
+                                        currency: "PHP",
+                                      }).format(Number(p.amount) || 0)}`,
+                                  )
+                                  .join("\n");
+
+                          return (
+                            <TableRow key={`ready-${transaction.id}`}>
+                              <TableCell sx={{ color: tableCellColor }}>
+                                {dayjs(
+                                  getTransactionDate(
+                                    transaction,
+                                    "dateReceived",
+                                  ),
+                                ).isValid()
+                                  ? dayjs(
+                                      getTransactionDate(
+                                        transaction,
+                                        "dateReceived",
+                                      ),
+                                    ).format("MM-DD-YY h:mm A")
+                                  : "-"}
+                              </TableCell>
+                              <TableCell sx={{ color: tableCellColor }}>
+                                {transaction.customer?.name || "-"}
+                              </TableCell>
+                              <TableCell sx={{ color: tableCellColor }}>
+                                {dayjs(
+                                  getTransactionDate(transaction, "dateLoaded"),
+                                ).isValid()
+                                  ? dayjs(
+                                      getTransactionDate(
+                                        transaction,
+                                        "dateLoaded",
+                                      ),
+                                    ).format("MM-DD-YY h:mm A")
+                                  : "-"}
+                              </TableCell>
+                              <TableCell sx={{ color: tableCellColor }}>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: 1,
+                                  }}
+                                >
+                                  <span>
+                                    {lastPaymentDate
+                                      ? dayjs(lastPaymentDate).format(
+                                          "MM-DD-YY h:mm A",
+                                        )
+                                      : "-"}
+                                  </span>
+                                  {payments.length > 0 && (
+                                    <Tooltip
+                                      title={
+                                        <Box
+                                          sx={{
+                                            whiteSpace: "pre-line",
+                                            fontSize: "0.875rem",
+                                          }}
+                                        >
+                                          <div>
+                                            <strong>Payment History</strong>
+                                          </div>
+                                          <div>{paymentHistoryTooltip}</div>
+                                          <div style={{ marginTop: "0.5rem" }}>
+                                            <strong>
+                                              Total Paid:{" "}
+                                              {new Intl.NumberFormat("en-PH", {
+                                                style: "currency",
+                                                currency: "PHP",
+                                              }).format(totalPaid)}
+                                            </strong>
+                                          </div>
+                                        </Box>
+                                      }
+                                      arrow
+                                    >
+                                      <Box
+                                        component="span"
+                                        sx={{
+                                          width: 18,
+                                          height: 18,
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          color: "#1d9a72",
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        <HistoryIcon sx={{ fontSize: 16 }} />
+                                      </Box>
+                                    </Tooltip>
+                                  )}
+                                </Box>
+                              </TableCell>
+                              <TableCell
+                                align="right"
+                                sx={{ color: tableCellColor }}
+                              >
+                                {formatCount(getTransactionLoads(transaction))}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 1.25, sm: 2 },
+                  borderRadius: 3,
+                  bgcolor: surfaceColor,
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  sx={{ mb: 1.5 }}
+                >
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <LocalShippingOutlinedIcon
+                      sx={{ color: "#80a93a", fontSize: 20 }}
+                    />
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 700,
+                        color: headingColor,
+                        fontSize: { xs: "1rem", sm: "1.25rem" },
+                      }}
+                    >
+                      Pickup Today
+                    </Typography>
+                  </Stack>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: titleColor,
+                      fontWeight: 700,
+                      textAlign: "right",
+                    }}
+                  >
+                    Total Loads: {formatCount(pickupTodayTotalLoads)}
+                  </Typography>
+                </Stack>
+                <TableContainer sx={{ maxHeight: "35vh" }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Transaction Date
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Customer
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Pickup Date
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Loads
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {pickupTodayTransactions.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={4}
+                            align="center"
+                            sx={{ color: tableCellColor }}
+                          >
+                            No pickups scheduled for today.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        pickupTodayTransactions.map((transaction) => (
+                          <TableRow key={`pickup-${transaction.id}`}>
+                            <TableCell sx={{ color: tableCellColor }}>
+                              {dayjs(
+                                getTransactionDate(transaction, "dateReceived"),
+                              ).isValid()
+                                ? dayjs(
+                                    getTransactionDate(
+                                      transaction,
+                                      "dateReceived",
+                                    ),
+                                  ).format("MM-DD-YY h:mm A")
+                                : "-"}
+                            </TableCell>
+                            <TableCell sx={{ color: tableCellColor }}>
+                              {transaction.customer?.name || "-"}
+                            </TableCell>
+                            <TableCell sx={{ color: tableCellColor }}>
+                              {dayjs(
+                                getTransactionDate(transaction, "datePickup"),
+                              ).isValid()
+                                ? dayjs(
+                                    getTransactionDate(
+                                      transaction,
+                                      "datePickup",
+                                    ),
+                                  ).format("MM-DD-YY h:mm A")
+                                : "-"}
                             </TableCell>
                             <TableCell
                               align="right"

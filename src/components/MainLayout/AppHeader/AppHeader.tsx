@@ -9,6 +9,7 @@ import Brightness7Icon from "@mui/icons-material/Brightness7";
 import { useThemeContext } from "../../ThemeContext/ThemeContext";
 import { useSidebar } from "../Sidebar/SidebarContext";
 import UserMenu from "../../UserMenu/UserMenu";
+import LiveClock from "./LiveClock";
 
 const AppHeader = () => {
   const { darkMode, toggleTheme } = useThemeContext();
@@ -57,6 +58,9 @@ const AppHeader = () => {
                 gap: 1.5,
               }}
             >
+              {/* Live Clock */}
+              <LiveClock />
+
               {/* User Menu with Avatar and Logout */}
               <UserMenu />
 
