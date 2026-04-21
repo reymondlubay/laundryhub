@@ -378,12 +378,27 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   // Backend stores TIMESTAMP (without timezone), so send local datetime strings
   // to avoid AM/PM shifts caused by UTC conversion.
   const toLocalDateTimeString = (value: Dayjs | null | undefined) => {
+    if (value === null) return null;
     if (!value) return undefined;
     return value.format("YYYY-MM-DDTHH:mm:ss");
   };
 
   return (
-    <Dialog open={isOpen} maxWidth="lg" fullWidth fullScreen={isMobile}>
+    <Dialog
+      open={isOpen}
+      maxWidth="lg"
+      fullWidth
+      fullScreen={isMobile}
+      slotProps={{
+        paper: {
+          sx: {
+            maxHeight: !isMobile ? "90vh" : "100vh",
+            display: "flex",
+            flexDirection: "column",
+          },
+        },
+      }}
+    >
       <DialogTitle>
         {isEditing ? "Edit Transaction" : "Transaction"}
       </DialogTitle>
@@ -480,6 +495,21 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                   field: {
                     clearable,
                     onClear: () => setFieldValue(field, null),
+                  },
+                  popper: {
+                    modifiers: [
+                      {
+                        name: "flip",
+                        enabled: true,
+                      },
+                      {
+                        name: "preventOverflow",
+                        enabled: true,
+                        options: {
+                          padding: 8,
+                        },
+                      },
+                    ],
                   },
                   textField: {
                     size: "small",
@@ -913,11 +943,21 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               </Grid>
 
               <DialogActions sx={{ justifyContent: "center", pb: 4 }}>
-                <Button type="submit" variant="contained" size="small">
-                  {loading ? UI_TEXT.SAVING : UI_TEXT.SAVE}
-                </Button>
-                <Button variant="contained" size="small" onClick={handleClose}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleClose}
+                  sx={{ minWidth: 100 }}
+                >
                   {UI_TEXT.CANCEL}
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="small"
+                  sx={{ minWidth: 100 }}
+                >
+                  {loading ? UI_TEXT.SAVING : UI_TEXT.SAVE}
                 </Button>
               </DialogActions>
 

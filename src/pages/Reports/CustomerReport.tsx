@@ -30,6 +30,7 @@ import addonsPricingService, {
   type AddonsPricing,
 } from "../../services/addonsPricingService";
 import { getAddonsTotal, getStoredSnapshots } from "../../utils/pricing";
+import { toPascalCase } from "../../utils/stringUtils";
 
 type TransactionWithLegacyFields = Transaction & {
   customerid?: string;
@@ -222,10 +223,11 @@ const CustomerReport: React.FC = () => {
       const dateReceived = getTransactionDateReceived(transaction);
       if (!isWithinDateRange(dateReceived, monthFrom, monthTo)) return;
 
-      const customerName =
+      const customerName = toPascalCase(
         transaction.customer?.name ||
-        customers.find((customer) => customer.id === txCustomerId)?.name ||
-        "-";
+          customers.find((customer) => customer.id === txCustomerId)?.name ||
+          "-",
+      );
 
       const current = rowsByCustomer.get(txCustomerId) || {
         customerId: txCustomerId,

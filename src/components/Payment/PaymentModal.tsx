@@ -103,10 +103,29 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   return (
-    <Dialog open={isOpen} maxWidth="sm" fullWidth>
+    <Dialog
+      open={isOpen}
+      maxWidth="sm"
+      fullWidth
+      slotProps={{
+        paper: {
+          sx: {
+            maxHeight: "90vh",
+            display: "flex",
+            flexDirection: "column",
+          },
+        },
+      }}
+    >
       <DialogTitle>{isEditMode ? "Edit Payment" : "Add Payment"}</DialogTitle>
       <DialogContent
-        sx={{ pt: 2.5, display: "flex", flexDirection: "column", gap: 2 }}
+        sx={{
+          pt: 2.5,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          overflow: "auto",
+        }}
       >
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <DateTimePicker
@@ -117,6 +136,21 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             timeSteps={{ minutes: 1 }}
             slotProps={{
               actionBar: { actions: ["today", "cancel", "accept"] },
+              popper: {
+                modifiers: [
+                  {
+                    name: "flip",
+                    enabled: true,
+                  },
+                  {
+                    name: "preventOverflow",
+                    enabled: true,
+                    options: {
+                      padding: 8,
+                    },
+                  },
+                ],
+              },
               textField: {
                 size: "small",
                 fullWidth: true,

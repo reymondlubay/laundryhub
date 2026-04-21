@@ -38,6 +38,7 @@ import {
   FORM_ERRORS,
   UI_TEXT,
 } from "../../constants/messages";
+import { toPascalCase } from "../../utils/stringUtils";
 import { USER_ROLE_ADMIN, USER_ROLE_EMPLOYEE } from "../../constants/roles";
 import {
   USER_STATUS_ACTIVE,
@@ -306,11 +307,13 @@ const Users: React.FC = () => {
                       .map((user) => (
                         <TableRow key={user.id}>
                           <TableCell>
-                            {[user.firstName, user.lastName]
-                              .filter(Boolean)
-                              .join(" ") ||
-                              user.userName ||
-                              "-"}
+                            {toPascalCase(
+                              [user.firstName, user.lastName]
+                                .filter(Boolean)
+                                .join(" ") ||
+                                user.userName ||
+                                "-",
+                            )}
                           </TableCell>
                           <TableCell>{user.userName || "-"}</TableCell>
                           <TableCell>{user.mobileNumber || "-"}</TableCell>

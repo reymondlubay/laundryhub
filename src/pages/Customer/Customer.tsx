@@ -30,6 +30,7 @@ import {
   FORM_ERRORS,
   UI_TEXT,
 } from "../../constants/messages";
+import { toPascalCase } from "../../utils/stringUtils";
 import customerService, {
   type CreateCustomerPayload,
   type Customer,
@@ -277,9 +278,13 @@ const CustomerPage: React.FC = () => {
                       )
                       .map((customer) => (
                         <TableRow key={customer.id}>
-                          <TableCell>{customer.name || "-"}</TableCell>
+                          <TableCell>
+                            {toPascalCase(customer.name || "-")}
+                          </TableCell>
                           <TableCell>{customer.mobileNumber || "-"}</TableCell>
-                          <TableCell>{customer.address || "-"}</TableCell>
+                          <TableCell>
+                            {toPascalCase(customer.address || "-")}
+                          </TableCell>
                           <TableCell>{customer.notes || "-"}</TableCell>
                           <TableCell align="right">
                             <IconButton
