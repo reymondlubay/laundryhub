@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
 import authService from "../../services/authService";
+import { toPascalCase } from "../../utils/stringUtils";
 
 const UserMenu: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -39,10 +40,9 @@ const UserMenu: React.FC = () => {
       .slice(0, 2);
   };
 
-  const fullName = [user?.firstName, user?.lastName]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  const fullName = toPascalCase(
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim(),
+  );
   const displayName =
     fullName ||
     user?.name ||

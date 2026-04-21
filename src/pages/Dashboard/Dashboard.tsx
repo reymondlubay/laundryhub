@@ -35,6 +35,7 @@ import transactionService, {
   type PaymentDetail,
   type Transaction,
 } from "../../services/transactionService";
+import { toPascalCase } from "../../utils/stringUtils";
 
 type DashboardCard = {
   key: string;
@@ -719,7 +720,11 @@ const Dashboard = () => {
                                   gap: 1,
                                 }}
                               >
-                                <span>{transaction.customer?.name || "-"}</span>
+                                <span>
+                                  {toPascalCase(
+                                    transaction.customer?.name || "-",
+                                  )}
+                                </span>
                                 {dayjs(
                                   getTransactionDate(
                                     transaction,
@@ -873,7 +878,7 @@ const Dashboard = () => {
                                 : "-"}
                             </TableCell>
                             <TableCell sx={{ color: tableCellColor }}>
-                              {transaction.customer?.name || "-"}
+                              {toPascalCase(transaction.customer?.name || "-")}
                             </TableCell>
                             <TableCell
                               align="right"
@@ -1046,7 +1051,9 @@ const Dashboard = () => {
                                   : "-"}
                               </TableCell>
                               <TableCell sx={{ color: tableCellColor }}>
-                                {transaction.customer?.name || "-"}
+                                {toPascalCase(
+                                  transaction.customer?.name || "-",
+                                )}
                               </TableCell>
                               <TableCell sx={{ color: tableCellColor }}>
                                 {dayjs(
@@ -1252,7 +1259,7 @@ const Dashboard = () => {
                                 : "-"}
                             </TableCell>
                             <TableCell sx={{ color: tableCellColor }}>
-                              {transaction.customer?.name || "-"}
+                              {toPascalCase(transaction.customer?.name || "-")}
                             </TableCell>
                             <TableCell sx={{ color: tableCellColor }}>
                               {dayjs(

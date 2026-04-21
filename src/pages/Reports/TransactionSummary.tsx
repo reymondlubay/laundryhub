@@ -31,6 +31,7 @@ import transactionService, {
   type Transaction,
 } from "../../services/transactionService";
 import customerService, { type Customer } from "../../services/customerService";
+import { toPascalCase } from "../../utils/stringUtils";
 
 type TransactionWithLegacyFields = Transaction & {
   customerid?: string;
@@ -517,7 +518,9 @@ const TransactionSummary = () => {
                       getTransactionFieldDate(transaction, "dateReceived"),
                     )}
                   </TableCell>
-                  <TableCell>{transaction.customer?.name || "-"}</TableCell>
+                  <TableCell>
+                    {toPascalCase(transaction.customer?.name || "-")}
+                  </TableCell>
                   <TableCell align="right">
                     {getTotalKg(transaction).toFixed(2)}
                   </TableCell>

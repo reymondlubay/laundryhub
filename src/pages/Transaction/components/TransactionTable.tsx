@@ -28,6 +28,7 @@ import dayjs, { type Dayjs } from "dayjs";
 import { AgGridReact } from "ag-grid-react";
 import { colorSchemeDark, colorSchemeLightWarm } from "ag-grid-community";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
+import { toPascalCase } from "../../../utils/stringUtils";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { themeQuartz } from "ag-grid-community";
 
@@ -156,7 +157,7 @@ function flattenTransactionRows(
   const hasDateLoaded = Boolean(dateLoaded);
   const hasEstimatedPickup = Boolean(estimatedPickup);
   const hasDatePickup = Boolean(datePickup);
-  const customerName = transaction.customer?.name || "Unknown";
+  const customerName = toPascalCase(transaction.customer?.name || "Unknown");
 
   const loadDetails = transaction.loadDetails || [];
   const totalKg = loadDetails.reduce(

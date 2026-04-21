@@ -28,6 +28,7 @@ import transactionService, {
   type PaymentDetail,
   type Transaction,
 } from "../../services/transactionService";
+import { toPascalCase } from "../../utils/stringUtils";
 import customerService, { type Customer } from "../../services/customerService";
 import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
@@ -674,7 +675,7 @@ const TransactionReport: React.FC = () => {
                               )}
                             </TableCell>
                             <TableCell>
-                              {transaction.customer?.name || "-"}
+                              {toPascalCase(transaction.customer?.name || "-")}
                             </TableCell>
                             <TableCell>{formatCount(totals.kg)}</TableCell>
                             <TableCell>{formatCount(totals.loads)}</TableCell>
@@ -836,7 +837,9 @@ const TransactionReport: React.FC = () => {
                                 )}
                               </TableCell>
                               <TableCell>
-                                {transaction.customer?.name || "-"}
+                                {toPascalCase(
+                                  transaction.customer?.name || "-",
+                                )}
                               </TableCell>
                               <TableCell>{formatCount(totals.kg)}</TableCell>
                               <TableCell>{formatCount(totals.loads)}</TableCell>
@@ -1011,7 +1014,7 @@ const TransactionReport: React.FC = () => {
                               )}
                             </TableCell>
                             <TableCell>
-                              {transaction.customer?.name || "-"}
+                              {toPascalCase(transaction.customer?.name || "-")}
                             </TableCell>
                             <TableCell>{formatCount(totals.kg)}</TableCell>
                             <TableCell>{formatCount(totals.loads)}</TableCell>
@@ -1125,7 +1128,9 @@ const TransactionReport: React.FC = () => {
                                 )}
                               </TableCell>
                               <TableCell>
-                                {transaction.customer?.name || "-"}
+                                {toPascalCase(
+                                  transaction.customer?.name || "-",
+                                )}
                               </TableCell>
                               <TableCell>{formatCount(totals.kg)}</TableCell>
                               <TableCell>{formatCount(totals.loads)}</TableCell>
