@@ -509,13 +509,13 @@ const TransactionReport: React.FC = () => {
         const datePickup = getTransactionFieldDate(transaction, "datePickup");
         const datePickupModifiedAt = transaction.datePickupModifiedAt;
 
-        console.log(`Transaction ${transaction.id}:`, {
-          datePickup,
-          datePickupModifiedAt,
-          hasBoth: !!(datePickup && datePickupModifiedAt),
-          datePickupType: typeof datePickup,
-          datePickupModifiedAtType: typeof datePickupModifiedAt,
-        });
+        // console.log(`Transaction ${transaction.id}:`, {
+        //   datePickup,
+        //   datePickupModifiedAt,
+        //   hasBoth: !!(datePickup && datePickupModifiedAt),
+        //   datePickupType: typeof datePickup,
+        //   datePickupModifiedAtType: typeof datePickupModifiedAt,
+        // });
 
         // Check if date pickup modified date is within range
         const isInRange = isWithinRange(
