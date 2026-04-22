@@ -12,12 +12,17 @@ import {
   DialogActions,
   Button,
   Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import HistoryIcon from "@mui/icons-material/History";
 import PaymentsIcon from "@mui/icons-material/Payments";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
@@ -37,11 +42,14 @@ import transactionService from "../../../services/transactionService";
 import type { Transaction } from "../../../services/transactionService";
 import type { Payment } from "../../../services/apiTypes";
 import { PaymentModal } from "../../../components/Payment/PaymentModal";
+import userService, { type UserItem } from "../../../services/userService";
+import authService from "../../../services/authService";
 import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../../services/addonsPricingService";
 import { EMPTY_STATES, UI_TEXT } from "../../../constants/messages";
+import { USER_ROLE_EMPLOYEE } from "../../../constants/roles";
 import {
   PAYMENT_MODE_CASH,
   PAYMENT_MODE_GCASH,
@@ -54,6 +62,8 @@ import { getAddonsTotal, getStoredSnapshots } from "../../../utils/pricing";
 import "./TransactionTable.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
+
+type EmployeeOption = { id: string; name: string };
 
 interface FlatTransactionRow {
   id: string;
@@ -106,6 +116,59 @@ const getStatusCellStyle = (row?: FlatTransactionRow) => {
 
 const formatAmount = (amount: number): string => {
   return Number.isInteger(amount) ? `${amount}` : amount.toFixed(2);
+};
+
+const getTransactionTotals = (
+  transaction: Transaction,
+  addonsPricing: AddonsPricing,
+): { totalPrice: number; totalPaid: number; balance: number } => {
+  const loadDetails = transaction.loadDetails || [];
+  const loadTotal = loadDetails.reduce(
+    (sum: number, load: { price?: number | string | null }) =>
+      sum + Number(load.price || 0),
+    0,
+  );
+
+  const payments = transaction.paymentDetails || [];
+  const totalPaid = payments.reduce(
+    (sum: number, payment) => sum + Number(payment.amount || 0),
+    0,
+  );
+
+  const tx2 = transaction as Transaction & {
+    whiteprice?: number;
+    fabconqty?: number;
+    detergentqty?: number;
+    colorsafeqty?: number;
+    grandtotal?: number;
+  };
+
+  const whitePrice = Number(transaction.whitePrice ?? tx2.whiteprice ?? 0);
+  const fabconQty = Number(transaction.fabconQty ?? tx2.fabconqty ?? 0);
+  const detergentQty = Number(
+    transaction.detergentQty ?? tx2.detergentqty ?? 0,
+  );
+  const colorSafeQty = Number(
+    transaction.colorSafeQty ?? tx2.colorsafeqty ?? 0,
+  );
+
+  const stored = getStoredSnapshots({
+    grandTotal: transaction.grandTotal,
+    grandtotal: tx2.grandtotal,
+  });
+
+  const addonsTotal = getAddonsTotal(
+    { whitePrice, fabconQty, detergentQty, colorSafeQty },
+    addonsPricing,
+  );
+
+  const totalPrice = stored.hasGrandTotal
+    ? stored.grandTotal
+    : loadTotal + addonsTotal;
+
+  const balance = Math.max(totalPrice - totalPaid, 0);
+
+  return { totalPrice, totalPaid, balance };
 };
 
 const isPaymentFullySettled = (row?: FlatTransactionRow): boolean => {
@@ -343,6 +406,8 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   const [markDateTime, setMarkDateTime] = useState<Dayjs>(dayjs());
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [releaseBy, setReleaseBy] = useState<string>("");
 
   const handleDeleteTransactionClick = useCallback((transactionId: string) => {
     setDeleteError(null);
@@ -424,6 +489,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
       setMarkModalType(type);
       setMarkDateTime(dayjs());
       setActionError(null);
+      setReleaseBy("");
       setMarkModalOpen(true);
     },
     [],
@@ -434,7 +500,44 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
     setMarkModalType(null);
     setMarkModalOpen(false);
     setActionError(null);
+    setReleaseBy("");
   }, []);
+
+  React.useEffect(() => {
+    const loadEmployees = async () => {
+      try {
+        const users = await userService.getAll();
+        const employeeUsers = users
+          .filter((user) => user.role === USER_ROLE_EMPLOYEE)
+          .map((user: UserItem) => ({
+            id: user.id,
+            name:
+              [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+              user.userName ||
+              USER_ROLE_EMPLOYEE,
+          }));
+        setEmployees(employeeUsers);
+      } catch {
+        const currentUser = authService.getCurrentUser();
+        if (currentUser?.role === USER_ROLE_EMPLOYEE && currentUser.id) {
+          const fallbackName =
+            [currentUser.firstName, currentUser.lastName]
+              .filter(Boolean)
+              .join(" ") ||
+            currentUser.userName ||
+            currentUser.username ||
+            USER_ROLE_EMPLOYEE;
+          setEmployees([{ id: currentUser.id, name: fallbackName }]);
+        } else {
+          setEmployees([]);
+        }
+      }
+    };
+
+    if (markModalOpen && markModalType === "pickup") {
+      loadEmployees();
+    }
+  }, [markModalOpen, markModalType]);
 
   const handleSaveMark = useCallback(async () => {
     if (!selectedTransactionForMark || !markModalType) return;
@@ -447,7 +550,12 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
       if (markModalType === "loaded") {
         transactionUpdate.dateLoaded = markDateTime.toISOString();
       } else {
+        if (!releaseBy) {
+          setActionError("Release By is required.");
+          return;
+        }
         transactionUpdate.datePickup = markDateTime.toISOString();
+        transactionUpdate.releasedBy = releaseBy;
       }
 
       await transactionService.update(
@@ -469,6 +577,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
     markDateTime,
     markModalType,
     onDeleted,
+    releaseBy,
     selectedTransactionForMark,
   ]);
 
@@ -816,7 +925,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
                           height: 16,
                         }}
                       >
-                        <InfoOutlinedIcon
+                        <HistoryIcon
                           sx={{
                             color: "#4caf50",
                             fontSize: 16,
@@ -1138,6 +1247,14 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
         isOpen={paymentModalOpen}
         onClose={handleClosePaymentModal}
         onSave={handleSavePayment}
+        balance={
+          selectedTransactionForPayment
+            ? getTransactionTotals(selectedTransactionForPayment, addonsPricing)
+                .balance
+            : undefined
+        }
+        history={selectedTransactionForPayment?.paymentDetails || []}
+        positionTop
       />
 
       <Dialog
@@ -1198,6 +1315,24 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
               }}
             />
           </LocalizationProvider>
+
+          {markModalType === "pickup" ? (
+            <FormControl fullWidth size="small" required>
+              <InputLabel>Release By</InputLabel>
+              <Select
+                label="Release By"
+                value={releaseBy}
+                onChange={(e) => setReleaseBy(String(e.target.value))}
+              >
+                {employees.map((employee) => (
+                  <MenuItem key={employee.id} value={employee.id}>
+                    {employee.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          ) : null}
+
           {actionError ? <Alert severity="error">{actionError}</Alert> : null}
         </DialogContent>
         <DialogActions sx={{ p: 2, gap: 1 }}>
@@ -1207,7 +1342,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
           <Button
             variant="contained"
             onClick={handleSaveMark}
-            disabled={actionLoading}
+            disabled={actionLoading || (markModalType === "pickup" && !releaseBy)}
           >
             {UI_TEXT.SAVE}
           </Button>

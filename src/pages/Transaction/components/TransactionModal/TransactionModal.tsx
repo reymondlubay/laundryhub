@@ -336,6 +336,25 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     return isNaN(num) || num < 0 ? 0 : num;
   };
 
+  const numberInputSx = {
+    "& input[type=number]::-webkit-outer-spin-button": {
+      WebkitAppearance: "none",
+      margin: 0,
+    },
+    "& input[type=number]::-webkit-inner-spin-button": {
+      WebkitAppearance: "none",
+      margin: 0,
+    },
+    "& input[type=number]": {
+      MozAppearance: "textfield",
+    },
+  } as const;
+
+  const preventWheelStep = (e: React.WheelEvent<HTMLInputElement>) => {
+    // Prevent mouse-wheel from stepping number inputs.
+    (e.target as HTMLInputElement).blur();
+  };
+
   const handleCreateCustomer = async (
     setFieldValue: (
       field: string,
@@ -445,7 +464,12 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             };
 
             if (isEditing && transaction) {
-              await transactionService.update(transaction.id, payload);
+              await transactionService.update(transaction.id, {
+                ...payload,
+                // Transaction modal is a full editor: the backend should replace payments
+                // exactly as shown in the UI (including allowing "delete all").
+                replacePaymentDetails: true,
+              });
               setSnackbar({
                 open: true,
                 message: SUCCESS_MESSAGES.TRANSACTION_UPDATED,
@@ -702,6 +726,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                       }
                                       error={kgTouched && !!kgError}
                                       helperText={kgTouched ? kgError : ""}
+                                      sx={numberInputSx}
+                                      inputProps={{ onWheel: preventWheelStep }}
                                       slotProps={{
                                         input: {
                                           // Targets the Input component
@@ -721,7 +747,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                       size="small"
                                       type="number"
                                       fullWidth
-                                      inputProps={{ min: 0 }}
                                       value={item.loads === 0 ? "" : item.loads}
                                       onChange={(e) =>
                                         setFieldValue(
@@ -733,6 +758,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                       helperText={
                                         loadsTouched ? loadsError : ""
                                       }
+                                      sx={numberInputSx}
+                                      inputProps={{
+                                        min: 0,
+                                        onWheel: preventWheelStep,
+                                      }}
                                     />
                                   </Grid>
 
@@ -747,7 +777,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                       size="small"
                                       type="number"
                                       fullWidth
-                                      inputProps={{ min: 0 }}
                                       value={item.price === 0 ? "" : item.price}
                                       onChange={(e) =>
                                         setFieldValue(
@@ -759,6 +788,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                       helperText={
                                         priceTouched ? priceError : ""
                                       }
+                                      sx={numberInputSx}
+                                      inputProps={{
+                                        min: 0,
+                                        onWheel: preventWheelStep,
+                                      }}
                                       InputProps={{
                                         startAdornment: (
                                           <InputAdornment position="start">
@@ -818,7 +852,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           size="small"
                           type="number"
                           fullWidth
-                          inputProps={{ min: 0 }}
                           value={
                             values.whitePrice === 0 ? "" : values.whitePrice
                           }
@@ -837,6 +870,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                               ? getIn(errors, "whitePrice")
                               : ""
                           }
+                          sx={numberInputSx}
+                          inputProps={{ min: 0, onWheel: preventWheelStep }}
                           InputProps={{
                             startAdornment: (
                               <InputAdornment position="start">
@@ -854,6 +889,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           size="small"
                           value={values.fabcon}
                           onValueChange={(val) => setFieldValue("fabcon", val)}
+                          hideStepper
                         />
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
@@ -866,6 +902,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           onValueChange={(val) =>
                             setFieldValue("detergent", val)
                           }
+                          hideStepper
                         />
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
@@ -876,6 +913,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           size="small"
                           value={values.cs}
                           onValueChange={(val) => setFieldValue("cs", val)}
+                          hideStepper
                         />
                       </Grid>
 

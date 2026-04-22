@@ -23,12 +23,14 @@ export default function NumberField({
   error,
   helperText,
   size = "medium",
+  hideStepper = false,
   ...other
 }: BaseNumberField.Root.Props & {
   label?: React.ReactNode;
   size?: "small" | "medium";
   error?: boolean;
   helperText?: string;
+  hideStepper?: boolean;
 }) {
   let id = React.useId();
   if (idProp) {
@@ -65,9 +67,16 @@ export default function NumberField({
             onKeyDown={props.onKeyDown}
             onFocus={props.onFocus}
             slotProps={{
-              input: props,
+              input: {
+                ...props,
+                onWheel: (e) => {
+                  // Prevent mouse wheel from incrementing/decrementing the value.
+                  (e.target as HTMLElement)?.blur?.();
+                },
+              },
             }}
             endAdornment={
+              hideStepper ? null : (
               <InputAdornment
                 position="end"
                 sx={{
@@ -102,6 +111,7 @@ export default function NumberField({
                   />
                 </BaseNumberField.Decrement>
               </InputAdornment>
+              )
             }
             sx={{ pr: 0 }}
           />
