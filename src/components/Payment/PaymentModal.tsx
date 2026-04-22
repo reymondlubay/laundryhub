@@ -10,6 +10,16 @@ import {
   Select,
   MenuItem,
   InputAdornment,
+  Box,
+  Chip,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
 } from "@mui/material";
 import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -30,6 +40,14 @@ type PaymentModalProps = {
   onSave: (payment: Omit<Payment, "id">) => void;
   editingPayment?: Payment;
   isEditMode?: boolean;
+  balance?: number;
+  history?: Array<{
+    id?: string;
+    paymentDate: string | Date;
+    amount: number;
+    mode: string;
+  }>;
+  positionTop?: boolean;
 };
 
 const validationSchema = Yup.object().shape({
@@ -46,6 +64,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onSave,
   editingPayment,
   isEditMode = false,
+  balance,
+  history = [],
+  positionTop = false,
 }) => {
   const [paymentDate, setPaymentDate] = useState<Dayjs>(dayjs());
   const [amount, setAmount] = useState<string>("");
@@ -102,6 +123,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     return parts.length > 2 ? parts[0] + "." + parts[1] : sanitized;
   };
 
+  const formatCurrency = (value: number): string => {
+    const n = Number(value || 0);
+    return `₱${n.toFixed(2)}`;
+  };
+
   return (
     <Dialog
       open={isOpen}
@@ -110,6 +136,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       slotProps={{
         paper: {
           sx: {
+            position: positionTop ? "fixed" : "relative",
+            top: positionTop ? 20 : "auto",
+            margin: positionTop ? 0 : undefined,
             maxHeight: "90vh",
             display: "flex",
             flexDirection: "column",
@@ -117,7 +146,57 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         },
       }}
     >
-      <DialogTitle>{isEditMode ? "Edit Payment" : "Add Payment"}</DialogTitle>
+      <DialogTitle>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1.5,
+            minWidth: 0,
+          }}
+        >
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{ fontWeight: 600, minWidth: 0 }}
+          >
+            {isEditMode ? "Edit Payment" : "Add Payment"}
+          </Typography>
+
+          {typeof balance === "number" ? (
+            <Chip
+              label={`Balance: ${formatCurrency(balance)}`}
+              sx={(theme) => ({
+                height: 34,
+                px: 0.75,
+                borderRadius: 2,
+                fontWeight: 800,
+                fontSize: "0.95rem",
+                letterSpacing: 0.2,
+                borderWidth: 2,
+                borderStyle: "solid",
+                borderColor:
+                  theme.palette.mode === "dark"
+                    ? "rgba(255,255,255,0.35)"
+                    : "rgba(0,0,0,0.2)",
+                bgcolor:
+                  theme.palette.mode === "dark"
+                    ? "#000"
+                    : "rgba(25, 118, 210, 0.08)",
+                color:
+                  theme.palette.mode === "dark"
+                    ? "rgba(255,255,255,0.95)"
+                    : "rgba(0,0,0,0.85)",
+                "& .MuiChip-label": {
+                  px: 1,
+                  py: 0,
+                },
+              })}
+            />
+          ) : null}
+        </Box>
+      </DialogTitle>
       <DialogContent
         sx={{
           pt: 2.5,
@@ -127,75 +206,122 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           overflow: "auto",
         }}
       >
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <DateTimePicker
-            label="Payment Date"
-            value={paymentDate}
-            onChange={(val) => val && setPaymentDate(val)}
-            maxDate={dayjs()} // Prevent future dates
-            timeSteps={{ minutes: 1 }}
-            slotProps={{
-              actionBar: { actions: ["today", "cancel", "accept"] },
-              popper: {
-                modifiers: [
-                  {
-                    name: "flip",
-                    enabled: true,
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 2,
+            flexDirection: { xs: "column", sm: "row" },
+          }}
+        >
+          <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <DateTimePicker
+                label="Payment Date"
+                value={paymentDate}
+                onChange={(val) => val && setPaymentDate(val)}
+                maxDate={dayjs()} // Prevent future dates
+                timeSteps={{ minutes: 1 }}
+                slotProps={{
+                  actionBar: { actions: ["today", "cancel", "accept"] },
+                  popper: {
+                    modifiers: [
+                      {
+                        name: "flip",
+                        enabled: true,
+                      },
+                      {
+                        name: "preventOverflow",
+                        enabled: true,
+                        options: {
+                          padding: 8,
+                        },
+                      },
+                    ],
                   },
-                  {
-                    name: "preventOverflow",
-                    enabled: true,
-                    options: {
-                      padding: 8,
+                  textField: {
+                    size: "small",
+                    fullWidth: true,
+                    error: !!errors.paymentDate,
+                    helperText: errors.paymentDate || "",
+                    sx: {
+                      mt: 0.5,
+                      "& .MuiInputBase-input": {
+                        color: "text.primary",
+                      },
+                      "& .MuiInputLabel-root": {
+                        color: "text.secondary",
+                      },
                     },
                   },
-                ],
-              },
-              textField: {
-                size: "small",
-                fullWidth: true,
-                error: !!errors.paymentDate,
-                helperText: errors.paymentDate || "",
-                sx: {
-                  mt: 0.5,
-                  "& .MuiInputBase-input": {
-                    color: "text.primary",
-                  },
-                  "& .MuiInputLabel-root": {
-                    color: "text.secondary",
-                  },
-                },
-              },
-            }}
-          />
-        </LocalizationProvider>
+                }}
+              />
+            </LocalizationProvider>
 
-        <TextField
-          label="Amount"
-          type="text"
-          size="small"
-          fullWidth
-          value={amount}
-          onChange={(e) => setAmount(sanitizeAmount(e.target.value))}
-          error={!!errors.amount}
-          helperText={errors.amount || ""}
-          InputProps={{
-            startAdornment: <InputAdornment position="start">₱</InputAdornment>,
-          }}
-          placeholder="0.00"
-        />
+            <TextField
+              label="Amount"
+              type="text"
+              size="small"
+              fullWidth
+              value={amount}
+              onChange={(e) => setAmount(sanitizeAmount(e.target.value))}
+              error={!!errors.amount}
+              helperText={errors.amount || ""}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">₱</InputAdornment>
+                ),
+              }}
+              placeholder="0.00"
+            />
 
-        <FormControl size="small" fullWidth error={!!errors.mode}>
-          <InputLabel>Payment Mode</InputLabel>
-          <Select
-            value={mode}
-            label="Payment Mode"
-            onChange={(e) => setMode(e.target.value as PaymentMode)}
-          >
-            <MenuItem value={PAYMENT_MODE_CASH}>{PAYMENT_MODE_CASH}</MenuItem>
-            <MenuItem value={PAYMENT_MODE_GCASH}>{PAYMENT_MODE_GCASH}</MenuItem>
-          </Select>
-        </FormControl>
+            <FormControl size="small" fullWidth error={!!errors.mode}>
+              <InputLabel>Payment Mode</InputLabel>
+              <Select
+                value={mode}
+                label="Payment Mode"
+                onChange={(e) => setMode(e.target.value as PaymentMode)}
+              >
+                <MenuItem value={PAYMENT_MODE_CASH}>{PAYMENT_MODE_CASH}</MenuItem>
+                <MenuItem value={PAYMENT_MODE_GCASH}>{PAYMENT_MODE_GCASH}</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </Box>
+
+        {history.length > 0 ? (
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700 }}>Payment Date</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>
+                    Amount
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Mode</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {[...history]
+                  .sort(
+                    (a, b) =>
+                      dayjs(a.paymentDate).valueOf() - dayjs(b.paymentDate).valueOf(),
+                  )
+                  .map((p, idx) => (
+                    <TableRow key={p.id || `${p.paymentDate}-${idx}`} hover>
+                      <TableCell>
+                        {dayjs(p.paymentDate).format("MM-DD-YY h:mm A")}
+                      </TableCell>
+                      <TableCell align="right">
+                        {formatCurrency(Number(p.amount || 0))}
+                      </TableCell>
+                      <TableCell>{p.mode}</TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : null}
       </DialogContent>
 
       <DialogActions sx={{ p: 2, gap: 1 }}>

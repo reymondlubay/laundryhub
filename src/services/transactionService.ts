@@ -109,6 +109,7 @@ export interface UpdateTransactionRequest {
     amount: number;
     mode: string;
   }>;
+  replacePaymentDetails?: boolean;
 }
 
 const transactionService = {
