@@ -51,3 +51,19 @@
 .transaction-grouped-grid .ag-pinned-right-cols-container .ag-row.tx-child-row .ag-cell {
   border-left: none !important;
 }
+
+@keyframes txRowHighlightFade {
+  0% {
+    background-color: rgba(255, 152, 0, 0.45);
+  }
+  70% {
+    background-color: rgba(255, 152, 0, 0.22);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.transaction-grouped-grid .ag-row.tx-highlight-fade {
+  animation: txRowHighlightFade 5s ease-out forwards;
+}

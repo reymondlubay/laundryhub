@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useRef } from "react";
 import {
   Tooltip,
   Stack,
@@ -371,21 +371,27 @@ function flattenTransactionRows(
   });
 }
 
-type TransactionTableProps = {
+export type TransactionTableProps = {
   transactions: Transaction[];
   loading: boolean;
   error: string | null;
   onEditTransaction?: (transaction: Transaction) => void;
   onDeleted?: () => void;
+  onToast?: (payload: { severity: "success" | "error"; message: string }) => void;
+  dataNonce: number;
+  restoreTo?: { transactionId: string; nonce: number; expectedRefreshKey: number } | null;
 };
 
-const TransactionTable: React.FC<TransactionTableProps> = ({
+function TransactionTable({
   transactions,
   loading,
   error,
   onEditTransaction,
   onDeleted,
-}) => {
+  onToast,
+  dataNonce,
+  restoreTo,
+}: TransactionTableProps) {
   const { darkMode } = useThemeContext();
   const [addonsPricing, setAddonsPricing] = useState<AddonsPricing>(
     DEFAULT_ADDONS_PRICING,
@@ -408,6 +414,141 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   const [actionError, setActionError] = useState<string | null>(null);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [releaseBy, setReleaseBy] = useState<string>("");
+  const releaseByInputRef = useRef<HTMLInputElement | null>(null);
+  const gridApiRef = useRef<any>(null);
+  const pendingRestoreTransactionIdRef = useRef<string | null>(null);
+  const pendingRestoreTargetPageRef = useRef<number | null>(null);
+  const pendingRestoreExpectedDataNonceRef = useRef<number | null>(null);
+  const restoreAttemptRef = useRef<number>(0);
+  const restoreTimerRef = useRef<number | null>(null);
+  const highlightTimerRef = useRef<number | null>(null);
+  const [highlightTransactionId, setHighlightTransactionId] = useState<
+    string | null
+  >(null);
+
+  const triggerRestoreAndHighlight = useCallback((transactionId: string) => {
+    pendingRestoreTransactionIdRef.current = transactionId;
+    setHighlightTransactionId(transactionId);
+
+    if (highlightTimerRef.current) {
+      window.clearTimeout(highlightTimerRef.current);
+    }
+    highlightTimerRef.current = window.setTimeout(() => {
+      setHighlightTransactionId(null);
+      highlightTimerRef.current = null;
+    }, 5000);
+  }, []);
+
+  const restoreViewToTransaction = useCallback((): boolean => {
+    const api = gridApiRef.current;
+    const transactionId = pendingRestoreTransactionIdRef.current;
+    if (!api || !transactionId) return false;
+
+    const expectedDataNonce = pendingRestoreExpectedDataNonceRef.current;
+    if (typeof expectedDataNonce === "number" && dataNonce < expectedDataNonce) {
+      return false; // wait until fresh data arrives
+    }
+
+    // With pagination enabled, node.rowIndex can be page-relative depending on the model.
+    // Compute a stable global index by counting nodes in filter/sort order.
+    let targetGlobalIndex: number | null = null;
+    const forEach =
+      typeof api.forEachNodeAfterFilterAndSort === "function"
+        ? api.forEachNodeAfterFilterAndSort.bind(api)
+        : typeof api.forEachNode === "function"
+          ? api.forEachNode.bind(api)
+          : null;
+
+    if (!forEach) return false;
+
+    let globalIndex = 0;
+    forEach((node: any) => {
+      if (targetGlobalIndex != null) return;
+      const row = node?.data as FlatTransactionRow | undefined;
+      if (row?.transactionId === transactionId && row?.isFirstRow) {
+        targetGlobalIndex = globalIndex;
+      }
+      globalIndex += 1;
+    });
+
+    if (typeof targetGlobalIndex !== "number") return false;
+
+    const pageSize =
+      typeof api.paginationGetPageSize === "function"
+        ? api.paginationGetPageSize()
+        : null;
+
+    if (
+      pageSize &&
+      typeof api.paginationGoToPage === "function" &&
+      typeof targetGlobalIndex === "number"
+    ) {
+      const targetPage = Math.floor(targetGlobalIndex / pageSize);
+      pendingRestoreTargetPageRef.current = targetPage;
+
+      const currentPage =
+        typeof api.paginationGetCurrentPage === "function"
+          ? api.paginationGetCurrentPage()
+          : null;
+
+      // Pagination resets to page 1 when rowData changes; go back to the page
+      // that contains the edited transaction before restoring scroll position.
+      if (typeof currentPage === "number" && currentPage !== targetPage) {
+        api.paginationGoToPage(targetPage);
+        return false; // wait for pagination change, then scroll
+      }
+
+      // We are on the correct page; ensure the row is visible and focused.
+      api.ensureIndexVisible(targetGlobalIndex, "middle");
+      if (typeof api.setFocusedCell === "function") {
+        api.setFocusedCell(targetGlobalIndex, "customer");
+      }
+
+      // One extra pass to counter any immediate post-refresh reflow.
+      window.setTimeout(() => {
+        try {
+          api.ensureIndexVisible(targetGlobalIndex, "middle");
+        } catch {
+          // ignore
+        }
+      }, 50);
+      pendingRestoreTransactionIdRef.current = null;
+      pendingRestoreTargetPageRef.current = null;
+      pendingRestoreExpectedDataNonceRef.current = null;
+      return true;
+    }
+
+    api.ensureIndexVisible(targetGlobalIndex, "middle");
+    if (typeof api.setFocusedCell === "function") {
+      api.setFocusedCell(targetGlobalIndex, "customer");
+    }
+    pendingRestoreTransactionIdRef.current = null;
+    pendingRestoreTargetPageRef.current = null;
+    pendingRestoreExpectedDataNonceRef.current = null;
+    return true;
+  }, [dataNonce]);
+
+  const scheduleRestore = useCallback(() => {
+    if (restoreTimerRef.current) {
+      window.clearTimeout(restoreTimerRef.current);
+      restoreTimerRef.current = null;
+    }
+
+    restoreAttemptRef.current = 0;
+
+    const tick = () => {
+      if (!pendingRestoreTransactionIdRef.current) return;
+      const done = restoreViewToTransaction();
+      if (done) return;
+
+      restoreAttemptRef.current += 1;
+      if (restoreAttemptRef.current >= 25) return; // give up after ~1.25s
+
+      restoreTimerRef.current = window.setTimeout(tick, 50);
+    };
+
+    restoreTimerRef.current = window.setTimeout(tick, 0);
+  }, [restoreViewToTransaction]);
 
   const handleDeleteTransactionClick = useCallback((transactionId: string) => {
     setDeleteError(null);
@@ -470,6 +611,15 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
           paymentDetails: updatedPaymentDetails,
         });
 
+        triggerRestoreAndHighlight(selectedTransactionForPayment.id);
+        pendingRestoreExpectedDataNonceRef.current = dataNonce + 1;
+        onToast?.({
+          severity: "success",
+          message:
+          `${toPascalCase(
+            selectedTransactionForPayment.customer?.name || "Customer",
+          )} payment of ₱${Number(payment.amount || 0).toFixed(2)} has been saved.`,
+        });
         handleClosePaymentModal();
         onDeleted?.();
       } catch (err: unknown) {
@@ -480,7 +630,14 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
         setActionLoading(false);
       }
     },
-    [handleClosePaymentModal, onDeleted, selectedTransactionForPayment],
+    [
+      dataNonce,
+      handleClosePaymentModal,
+      onDeleted,
+      onToast,
+      selectedTransactionForPayment,
+      triggerRestoreAndHighlight,
+    ],
   );
 
   const handleOpenMarkModal = useCallback(
@@ -539,6 +696,16 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
     }
   }, [markModalOpen, markModalType]);
 
+  React.useEffect(() => {
+    if (!(markModalOpen && markModalType === "pickup")) return;
+
+    const timer = window.setTimeout(() => {
+      releaseByInputRef.current?.focus();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [markModalOpen, markModalType]);
+
   const handleSaveMark = useCallback(async () => {
     if (!selectedTransactionForMark || !markModalType) return;
     setActionLoading(true);
@@ -563,6 +730,23 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
         transactionUpdate,
       );
 
+      triggerRestoreAndHighlight(selectedTransactionForMark.id);
+      pendingRestoreExpectedDataNonceRef.current = dataNonce + 1;
+      if (markModalType === "pickup") {
+        onToast?.({
+          severity: "success",
+          message: `${toPascalCase(
+            selectedTransactionForMark.customer?.name || "Customer",
+          )} record has been picked up.`,
+        });
+      } else {
+        onToast?.({
+          severity: "success",
+          message: `${toPascalCase(
+            selectedTransactionForMark.customer?.name || "Customer",
+          )} transaction has been loaded.`,
+        });
+      }
       handleCloseMarkModal();
       onDeleted?.();
     } catch (err: unknown) {
@@ -573,13 +757,36 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
       setActionLoading(false);
     }
   }, [
+    dataNonce,
     handleCloseMarkModal,
     markDateTime,
     markModalType,
     onDeleted,
+    onToast,
     releaseBy,
     selectedTransactionForMark,
+    triggerRestoreAndHighlight,
   ]);
+
+  React.useEffect(() => {
+    if (!restoreTo?.transactionId) return;
+    triggerRestoreAndHighlight(restoreTo.transactionId);
+    // For edit/save from TransactionModal, the parent will refresh the list;
+    // don't restore until the new data has arrived.
+    pendingRestoreExpectedDataNonceRef.current = (restoreTo as any)
+      .expectedRefreshKey;
+  }, [
+    restoreTo?.nonce,
+    restoreTo?.transactionId,
+    triggerRestoreAndHighlight,
+  ]);
+
+  React.useEffect(() => {
+    if (!pendingRestoreTransactionIdRef.current) return;
+    const expected = pendingRestoreExpectedDataNonceRef.current;
+    if (typeof expected === "number" && dataNonce < expected) return;
+    scheduleRestore();
+  }, [dataNonce, scheduleRestore]);
 
   const sortedTransactions = useMemo(() => {
     return [...transactions].sort((a, b) => {
@@ -1148,7 +1355,13 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
         },
       },
     ],
-    [onEditTransaction, transactions, handleDeleteTransactionClick],
+    [
+      handleOpenMarkModal,
+      handleOpenPaymentModal,
+      onEditTransaction,
+      transactions,
+      handleDeleteTransactionClick,
+    ],
   );
 
   const defaultColDef = useMemo<ColDef<FlatTransactionRow>>(
@@ -1165,6 +1378,13 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
 
   const getRowClass = (params: { data?: FlatTransactionRow }) => {
     const classes: string[] = [];
+
+    if (
+      highlightTransactionId &&
+      params.data?.transactionId === highlightTransactionId
+    ) {
+      classes.push("tx-highlight-fade");
+    }
 
     if (params.data?.isFirstRow) {
       classes.push("tx-main-row");
@@ -1239,6 +1459,18 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
             getRowHeight={getRowHeight}
             animateRows
             pagination={true}
+            onGridReady={(params) => {
+              gridApiRef.current = params.api;
+            }}
+            onFirstDataRendered={() => {
+              scheduleRestore();
+            }}
+            onModelUpdated={() => {
+              scheduleRestore();
+            }}
+            onPaginationChanged={() => {
+              scheduleRestore();
+            }}
           />
         )}
       </div>
@@ -1323,6 +1555,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
                 label="Release By"
                 value={releaseBy}
                 onChange={(e) => setReleaseBy(String(e.target.value))}
+                inputRef={releaseByInputRef}
               >
                 {employees.map((employee) => (
                   <MenuItem key={employee.id} value={employee.id}>
@@ -1356,6 +1589,6 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
       />
     </>
   );
-};
+}
 
 export default TransactionTable;
