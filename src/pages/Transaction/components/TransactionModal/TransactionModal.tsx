@@ -18,8 +18,6 @@ import {
   InputAdornment,
   DialogTitle,
   Tooltip,
-  Alert,
-  Snackbar,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
@@ -47,7 +45,6 @@ import authService from "../../../../services/authService";
 import {
   API_ERRORS,
   FORM_ERRORS,
-  SUCCESS_MESSAGES,
   UI_TEXT,
 } from "../../../../constants/messages";
 import { USER_ROLE_EMPLOYEE } from "../../../../constants/roles";
@@ -61,7 +58,12 @@ type TransactionModalProps = {
   isOpen: boolean;
   handleClose: () => void;
   transaction?: Transaction | null;
-  onSaved?: () => void;
+  onSaved?: (result: {
+    mode: "create" | "edit";
+    customerName: string;
+    transactionId?: string;
+  }) => void;
+  onError?: (message: string) => void;
 };
 
 type Customer = {
@@ -105,6 +107,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   handleClose,
   transaction,
   onSaved,
+  onError,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -122,15 +125,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       notes: "",
     });
   const [payments, setPayments] = React.useState<Payment[]>([]);
-  const [snackbar, setSnackbar] = React.useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "error";
-  }>({
-    open: false,
-    message: "",
-    severity: "success",
-  });
 
   const isEditing = !!transaction;
 
@@ -402,6 +396,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     return value.format("YYYY-MM-DDTHH:mm:ss");
   };
 
+  const getSelectedCustomerName = (customerId: string): string => {
+    const found = customers.find((c) => c.id === customerId);
+    return found?.name?.trim() || "Customer";
+  };
+
   return (
     <Dialog
       open={isOpen}
@@ -470,25 +469,22 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 // exactly as shown in the UI (including allowing "delete all").
                 replacePaymentDetails: true,
               });
-              setSnackbar({
-                open: true,
-                message: SUCCESS_MESSAGES.TRANSACTION_UPDATED,
-                severity: "success",
+              const customerName = getSelectedCustomerName(values.customer);
+              onSaved?.({
+                mode: "edit",
+                customerName,
+                transactionId: transaction.id,
               });
             } else {
               await transactionService.create(payload);
-              setSnackbar({
-                open: true,
-                message: SUCCESS_MESSAGES.TRANSACTION_CREATED,
-                severity: "success",
-              });
+              const customerName = getSelectedCustomerName(values.customer);
+              onSaved?.({ mode: "create", customerName });
             }
 
-            onSaved?.();
           } catch (error: unknown) {
             const message =
               error instanceof Error ? error.message : API_ERRORS.SAVE_FAILED;
-            setSnackbar({ open: true, message, severity: "error" });
+            onError?.(message);
           } finally {
             setLoading(false);
           }
@@ -1101,20 +1097,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
           );
         }}
       </Formik>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-      >
-        <Alert
-          severity={snackbar.severity}
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-          sx={{ width: "100%" }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Dialog>
   );
 };

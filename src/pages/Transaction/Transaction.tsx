@@ -11,6 +11,9 @@ import {
   Typography,
   InputAdornment,
   IconButton,
+  Snackbar,
+  Alert,
+  Slide,
 } from "@mui/material";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -26,6 +29,30 @@ const Transaction = () => {
     React.useState<Transaction | null>(null);
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [showPendingOnly, setShowPendingOnly] = React.useState(false);
+  const [restoreTo, setRestoreTo] = React.useState<{
+    transactionId: string;
+    nonce: number;
+    expectedRefreshKey: number;
+  } | null>(null);
+  const [toast, setToast] = React.useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error";
+  }>({ open: false, message: "", severity: "success" });
+
+  const ToastTransition = React.useMemo(() => {
+    return React.forwardRef(function ToastTransition(
+      props: any,
+      ref: React.Ref<unknown>,
+    ) {
+      // Enter: left -> right (comes from left). Exit: reverse (right -> left).
+      return <Slide {...props} direction="right" ref={ref} />;
+    });
+  }, []);
+  const refreshKeyRef = React.useRef(0);
+  React.useEffect(() => {
+    refreshKeyRef.current = refreshKey;
+  }, [refreshKey]);
 
   const {
     searchText,
@@ -55,9 +82,36 @@ const Transaction = () => {
     setOpenTransaction(true);
   };
 
-  const handleSavedTransaction = () => {
+  const handleTransactionSaved = (result: {
+    mode: "create" | "edit";
+    customerName: string;
+    transactionId?: string;
+  }) => {
+    const message =
+      result.mode === "create"
+        ? `${result.customerName} transaction has been added.`
+        : `${result.customerName} record has been saved.`;
+    setToast({ open: true, message, severity: "success" });
+
+    if (result.transactionId) {
+      const nextRefreshKey = refreshKeyRef.current + 1;
+      setRestoreTo((prev) => ({
+        transactionId: result.transactionId!,
+        nonce: (prev?.nonce || 0) + 1,
+        expectedRefreshKey: nextRefreshKey,
+      }));
+      setRefreshKey(nextRefreshKey);
+      handleCloseTransaction();
+      return;
+    }
+
+    // new transaction: just refresh list
     setRefreshKey((prev) => prev + 1);
     handleCloseTransaction();
+  };
+
+  const handleTransactionError = (message: string) => {
+    setToast({ open: true, message, severity: "error" });
   };
 
   const handleClearFilters = () => {
@@ -242,13 +296,45 @@ const Transaction = () => {
         error={error}
         onEditTransaction={handleEditTransaction}
         onDeleted={() => setRefreshKey((prev) => prev + 1)}
+        onToast={(payload) => {
+          setToast({ open: true, ...payload });
+        }}
+        dataNonce={refreshKey}
+        restoreTo={restoreTo}
       />
       <TransactionModal
         isOpen={openTransaction}
         handleClose={handleCloseTransaction}
         transaction={selectedTransaction}
-        onSaved={handleSavedTransaction}
+        onSaved={handleTransactionSaved}
+        onError={handleTransactionError}
       />
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={5000}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        TransitionComponent={ToastTransition}
+      >
+        <Alert
+          severity={toast.severity}
+          variant="filled"
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          sx={{
+            width: "100%",
+            bgcolor: toast.severity === "success" ? "#c8e6c9" : undefined,
+            color: toast.severity === "success" ? "#1b5e20" : undefined,
+            fontWeight: 700,
+            letterSpacing: 0.2,
+            "& .MuiAlert-icon": {
+              color: toast.severity === "success" ? "#1b5e20" : undefined,
+            },
+          }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 };

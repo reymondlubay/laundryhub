@@ -24,7 +24,7 @@ import {
 import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { Dayjs } from "dayjs";
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import * as Yup from "yup";
 import type { Payment, PaymentMode } from "../../services/apiTypes";
 import {
@@ -68,6 +68,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   history = [],
   positionTop = false,
 }) => {
+  const amountInputRef = useRef<HTMLInputElement | null>(null);
   const [paymentDate, setPaymentDate] = useState<Dayjs>(dayjs());
   const [amount, setAmount] = useState<string>("");
   const [mode, setMode] = useState<PaymentMode>(DEFAULT_PAYMENT_MODE);
@@ -85,6 +86,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
     setErrors({});
   }, [editingPayment, isEditMode, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timer = window.setTimeout(() => {
+      amountInputRef.current?.focus();
+      amountInputRef.current?.select?.();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [isOpen]);
 
   const handleSave = async () => {
     try {
@@ -267,6 +279,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               onChange={(e) => setAmount(sanitizeAmount(e.target.value))}
               error={!!errors.amount}
               helperText={errors.amount || ""}
+              inputRef={amountInputRef}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">₱</InputAdornment>

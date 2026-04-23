@@ -20,7 +20,6 @@ import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
-import LocalLaundryServiceOutlinedIcon from "@mui/icons-material/LocalLaundryServiceOutlined";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HistoryIcon from "@mui/icons-material/History";
@@ -191,9 +190,11 @@ const Dashboard = () => {
       )
       .reduce((sum, transaction) => sum + getTransactionLoads(transaction), 0);
 
-    const todaysLoaded = activeTransactions.filter((transaction) =>
-      isSameDay(getTransactionDate(transaction, "dateLoaded")),
-    ).length;
+    const todaysLoaded = activeTransactions
+      .filter((transaction) =>
+        isSameDay(getTransactionDate(transaction, "dateLoaded")),
+      )
+      .reduce((sum, transaction) => sum + getTransactionLoads(transaction), 0);
 
     const todaysPickup = activeTransactions.filter((transaction) =>
       isSameDay(getTransactionDate(transaction, "datePickup")),
@@ -275,7 +276,7 @@ const Dashboard = () => {
         if (!bDate.isValid()) return -1;
         return aDate.valueOf() - bDate.valueOf();
       });
-  }, [transactions]);
+  }, [activeTransactions]);
 
   const pendingTotalLoads = React.useMemo(
     () =>
