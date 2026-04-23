@@ -349,14 +349,14 @@ const Dashboard = () => {
       iconBg: "#ffe7df",
       iconColor: "#ff5a2d",
     },
-    {
-      key: "todays-load",
-      title: "Total Loads",
-      value: metrics.todaysLoad,
-      icon: <LocalLaundryServiceOutlinedIcon />,
-      iconBg: "#e5f2ff",
-      iconColor: "#2e7dd7",
-    },
+    // {
+    //   key: "todays-load",
+    //   title: "Total Loads",
+    //   value: metrics.todaysLoad,
+    //   icon: <LocalLaundryServiceOutlinedIcon />,
+    //   iconBg: "#e5f2ff",
+    //   iconColor: "#2e7dd7",
+    // },
     {
       key: "todays-loaded",
       title: "Completed Loads",
