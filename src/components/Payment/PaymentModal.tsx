@@ -33,6 +33,7 @@ import {
   PAYMENT_MODE_GCASH,
 } from "../../constants/payment";
 import { UI_TEXT } from "../../constants/messages";
+import { toPascalCase } from "../../utils/stringUtils";
 
 type PaymentModalProps = {
   isOpen: boolean;
@@ -40,6 +41,8 @@ type PaymentModalProps = {
   onSave: (payment: Omit<Payment, "id">) => void;
   editingPayment?: Payment;
   isEditMode?: boolean;
+  /** Shown as a confirmation line under the title (e.g. transaction table). */
+  customerName?: string;
   balance?: number;
   history?: Array<{
     id?: string;
@@ -64,6 +67,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onSave,
   editingPayment,
   isEditMode = false,
+  customerName,
   balance,
   history = [],
   positionTop = false,
@@ -168,13 +172,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             minWidth: 0,
           }}
         >
-          <Typography
-            variant="h6"
-            component="div"
-            sx={{ fontWeight: 600, minWidth: 0 }}
-          >
-            {isEditMode ? "Edit Payment" : "Add Payment"}
-          </Typography>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
+              {isEditMode ? "Edit payment" : "Add payment"}
+            </Typography>
+            {customerName?.trim() ? (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 0.5, fontWeight: 500 }}
+              >
+                {isEditMode
+                  ? `Edit this payment for ${toPascalCase(customerName.trim())}?`
+                  : `Add a payment for ${toPascalCase(customerName.trim())}?`}
+              </Typography>
+            ) : null}
+          </Box>
 
           {typeof balance === "number" ? (
             <Chip

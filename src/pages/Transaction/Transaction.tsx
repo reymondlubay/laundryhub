@@ -75,22 +75,22 @@ const Transaction = () => {
     removeTransaction,
   } = useTransactionSearch();
 
-  const handleOpenTransaction = () => {
+  const handleOpenTransaction = React.useCallback(() => {
     setSelectedTransaction(null);
     setOpenTransaction(true);
-  };
+  }, []);
 
-  const handleCloseTransaction = () => {
+  const handleCloseTransaction = React.useCallback(() => {
     setOpenTransaction(false);
     setSelectedTransaction(null);
-  };
+  }, []);
 
-  const handleEditTransaction = (transaction: Transaction) => {
+  const handleEditTransaction = React.useCallback((transaction: Transaction) => {
     setSelectedTransaction(transaction);
     setOpenTransaction(true);
-  };
+  }, []);
 
-  const handleTransactionSaved = (result: {
+  const handleTransactionSaved = React.useCallback((result: {
     mode: "create" | "edit";
     customerName: string;
     transaction?: Transaction;
@@ -122,16 +122,16 @@ const Transaction = () => {
       });
     }
     handleCloseTransaction();
-  };
+  }, [handleCloseTransaction, search, upsertTransaction]);
 
-  const handleTransactionError = (message: string) => {
+  const handleTransactionError = React.useCallback((message: string) => {
     setToast({ open: true, message, severity: "error" });
-  };
+  }, []);
 
-  const handleClearFilters = () => {
+  const handleClearFilters = React.useCallback(() => {
     setShowPendingOnly(false);
     clearFilters();
-  };
+  }, [clearFilters]);
 
   const filteredTransactions = React.useMemo(() => {
     if (!showPendingOnly) return transactions;
@@ -143,8 +143,35 @@ const Transaction = () => {
     });
   }, [showPendingOnly, transactions]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") search();
+  const handleKeyDown = React.useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") void search();
+    },
+    [search],
+  );
+
+  const autocompleteOptions = React.useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    if (q.length < 3) return [];
+    return customerSuggestions
+      .filter((c) => c.name.toLowerCase().includes(q))
+      .slice(0, 50);
+  }, [customerSuggestions, searchText]);
+
+  const handleTableToast = React.useCallback(
+    (payload: { severity: "success" | "error"; message: string }) => {
+      setToast({ open: true, ...payload });
+    },
+    [],
+  );
+
+  const [comboOpen, setComboOpen] = React.useState(false);
+  const canShowSuggestionList = searchText.trim().length >= 3;
+  const suggestionListOpen = comboOpen && canShowSuggestionList;
+
+  const handleClearCustomerSearch = () => {
+    setComboOpen(false);
+    void clearCustomerAndSearch();
   };
 
   return (
@@ -154,12 +181,16 @@ const Transaction = () => {
         {/* Customer search */}
         <Grid size={{ xs: 12, sm: "auto" }} sx={{ minWidth: { sm: 240 } }}>
           <Stack spacing={0.25}>
-            <Autocomplete<Customer, false, false, true>
+            <Autocomplete<Customer, false, true, true>
               freeSolo
+              disableClearable
               size="small"
               fullWidth
               disabled={loading}
-              options={customerSuggestions}
+              open={suggestionListOpen}
+              onOpen={() => setComboOpen(true)}
+              onClose={() => setComboOpen(false)}
+              options={autocompleteOptions}
               getOptionLabel={(option) =>
                 typeof option === "string" ? option : option.name
               }
@@ -173,18 +204,11 @@ const Transaction = () => {
                   setSearchText(value.name);
                 }
               }}
-              filterOptions={(options, state) => {
-                if (state.inputValue.length < 3) return options.slice(0, 0);
-                const q = state.inputValue.trim().toLowerCase();
-                if (!q) return options.slice(0, 50);
-                return options
-                  .filter((c) => c.name.toLowerCase().includes(q))
-                  .slice(0, 50);
-              }}
+              filterOptions={(options) => options}
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  placeholder="Search customer..."
+                  placeholder="Type at least 3 characters for suggestions…"
                   onKeyDown={handleKeyDown}
                   InputProps={{
                     ...params.InputProps,
@@ -196,24 +220,18 @@ const Transaction = () => {
                         {params.InputProps.startAdornment}
                       </>
                     ),
-                    endAdornment: (
-                      <>
-                        {searchText ? (
-                          <InputAdornment position="end">
-                            <IconButton
-                              size="small"
-                              onClick={() => {
-                                void clearCustomerAndSearch();
-                              }}
-                              edge="end"
-                            >
-                              <ClearIcon fontSize="small" />
-                            </IconButton>
-                          </InputAdornment>
-                        ) : null}
-                        {params.InputProps.endAdornment}
-                      </>
-                    ),
+                    endAdornment: searchText ? (
+                      <InputAdornment position="end">
+                        <IconButton
+                          size="small"
+                          onClick={handleClearCustomerSearch}
+                          edge="end"
+                          aria-label="Clear customer search and refresh"
+                        >
+                          <ClearIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : null,
                   }}
                 />
               )}
@@ -343,10 +361,8 @@ const Transaction = () => {
         error={error}
         onEditTransaction={handleEditTransaction}
         onTransactionSynced={upsertTransaction}
-        onTransactionDeleted={(id) => removeTransaction(id)}
-        onToast={(payload) => {
-          setToast({ open: true, ...payload });
-        }}
+        onTransactionDeleted={removeTransaction}
+        onToast={handleTableToast}
         jumpToFirstPageNonce={jumpToFirstPageNonce}
         flashRowRequest={flashRowRequest}
       />

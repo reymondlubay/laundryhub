@@ -16,6 +16,7 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  Typography,
 } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
 import EditIcon from "@mui/icons-material/Edit";
@@ -387,7 +388,7 @@ export type TransactionTableProps = {
   flashRowRequest?: { transactionId: string; nonce: number } | null;
 };
 
-function TransactionTable({
+function TransactionTableInner({
   transactions,
   loading,
   error,
@@ -1423,6 +1424,7 @@ function TransactionTable({
         isOpen={paymentModalOpen}
         onClose={handleClosePaymentModal}
         onSave={handleSavePayment}
+        customerName={selectedTransactionForPayment?.customer?.name}
         balance={
           selectedTransactionForPayment
             ? getTransactionTotals(selectedTransactionForPayment, addonsPricing)
@@ -1463,6 +1465,17 @@ function TransactionTable({
             overflow: "auto",
           }}
         >
+          {selectedTransactionForMark?.customer?.name ? (
+            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+              {markModalType === "loaded"
+                ? `Mark ${toPascalCase(
+                    selectedTransactionForMark.customer.name,
+                  )} as loaded?`
+                : `Mark ${toPascalCase(
+                    selectedTransactionForMark.customer.name,
+                  )} as picked up?`}
+            </Typography>
+          ) : null}
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DateTimePicker
               label={markModalType === "loaded" ? "Loaded Date" : "Pickup Date"}
@@ -1574,4 +1587,5 @@ function TransactionTable({
   );
 }
 
+const TransactionTable = React.memo(TransactionTableInner);
 export default TransactionTable;
