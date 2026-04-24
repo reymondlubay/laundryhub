@@ -29,6 +29,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Navigate } from "react-router-dom";
 import dayjs from "dayjs";
+import { toApiDateTimeString } from "../../utils/dateTimeApi";
 import authService from "../../services/authService";
 import route from "../../constants/route";
 import {
@@ -158,7 +159,6 @@ const Users: React.FC = () => {
     if (!form.firstName.trim()) return FORM_ERRORS.REQUIRED_FIRST_NAME;
     if (!form.lastName.trim()) return FORM_ERRORS.REQUIRED_LAST_NAME;
     if (!form.userName.trim()) return FORM_ERRORS.REQUIRED_USERNAME;
-    if (!form.mobileNumber.trim()) return FORM_ERRORS.REQUIRED_MOBILE_NUMBER;
     if (!form.dateHired) return FORM_ERRORS.REQUIRED_DATE_HIRED;
     if (!editingUser && form.password.trim().length < 6) {
       return FORM_ERRORS.PASSWORD_MIN_LENGTH;
@@ -180,14 +180,16 @@ const Users: React.FC = () => {
       setSubmitting(true);
       setError(null);
 
-      const dateHiredISO = dayjs(form.dateHired).startOf("day").toISOString();
+      const dateHiredISO = toApiDateTimeString(
+        dayjs(form.dateHired).startOf("day"),
+      )!;
 
       if (editingUser) {
         const payload: UpdateUserPayload = {
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
           userName: form.userName.trim(),
-          mobileNumber: form.mobileNumber.trim(),
+          mobileNumber: form.mobileNumber.trim() || null,
           role: form.role,
           status: form.status,
           dateHired: dateHiredISO,
@@ -203,7 +205,9 @@ const Users: React.FC = () => {
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
           userName: form.userName.trim(),
-          mobileNumber: form.mobileNumber.trim(),
+          ...(form.mobileNumber.trim()
+            ? { mobileNumber: form.mobileNumber.trim() }
+            : {}),
           password: form.password.trim(),
           role: form.role,
           status: form.status,
@@ -423,7 +427,7 @@ const Users: React.FC = () => {
               <TextField
                 fullWidth
                 size="small"
-                label="Mobile Number"
+                label="Mobile Number (optional)"
                 autoComplete="off"
                 name="new-mobile-number"
                 value={form.mobileNumber}

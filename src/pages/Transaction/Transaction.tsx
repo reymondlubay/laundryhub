@@ -1,6 +1,7 @@
 import React from "react";
 import TransactionTable from "./components/TransactionTable";
 import {
+  Autocomplete,
   Box,
   Button,
   Checkbox,
@@ -19,26 +20,36 @@ import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import TransactionModal from "./components/TransactionModal/TransactionModal";
 import type { Transaction } from "../../services/transactionService";
+import customerService, { type Customer } from "../../services/customerService";
 import { useTransactionSearch } from "./hooks/useTransactionSearch";
 
 const Transaction = () => {
   const [openTransaction, setOpenTransaction] = React.useState(false);
   const [selectedTransaction, setSelectedTransaction] =
     React.useState<Transaction | null>(null);
-  const [refreshKey, setRefreshKey] = React.useState(0);
   const [showPendingOnly, setShowPendingOnly] = React.useState(false);
-  const [restoreTo, setRestoreTo] = React.useState<{
+  const [jumpToFirstPageNonce, setJumpToFirstPageNonce] = React.useState(0);
+  const [flashRowRequest, setFlashRowRequest] = React.useState<{
     transactionId: string;
     nonce: number;
-    expectedRefreshKey: number;
   } | null>(null);
+  const flashRowNonceRef = React.useRef(0);
   const [toast, setToast] = React.useState<{
     open: boolean;
     message: string;
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
+
+  const [customerSuggestions, setCustomerSuggestions] = React.useState<
+    Customer[]
+  >([]);
+
+  React.useEffect(() => {
+    return customerService.subscribeToCustomerLookup(setCustomerSuggestions);
+  }, []);
 
   const ToastTransition = React.useMemo(() => {
     return React.forwardRef(function ToastTransition(
@@ -49,11 +60,6 @@ const Transaction = () => {
       return <Slide {...props} direction="right" ref={ref} />;
     });
   }, []);
-  const refreshKeyRef = React.useRef(0);
-  React.useEffect(() => {
-    refreshKeyRef.current = refreshKey;
-  }, [refreshKey]);
-
   const {
     searchText,
     selectedMonth,
@@ -65,7 +71,9 @@ const Transaction = () => {
     search,
     clearCustomerAndSearch,
     clearFilters,
-  } = useTransactionSearch(refreshKey);
+    upsertTransaction,
+    removeTransaction,
+  } = useTransactionSearch();
 
   const handleOpenTransaction = () => {
     setSelectedTransaction(null);
@@ -85,7 +93,7 @@ const Transaction = () => {
   const handleTransactionSaved = (result: {
     mode: "create" | "edit";
     customerName: string;
-    transactionId?: string;
+    transaction?: Transaction;
   }) => {
     const message =
       result.mode === "create"
@@ -93,20 +101,26 @@ const Transaction = () => {
         : `${result.customerName} record has been saved.`;
     setToast({ open: true, message, severity: "success" });
 
-    if (result.transactionId) {
-      const nextRefreshKey = refreshKeyRef.current + 1;
-      setRestoreTo((prev) => ({
-        transactionId: result.transactionId!,
-        nonce: (prev?.nonce || 0) + 1,
-        expectedRefreshKey: nextRefreshKey,
-      }));
-      setRefreshKey(nextRefreshKey);
-      handleCloseTransaction();
-      return;
+    if (result.mode === "create") {
+      // New row may be outside the active month/customer filter — refetch, then page 1 / top.
+      void search().then(() => {
+        setJumpToFirstPageNonce((n) => n + 1);
+        if (result.transaction?.id) {
+          flashRowNonceRef.current += 1;
+          setFlashRowRequest({
+            transactionId: result.transaction.id,
+            nonce: flashRowNonceRef.current,
+          });
+        }
+      });
+    } else if (result.transaction) {
+      upsertTransaction(result.transaction);
+      flashRowNonceRef.current += 1;
+      setFlashRowRequest({
+        transactionId: result.transaction.id,
+        nonce: flashRowNonceRef.current,
+      });
     }
-
-    // new transaction: just refresh list
-    setRefreshKey((prev) => prev + 1);
     handleCloseTransaction();
   };
 
@@ -140,34 +154,69 @@ const Transaction = () => {
         {/* Customer search */}
         <Grid size={{ xs: 12, sm: "auto" }} sx={{ minWidth: { sm: 240 } }}>
           <Stack spacing={0.25}>
-            <TextField
+            <Autocomplete<Customer, false, false, true>
+              freeSolo
               size="small"
               fullWidth
-              placeholder="Search customer..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              onKeyDown={handleKeyDown}
               disabled={loading}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: searchText ? (
-                    <InputAdornment position="end">
-                      <IconButton
-                        size="small"
-                        onClick={clearCustomerAndSearch}
-                        edge="end"
-                      >
-                        <ClearIcon fontSize="small" />
-                      </IconButton>
-                    </InputAdornment>
-                  ) : null,
-                },
+              options={customerSuggestions}
+              getOptionLabel={(option) =>
+                typeof option === "string" ? option : option.name
+              }
+              inputValue={searchText}
+              onInputChange={(_, value, reason) => {
+                if (reason === "reset") return;
+                setSearchText(value);
               }}
+              onChange={(_, value) => {
+                if (value && typeof value === "object" && "name" in value) {
+                  setSearchText(value.name);
+                }
+              }}
+              filterOptions={(options, state) => {
+                if (state.inputValue.length < 3) return options.slice(0, 0);
+                const q = state.inputValue.trim().toLowerCase();
+                if (!q) return options.slice(0, 50);
+                return options
+                  .filter((c) => c.name.toLowerCase().includes(q))
+                  .slice(0, 50);
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="Search customer..."
+                  onKeyDown={handleKeyDown}
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <>
+                        <InputAdornment position="start">
+                          <SearchIcon fontSize="small" />
+                        </InputAdornment>
+                        {params.InputProps.startAdornment}
+                      </>
+                    ),
+                    endAdornment: (
+                      <>
+                        {searchText ? (
+                          <InputAdornment position="end">
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                void clearCustomerAndSearch();
+                              }}
+                              edge="end"
+                            >
+                              <ClearIcon fontSize="small" />
+                            </IconButton>
+                          </InputAdornment>
+                        ) : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
             />
           </Stack>
         </Grid>
@@ -206,18 +255,16 @@ const Transaction = () => {
           </Button>
         </Grid>
 
-        {/* Clear filter */}
+        {/* Reset filter */}
         <Grid size="auto">
           <Button
             variant="outlined"
             size="small"
             onClick={handleClearFilters}
-            disabled={
-              loading || (!searchText && !selectedMonth && !showPendingOnly)
-            }
-            startIcon={<ClearIcon />}
+            disabled={loading}
+            startIcon={<RestartAltIcon />}
           >
-            Clear
+            Reset filter
           </Button>
         </Grid>
 
@@ -295,12 +342,13 @@ const Transaction = () => {
         loading={loading}
         error={error}
         onEditTransaction={handleEditTransaction}
-        onDeleted={() => setRefreshKey((prev) => prev + 1)}
+        onTransactionSynced={upsertTransaction}
+        onTransactionDeleted={(id) => removeTransaction(id)}
         onToast={(payload) => {
           setToast({ open: true, ...payload });
         }}
-        dataNonce={refreshKey}
-        restoreTo={restoreTo}
+        jumpToFirstPageNonce={jumpToFirstPageNonce}
+        flashRowRequest={flashRowRequest}
       />
       <TransactionModal
         isOpen={openTransaction}

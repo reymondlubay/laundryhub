@@ -13,9 +13,11 @@ export interface TransactionSearchState {
   error: string | null;
   setSearchText: (value: string) => void;
   setSelectedMonth: (value: Dayjs | null) => void;
-  search: () => void;
+  search: () => Promise<void>;
   clearCustomerAndSearch: () => void;
   clearFilters: () => void;
+  upsertTransaction: (next: Transaction) => void;
+  removeTransaction: (id: string) => void;
 }
 
 type TransactionQueryParams = {
@@ -31,7 +33,7 @@ function defaultParams() {
   };
 }
 
-export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
+export function useTransactionSearch(): TransactionSearchState {
   const [searchText, setSearchText] = useState("");
   const [selectedMonth, setSelectedMonth] = useState<Dayjs | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -65,20 +67,36 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
     [],
   );
 
-  // Initial load and refreshKey-triggered reload using the last applied params.
+  // Initial load using the last applied params (search/clear update appliedParamsRef).
   useEffect(() => {
     fetchTransactions(appliedParamsRef.current);
-  }, [refreshKey, fetchTransactions]);
+  }, [fetchTransactions]);
 
-  // Explicit search triggered by the Search button
-  const search = useCallback(() => {
+  const upsertTransaction = useCallback((next: Transaction) => {
+    setTransactions((prev) => {
+      const idx = prev.findIndex((t) => t.id === next.id);
+      if (idx === -1) {
+        return [next, ...prev];
+      }
+      const copy = [...prev];
+      copy[idx] = next;
+      return copy;
+    });
+  }, []);
+
+  const removeTransaction = useCallback((id: string) => {
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // Explicit search triggered by the Search button (returns when the list fetch finishes).
+  const search = useCallback(async () => {
     const hasText = searchText.trim().length > 0;
     const hasMonth = !!selectedMonth;
 
     if (!hasText && !hasMonth) {
       const defaults = defaultParams();
       appliedParamsRef.current = defaults;
-      fetchTransactions(defaults);
+      await fetchTransactions(defaults);
       return;
     }
 
@@ -93,7 +111,7 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
     };
 
     appliedParamsRef.current = params;
-    fetchTransactions(params);
+    await fetchTransactions(params);
   }, [searchText, selectedMonth, fetchTransactions]);
 
   const clearCustomerAndSearch = useCallback(() => {
@@ -136,5 +154,7 @@ export function useTransactionSearch(refreshKey = 0): TransactionSearchState {
     search,
     clearCustomerAndSearch,
     clearFilters,
+    upsertTransaction,
+    removeTransaction,
   };
 }

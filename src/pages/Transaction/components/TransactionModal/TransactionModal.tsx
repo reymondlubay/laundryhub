@@ -12,22 +12,27 @@ import {
   Divider,
   IconButton,
   FormControl,
+  FormHelperText,
   InputLabel,
   Select,
   MenuItem as MUIMenuItem,
   InputAdornment,
   DialogTitle,
   Tooltip,
+  Stack,
+  Typography,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
 import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { Dayjs } from "dayjs";
+import { toApiDateTimeString } from "../../../../utils/dateTimeApi";
 import React from "react";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import DeleteIcon from "@mui/icons-material/Delete";
+import ClearIcon from "@mui/icons-material/Clear";
 import { Formik, FieldArray, getIn } from "formik";
 import * as Yup from "yup";
 import type {
@@ -52,6 +57,7 @@ import {
   PAYMENT_MODE_CASH,
   PAYMENT_MODE_GCASH,
   PAYMENT_MODE_GCASH_BACKEND,
+  toBackendPaymentMode,
 } from "../../../../constants/payment";
 
 type TransactionModalProps = {
@@ -61,7 +67,7 @@ type TransactionModalProps = {
   onSaved?: (result: {
     mode: "create" | "edit";
     customerName: string;
-    transactionId?: string;
+    transaction?: Transaction;
   }) => void;
   onError?: (message: string) => void;
 };
@@ -101,6 +107,14 @@ export type TransactionFormValues = {
   releaseBy: string;
   notes: string;
 };
+
+/** True when Date pickup has a value (Formik may hold Dayjs, Date, or ISO string after reinit). */
+function isPickupFilled(p: unknown): boolean {
+  if (p == null) return false;
+  if (dayjs.isDayjs(p)) return p.isValid();
+  if (p instanceof Date) return !Number.isNaN(p.getTime());
+  return dayjs(p as string | number).isValid();
+}
 
 const TransactionModal: React.FC<TransactionModalProps> = ({
   isOpen,
@@ -322,6 +336,15 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     fabcon: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
     detergent: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
     cs: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+    releaseBy: Yup.string().when("datePickup", {
+      is: (datePickup: unknown) => isPickupFilled(datePickup),
+      then: (schema) =>
+        schema
+          .trim()
+          .required("Release by is required when date pickup is set")
+          .uuid("Select a valid employee"),
+      otherwise: (schema) => schema.optional(),
+    }),
     notes: Yup.string(),
   });
 
@@ -388,14 +411,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   };
 
-  // Backend stores TIMESTAMP (without timezone), so send local datetime strings
-  // to avoid AM/PM shifts caused by UTC conversion.
-  const toLocalDateTimeString = (value: Dayjs | null | undefined) => {
-    if (value === null) return null;
-    if (!value) return undefined;
-    return value.format("YYYY-MM-DDTHH:mm:ss");
-  };
-
   const getSelectedCustomerName = (customerId: string): string => {
     const found = customers.find((c) => c.id === customerId);
     return found?.name?.trim() || "Customer";
@@ -431,18 +446,23 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             setLoading(true);
 
             const trimmedNotes = values.notes.trim();
+            const hasValidPickup = isPickupFilled(values.datePickup);
             const payload = {
               customerId: values.customer,
-              dateReceived: values.receiveDate.format("YYYY-MM-DDTHH:mm:ss"),
-              dateLoaded: toLocalDateTimeString(values.dateLoaded),
-              estimatedPickup: toLocalDateTimeString(values.estimatedPickup),
-              datePickup: toLocalDateTimeString(values.datePickup),
+              dateReceived: toApiDateTimeString(values.receiveDate)!,
+              dateLoaded: toApiDateTimeString(values.dateLoaded),
+              estimatedPickup: toApiDateTimeString(values.estimatedPickup),
+              datePickup: hasValidPickup
+                ? toApiDateTimeString(values.datePickup)
+                : null,
               isDelivered: values.isDelivered,
               whitePrice: values.whitePrice,
               fabconQty: values.fabcon,
               detergentQty: values.detergent,
               colorSafeQty: values.cs,
-              releasedBy: values.releaseBy || undefined,
+              releasedBy: hasValidPickup
+                ? values.releaseBy?.trim() || null
+                : null,
               notes: trimmedNotes || undefined,
               loadDetails: values.items.map((item) => ({
                 type: item.type,
@@ -451,34 +471,71 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 price: Number(item.price || 0),
               })),
               paymentDetails: payments.map((payment) => ({
-                paymentDate: dayjs(payment.paymentDate).format(
-                  "YYYY-MM-DDTHH:mm:ss",
-                ),
+                paymentDate: toApiDateTimeString(
+                  dayjs(payment.paymentDate),
+                )!,
                 amount: Number(payment.amount || 0),
-                mode:
-                  payment.mode === PAYMENT_MODE_GCASH
-                    ? PAYMENT_MODE_GCASH_BACKEND
-                    : PAYMENT_MODE_CASH,
+                mode: toBackendPaymentMode(payment.mode),
               })),
             };
 
+            const customerName = getSelectedCustomerName(values.customer);
+            const customerRow = customers.find((c) => c.id === values.customer);
+            const customerForList = {
+              id: values.customer,
+              name: customerRow?.name || customerName,
+              mobileNumber: customerRow?.mobileNumber || "",
+            };
+
             if (isEditing && transaction) {
-              await transactionService.update(transaction.id, {
-                ...payload,
-                // Transaction modal is a full editor: the backend should replace payments
-                // exactly as shown in the UI (including allowing "delete all").
-                replacePaymentDetails: true,
-              });
-              const customerName = getSelectedCustomerName(values.customer);
+              const updated = await transactionService.update(
+                transaction.id,
+                {
+                  ...payload,
+                  replacePaymentDetails: true,
+                },
+                transaction,
+              );
+              updated.customer = customerForList;
+              if (values.releaseBy) {
+                const emp = employees.find((e) => e.id === values.releaseBy);
+                if (emp) {
+                  const parts = emp.name.trim().split(/\s+/);
+                  updated.releasedByUser = {
+                    id: emp.id,
+                    userName: emp.name,
+                    firstName: parts[0] || "",
+                    lastName: parts.slice(1).join(" ") || "",
+                  };
+                }
+              } else {
+                updated.releasedByUser = null;
+              }
               onSaved?.({
                 mode: "edit",
                 customerName,
-                transactionId: transaction.id,
+                transaction: updated,
               });
             } else {
-              await transactionService.create(payload);
-              const customerName = getSelectedCustomerName(values.customer);
-              onSaved?.({ mode: "create", customerName });
+              const created = await transactionService.create(payload);
+              created.customer = customerForList;
+              if (values.releaseBy) {
+                const emp = employees.find((e) => e.id === values.releaseBy);
+                if (emp) {
+                  const parts = emp.name.trim().split(/\s+/);
+                  created.releasedByUser = {
+                    id: emp.id,
+                    userName: emp.name,
+                    firstName: parts[0] || "",
+                    lastName: parts.slice(1).join(" ") || "",
+                  };
+                }
+              }
+              onSaved?.({
+                mode: "create",
+                customerName,
+                transaction: created,
+              });
             }
 
           } catch (error: unknown) {
@@ -501,6 +558,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               | "datePickup",
             label: string,
             clearable = false,
+            onDateCleared?: () => void,
           ) => (
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DateTimePicker
@@ -514,7 +572,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 slotProps={{
                   field: {
                     clearable,
-                    onClear: () => setFieldValue(field, null),
+                    onClear: () => {
+                      setFieldValue(field, null);
+                      onDateCleared?.();
+                    },
                   },
                   popper: {
                     modifiers: [
@@ -918,29 +979,81 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       </Grid>
 
                       <Grid size={{ xs: 12, sm: 6 }}>
-                        {renderDatePicker("datePickup", "Date Pickup", true)}
+                        {renderDatePicker(
+                          "datePickup",
+                          "Date Pickup",
+                          true,
+                          () => setFieldValue("releaseBy", ""),
+                        )}
                       </Grid>
 
                       <Grid size={{ xs: 12, sm: 6 }}>
-                        <FormControl fullWidth size="small">
-                          <InputLabel>Release By</InputLabel>
-                          <Select
-                            label="Release By"
-                            value={values.releaseBy}
-                            onChange={(e) =>
-                              setFieldValue("releaseBy", e.target.value)
-                            }
+                        <Stack direction="row" spacing={0.5} alignItems="flex-start">
+                          <FormControl
+                            fullWidth
+                            size="small"
+                            error={Boolean(getIn(errors, "releaseBy"))}
                           >
-                            {employees.map((employee) => (
-                              <MUIMenuItem
-                                key={employee.id}
-                                value={employee.id}
+                            <InputLabel id="tx-modal-release-by-label" shrink>
+                              Release By
+                            </InputLabel>
+                            <Select
+                              labelId="tx-modal-release-by-label"
+                              label="Release By"
+                              displayEmpty
+                              value={values.releaseBy || ""}
+                              onChange={(e) =>
+                                setFieldValue(
+                                  "releaseBy",
+                                  String(e.target.value),
+                                )
+                              }
+                              error={Boolean(getIn(errors, "releaseBy"))}
+                              renderValue={(selected) => {
+                                if (!selected) {
+                                  return (
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      Select employee
+                                    </Typography>
+                                  );
+                                }
+                                const emp = employees.find(
+                                  (e) => e.id === selected,
+                                );
+                                return emp?.name ?? String(selected);
+                              }}
+                            >
+                              {employees.map((employee) => (
+                                <MUIMenuItem
+                                  key={employee.id}
+                                  value={employee.id}
+                                >
+                                  {employee.name}
+                                </MUIMenuItem>
+                              ))}
+                            </Select>
+                            {getIn(errors, "releaseBy") ? (
+                              <FormHelperText>
+                                {String(getIn(errors, "releaseBy"))}
+                              </FormHelperText>
+                            ) : null}
+                          </FormControl>
+                          {values.releaseBy ? (
+                            <Tooltip title="Clear release by">
+                              <IconButton
+                                aria-label="clear release by"
+                                size="small"
+                                sx={{ mt: 0.25 }}
+                                onClick={() => setFieldValue("releaseBy", "")}
                               >
-                                {employee.name}
-                              </MUIMenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
+                                <ClearIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          ) : null}
+                        </Stack>
                       </Grid>
                       <Grid size={12}>
                         <TextField
