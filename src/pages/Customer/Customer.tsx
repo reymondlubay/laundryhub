@@ -65,6 +65,7 @@ const CustomerPage: React.FC = () => {
   const [activeSearch, setActiveSearch] = useState("");
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deleteCustomerId, setDeleteCustomerId] = useState<string | null>(null);
   const [form, setForm] = useState<CustomerFormState>(emptyForm);
@@ -109,6 +110,7 @@ const CustomerPage: React.FC = () => {
   const openCreate = () => {
     setEditingCustomer(null);
     setForm(emptyForm);
+    setDialogError(null);
     setDialogOpen(true);
   };
 
@@ -120,6 +122,7 @@ const CustomerPage: React.FC = () => {
       address: customer.address || "",
       notes: customer.notes || "",
     });
+    setDialogError(null);
     setDialogOpen(true);
   };
 
@@ -127,6 +130,7 @@ const CustomerPage: React.FC = () => {
     setDialogOpen(false);
     setEditingCustomer(null);
     setForm(emptyForm);
+    setDialogError(null);
   };
 
   const validateForm = (): string | null => {
@@ -137,13 +141,14 @@ const CustomerPage: React.FC = () => {
   const handleSubmit = async () => {
     const validationError = validateForm();
     if (validationError) {
-      setError(validationError);
+      setDialogError(validationError);
       return;
     }
 
     try {
       setSubmitting(true);
       setError(null);
+      setDialogError(null);
 
       if (editingCustomer) {
         const payload: UpdateCustomerPayload = {
@@ -170,7 +175,7 @@ const CustomerPage: React.FC = () => {
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : API_ERRORS.SAVE_FAILED;
-      setError(message);
+      setDialogError(message);
     } finally {
       setSubmitting(false);
     }
@@ -343,6 +348,11 @@ const CustomerPage: React.FC = () => {
           {editingCustomer ? "Edit Customer" : "Add New Customer"}
         </DialogTitle>
         <DialogContent>
+          {dialogError ? (
+            <Alert severity="error" sx={{ mb: 1 }}>
+              {dialogError}
+            </Alert>
+          ) : null}
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid size={12}>
               <TextField

@@ -24,7 +24,7 @@ export interface CreateUserPayload {
   firstName: string;
   lastName: string;
   userName: string;
-  mobileNumber: string;
+  mobileNumber?: string;
   password: string;
   role: UserRole;
   status: UserStatus;
@@ -35,7 +35,7 @@ export interface UpdateUserPayload {
   firstName?: string;
   lastName?: string;
   userName?: string;
-  mobileNumber?: string;
+  mobileNumber?: string | null;
   password?: string;
   role?: UserRole;
   status?: UserStatus;

@@ -17,6 +17,7 @@ import {
   MenuItem,
   Select,
 } from "@mui/material";
+import ClearIcon from "@mui/icons-material/Clear";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
@@ -29,6 +30,7 @@ import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { type Dayjs } from "dayjs";
+import { toApiDateTimeString } from "../../../utils/dateTimeApi";
 
 import { AgGridReact } from "ag-grid-react";
 import { colorSchemeDark, colorSchemeLightWarm } from "ag-grid-community";
@@ -50,11 +52,7 @@ import addonsPricingService, {
 } from "../../../services/addonsPricingService";
 import { EMPTY_STATES, UI_TEXT } from "../../../constants/messages";
 import { USER_ROLE_EMPLOYEE } from "../../../constants/roles";
-import {
-  PAYMENT_MODE_CASH,
-  PAYMENT_MODE_GCASH,
-  PAYMENT_MODE_GCASH_BACKEND,
-} from "../../../constants/payment";
+import { toBackendPaymentMode } from "../../../constants/payment";
 import TransactionDeleteDialog, {
   type DeleteReason,
 } from "../../../components/TransactionDeleteDialog/TransactionDeleteDialog";
@@ -171,11 +169,14 @@ const getTransactionTotals = (
   return { totalPrice, totalPaid, balance };
 };
 
-const isPaymentFullySettled = (row?: FlatTransactionRow): boolean => {
+/** Disable "Mark as paid" when balance is settled, or when total is ₱0 but payments exist (overpayment). */
+const isAddPaymentDisabled = (row?: FlatTransactionRow): boolean => {
   if (!row) return false;
   const totalPrice = Number(row.price || 0);
   const totalPaid = Number(row.totalPaid || 0);
-  return totalPrice > 0 && totalPaid >= totalPrice;
+  if (totalPrice > 0 && totalPaid >= totalPrice) return true;
+  if (totalPrice <= 0 && totalPaid > 0) return true;
+  return false;
 };
 
 const getNoteDetails = (row?: FlatTransactionRow): string[] => {
@@ -376,10 +377,14 @@ export type TransactionTableProps = {
   loading: boolean;
   error: string | null;
   onEditTransaction?: (transaction: Transaction) => void;
-  onDeleted?: () => void;
+  /** Merge one row from API after mark / pay / inline edit (no full list refetch). */
+  onTransactionSynced?: (transaction: Transaction) => void;
+  onTransactionDeleted?: (transactionId: string) => void;
   onToast?: (payload: { severity: "success" | "error"; message: string }) => void;
-  dataNonce: number;
-  restoreTo?: { transactionId: string; nonce: number; expectedRefreshKey: number } | null;
+  /** Increment after a new transaction is saved and list refetched — grid goes to page 1 / top. */
+  jumpToFirstPageNonce?: number;
+  /** Set after create/edit save so the row highlight animation runs (AG Grid may not pick up class changes otherwise). */
+  flashRowRequest?: { transactionId: string; nonce: number } | null;
 };
 
 function TransactionTable({
@@ -387,10 +392,11 @@ function TransactionTable({
   loading,
   error,
   onEditTransaction,
-  onDeleted,
+  onTransactionSynced,
+  onTransactionDeleted,
   onToast,
-  dataNonce,
-  restoreTo,
+  jumpToFirstPageNonce = 0,
+  flashRowRequest = null,
 }: TransactionTableProps) {
   const { darkMode } = useThemeContext();
   const [addonsPricing, setAddonsPricing] = useState<AddonsPricing>(
@@ -409,146 +415,77 @@ function TransactionTable({
   >(null);
   const [selectedTransactionForMark, setSelectedTransactionForMark] =
     useState<Transaction | null>(null);
-  const [markDateTime, setMarkDateTime] = useState<Dayjs>(dayjs());
+  const [markDateTime, setMarkDateTime] = useState<Dayjs | null>(dayjs());
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [releaseBy, setReleaseBy] = useState<string>("");
   const releaseByInputRef = useRef<HTMLInputElement | null>(null);
   const gridApiRef = useRef<any>(null);
-  const pendingRestoreTransactionIdRef = useRef<string | null>(null);
-  const pendingRestoreTargetPageRef = useRef<number | null>(null);
-  const pendingRestoreExpectedDataNonceRef = useRef<number | null>(null);
-  const restoreAttemptRef = useRef<number>(0);
-  const restoreTimerRef = useRef<number | null>(null);
   const highlightTimerRef = useRef<number | null>(null);
   const [highlightTransactionId, setHighlightTransactionId] = useState<
     string | null
   >(null);
 
-  const triggerRestoreAndHighlight = useCallback((transactionId: string) => {
-    pendingRestoreTransactionIdRef.current = transactionId;
+  const flashTransactionHighlight = useCallback((transactionId: string) => {
     setHighlightTransactionId(transactionId);
-
     if (highlightTimerRef.current) {
       window.clearTimeout(highlightTimerRef.current);
     }
     highlightTimerRef.current = window.setTimeout(() => {
       setHighlightTransactionId(null);
       highlightTimerRef.current = null;
-    }, 5000);
+    }, 5200);
   }, []);
 
-  const restoreViewToTransaction = useCallback((): boolean => {
-    const api = gridApiRef.current;
-    const transactionId = pendingRestoreTransactionIdRef.current;
-    if (!api || !transactionId) return false;
+  const lastJumpNonceRef = useRef(0);
+  React.useEffect(() => {
+    const n = jumpToFirstPageNonce ?? 0;
+    if (n <= 0 || n === lastJumpNonceRef.current) return;
+    lastJumpNonceRef.current = n;
 
-    const expectedDataNonce = pendingRestoreExpectedDataNonceRef.current;
-    if (typeof expectedDataNonce === "number" && dataNonce < expectedDataNonce) {
-      return false; // wait until fresh data arrives
-    }
-
-    // With pagination enabled, node.rowIndex can be page-relative depending on the model.
-    // Compute a stable global index by counting nodes in filter/sort order.
-    let targetGlobalIndex: number | null = null;
-    const forEach =
-      typeof api.forEachNodeAfterFilterAndSort === "function"
-        ? api.forEachNodeAfterFilterAndSort.bind(api)
-        : typeof api.forEachNode === "function"
-          ? api.forEachNode.bind(api)
-          : null;
-
-    if (!forEach) return false;
-
-    let globalIndex = 0;
-    forEach((node: any) => {
-      if (targetGlobalIndex != null) return;
-      const row = node?.data as FlatTransactionRow | undefined;
-      if (row?.transactionId === transactionId && row?.isFirstRow) {
-        targetGlobalIndex = globalIndex;
-      }
-      globalIndex += 1;
-    });
-
-    if (typeof targetGlobalIndex !== "number") return false;
-
-    const pageSize =
-      typeof api.paginationGetPageSize === "function"
-        ? api.paginationGetPageSize()
-        : null;
-
-    if (
-      pageSize &&
-      typeof api.paginationGoToPage === "function" &&
-      typeof targetGlobalIndex === "number"
-    ) {
-      const targetPage = Math.floor(targetGlobalIndex / pageSize);
-      pendingRestoreTargetPageRef.current = targetPage;
-
-      const currentPage =
-        typeof api.paginationGetCurrentPage === "function"
-          ? api.paginationGetCurrentPage()
-          : null;
-
-      // Pagination resets to page 1 when rowData changes; go back to the page
-      // that contains the edited transaction before restoring scroll position.
-      if (typeof currentPage === "number" && currentPage !== targetPage) {
-        api.paginationGoToPage(targetPage);
-        return false; // wait for pagination change, then scroll
-      }
-
-      // We are on the correct page; ensure the row is visible and focused.
-      api.ensureIndexVisible(targetGlobalIndex, "middle");
-      if (typeof api.setFocusedCell === "function") {
-        api.setFocusedCell(targetGlobalIndex, "customer");
-      }
-
-      // One extra pass to counter any immediate post-refresh reflow.
-      window.setTimeout(() => {
-        try {
-          api.ensureIndexVisible(targetGlobalIndex, "middle");
-        } catch {
-          // ignore
+    const scrollToTop = () => {
+      const api = gridApiRef.current;
+      if (!api) return;
+      try {
+        if (typeof api.paginationGoToPage === "function") {
+          api.paginationGoToPage(0);
         }
-      }, 50);
-      pendingRestoreTransactionIdRef.current = null;
-      pendingRestoreTargetPageRef.current = null;
-      pendingRestoreExpectedDataNonceRef.current = null;
-      return true;
-    }
-
-    api.ensureIndexVisible(targetGlobalIndex, "middle");
-    if (typeof api.setFocusedCell === "function") {
-      api.setFocusedCell(targetGlobalIndex, "customer");
-    }
-    pendingRestoreTransactionIdRef.current = null;
-    pendingRestoreTargetPageRef.current = null;
-    pendingRestoreExpectedDataNonceRef.current = null;
-    return true;
-  }, [dataNonce]);
-
-  const scheduleRestore = useCallback(() => {
-    if (restoreTimerRef.current) {
-      window.clearTimeout(restoreTimerRef.current);
-      restoreTimerRef.current = null;
-    }
-
-    restoreAttemptRef.current = 0;
-
-    const tick = () => {
-      if (!pendingRestoreTransactionIdRef.current) return;
-      const done = restoreViewToTransaction();
-      if (done) return;
-
-      restoreAttemptRef.current += 1;
-      if (restoreAttemptRef.current >= 25) return; // give up after ~1.25s
-
-      restoreTimerRef.current = window.setTimeout(tick, 50);
+        if (typeof api.ensureIndexVisible === "function") {
+          api.ensureIndexVisible(0, "top");
+        }
+        api.refreshCells?.({ force: true });
+      } catch {
+        // ignore
+      }
     };
 
-    restoreTimerRef.current = window.setTimeout(tick, 0);
-  }, [restoreViewToTransaction]);
+    scrollToTop();
+    const raf = window.requestAnimationFrame(() => scrollToTop());
+    const tmo = window.setTimeout(scrollToTop, 80);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(tmo);
+    };
+  }, [jumpToFirstPageNonce]);
+
+  const lastFlashNonceRef = useRef(0);
+  React.useEffect(() => {
+    if (!flashRowRequest?.transactionId) return;
+    if (flashRowRequest.nonce === lastFlashNonceRef.current) return;
+    lastFlashNonceRef.current = flashRowRequest.nonce;
+
+    flashTransactionHighlight(flashRowRequest.transactionId);
+    queueMicrotask(() => {
+      try {
+        const api = gridApiRef.current;
+        api?.refreshCells?.({ force: true });
+        api?.redrawRows?.();
+      } catch {
+        // ignore
+      }
+    });
+  }, [flashRowRequest, flashTransactionHighlight]);
 
   const handleDeleteTransactionClick = useCallback((transactionId: string) => {
     setDeleteError(null);
@@ -562,14 +499,14 @@ function TransactionTable({
       try {
         await transactionService.delete(deleteTransactionId, deleteReason);
         setDeleteTransactionId(null);
-        onDeleted?.();
+        onTransactionDeleted?.(deleteTransactionId);
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : "Failed to delete transaction";
         setDeleteError(message);
       }
     },
-    [deleteTransactionId, onDeleted],
+    [deleteTransactionId, onTransactionDeleted],
   );
 
   const handleOpenPaymentModal = useCallback((transaction: Transaction) => {
@@ -595,24 +532,29 @@ function TransactionTable({
         const updatedPaymentDetails = [...existingPayments, payment].map(
           (paymentItem) => ({
             paymentDate:
-              paymentItem.paymentDate instanceof Date
-                ? paymentItem.paymentDate.toISOString()
-                : paymentItem.paymentDate,
+              toApiDateTimeString(
+                paymentItem.paymentDate instanceof Date
+                  ? paymentItem.paymentDate
+                  : paymentItem.paymentDate,
+              ) ?? String(paymentItem.paymentDate),
             amount: paymentItem.amount,
-            mode:
-              paymentItem.mode === PAYMENT_MODE_GCASH
-                ? PAYMENT_MODE_GCASH_BACKEND
-                : PAYMENT_MODE_CASH,
+            mode: toBackendPaymentMode(
+              paymentItem.mode == null ? undefined : String(paymentItem.mode),
+            ),
           }),
         );
 
         // Only send paymentDetails, no loadDetails since we're just updating payments
-        await transactionService.update(selectedTransactionForPayment.id, {
-          paymentDetails: updatedPaymentDetails,
-        });
+        const updated = await transactionService.update(
+          selectedTransactionForPayment.id,
+          {
+            paymentDetails: updatedPaymentDetails,
+          },
+          selectedTransactionForPayment,
+        );
 
-        triggerRestoreAndHighlight(selectedTransactionForPayment.id);
-        pendingRestoreExpectedDataNonceRef.current = dataNonce + 1;
+        onTransactionSynced?.(updated);
+        flashTransactionHighlight(updated.id);
         onToast?.({
           severity: "success",
           message:
@@ -621,7 +563,6 @@ function TransactionTable({
           )} payment of ₱${Number(payment.amount || 0).toFixed(2)} has been saved.`,
         });
         handleClosePaymentModal();
-        onDeleted?.();
       } catch (err: unknown) {
         setActionError(
           err instanceof Error ? err.message : "Failed to save payment",
@@ -631,12 +572,11 @@ function TransactionTable({
       }
     },
     [
-      dataNonce,
+      flashTransactionHighlight,
       handleClosePaymentModal,
-      onDeleted,
       onToast,
+      onTransactionSynced,
       selectedTransactionForPayment,
-      triggerRestoreAndHighlight,
     ],
   );
 
@@ -715,23 +655,45 @@ function TransactionTable({
       const transactionUpdate: Record<string, unknown> = {};
 
       if (markModalType === "loaded") {
-        transactionUpdate.dateLoaded = markDateTime.toISOString();
+        if (!markDateTime?.isValid()) {
+          setActionError("Loaded date is required.");
+          return;
+        }
+        transactionUpdate.dateLoaded = toApiDateTimeString(markDateTime);
       } else {
+        if (!markDateTime?.isValid()) {
+          setActionError("Pickup date is required.");
+          return;
+        }
         if (!releaseBy) {
           setActionError("Release By is required.");
           return;
         }
-        transactionUpdate.datePickup = markDateTime.toISOString();
+        transactionUpdate.datePickup = toApiDateTimeString(markDateTime);
         transactionUpdate.releasedBy = releaseBy;
       }
 
-      await transactionService.update(
+      const updated = await transactionService.update(
         selectedTransactionForMark.id,
         transactionUpdate,
+        selectedTransactionForMark,
       );
 
-      triggerRestoreAndHighlight(selectedTransactionForMark.id);
-      pendingRestoreExpectedDataNonceRef.current = dataNonce + 1;
+      if (markModalType === "pickup" && releaseBy) {
+        const emp = employees.find((e) => e.id === releaseBy);
+        if (emp) {
+          const parts = emp.name.trim().split(/\s+/);
+          updated.releasedByUser = {
+            id: emp.id,
+            userName: emp.name,
+            firstName: parts[0] || "",
+            lastName: parts.slice(1).join(" ") || "",
+          };
+        }
+      }
+
+      onTransactionSynced?.(updated);
+      flashTransactionHighlight(updated.id);
       if (markModalType === "pickup") {
         onToast?.({
           severity: "success",
@@ -748,7 +710,6 @@ function TransactionTable({
         });
       }
       handleCloseMarkModal();
-      onDeleted?.();
     } catch (err: unknown) {
       setActionError(
         err instanceof Error ? err.message : "Failed to save status update",
@@ -757,54 +718,36 @@ function TransactionTable({
       setActionLoading(false);
     }
   }, [
-    dataNonce,
+    employees,
+    flashTransactionHighlight,
     handleCloseMarkModal,
     markDateTime,
     markModalType,
-    onDeleted,
     onToast,
+    onTransactionSynced,
     releaseBy,
     selectedTransactionForMark,
-    triggerRestoreAndHighlight,
   ]);
-
-  React.useEffect(() => {
-    if (!restoreTo?.transactionId) return;
-    triggerRestoreAndHighlight(restoreTo.transactionId);
-    // For edit/save from TransactionModal, the parent will refresh the list;
-    // don't restore until the new data has arrived.
-    pendingRestoreExpectedDataNonceRef.current = (restoreTo as any)
-      .expectedRefreshKey;
-  }, [
-    restoreTo?.nonce,
-    restoreTo?.transactionId,
-    triggerRestoreAndHighlight,
-  ]);
-
-  React.useEffect(() => {
-    if (!pendingRestoreTransactionIdRef.current) return;
-    const expected = pendingRestoreExpectedDataNonceRef.current;
-    if (typeof expected === "number" && dataNonce < expected) return;
-    scheduleRestore();
-  }, [dataNonce, scheduleRestore]);
 
   const sortedTransactions = useMemo(() => {
     return [...transactions].sort((a, b) => {
       const aTx = a as Transaction & {
         datereceived?: string;
+        dateloaded?: string;
         estimatedpickup?: string;
         datepickup?: string;
       };
       const bTx = b as Transaction & {
         datereceived?: string;
+        dateloaded?: string;
         estimatedpickup?: string;
         datepickup?: string;
       };
 
       const aEstimated = dayjs(a.estimatedPickup || aTx.estimatedpickup);
       const bEstimated = dayjs(b.estimatedPickup || bTx.estimatedpickup);
-      const aLoaded = Boolean(a.dateLoaded || aTx.dateLoaded);
-      const bLoaded = Boolean(b.dateLoaded || bTx.dateLoaded);
+      const aLoaded = Boolean(a.dateLoaded || aTx.dateloaded);
+      const bLoaded = Boolean(b.dateLoaded || bTx.dateloaded);
       const aPriority = !aLoaded && aEstimated.isValid();
       const bPriority = !bLoaded && bEstimated.isValid();
 
@@ -1241,7 +1184,7 @@ function TransactionTable({
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
           if (!params.data?.isFirstRow) return "";
 
-          const payDisabled = isPaymentFullySettled(params.data);
+          const payDisabled = isAddPaymentDisabled(params.data);
           const loadDisabled = Boolean(params.data?.hasDateLoaded);
           const pickupDisabled = Boolean(params.data?.hasDatePickup);
 
@@ -1275,7 +1218,16 @@ function TransactionTable({
                 </span>
               </Tooltip>
 
-              <Tooltip title={payDisabled ? "Fully paid" : "Mark as paid"}>
+              <Tooltip
+                title={
+                  payDisabled
+                    ? Number(params.data?.price || 0) <= 0 &&
+                      Number(params.data?.totalPaid || 0) > 0
+                      ? "No amount due"
+                      : "Fully paid"
+                    : "Mark as paid"
+                }
+              >
                 <span>
                   <IconButton
                     aria-label="mark-paid"
@@ -1455,21 +1407,13 @@ function TransactionTable({
             rowData={rowData}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
+            getRowId={(params) => params.data?.id ?? ""}
             getRowClass={getRowClass}
             getRowHeight={getRowHeight}
             animateRows
             pagination={true}
             onGridReady={(params) => {
               gridApiRef.current = params.api;
-            }}
-            onFirstDataRendered={() => {
-              scheduleRestore();
-            }}
-            onModelUpdated={() => {
-              scheduleRestore();
-            }}
-            onPaginationChanged={() => {
-              scheduleRestore();
             }}
           />
         )}
@@ -1523,11 +1467,28 @@ function TransactionTable({
             <DateTimePicker
               label={markModalType === "loaded" ? "Loaded Date" : "Pickup Date"}
               value={markDateTime}
-              onChange={(value) => value && setMarkDateTime(value)}
+              onChange={(value) => {
+                if (markModalType === "pickup") {
+                  setMarkDateTime(value);
+                } else {
+                  setMarkDateTime(value ?? dayjs());
+                }
+              }}
               maxDate={dayjs()}
               timeSteps={{ minutes: 1 }}
               slotProps={{
                 actionBar: { actions: ["today", "cancel", "accept"] },
+                field: {
+                  clearable: markModalType === "pickup",
+                  onClear: () => {
+                    if (markModalType === "pickup") {
+                      setMarkDateTime(null);
+                      setReleaseBy("");
+                    } else {
+                      setMarkDateTime(dayjs());
+                    }
+                  },
+                },
                 popper: {
                   modifiers: [
                     {
@@ -1549,21 +1510,39 @@ function TransactionTable({
           </LocalizationProvider>
 
           {markModalType === "pickup" ? (
-            <FormControl fullWidth size="small" required>
-              <InputLabel>Release By</InputLabel>
-              <Select
-                label="Release By"
-                value={releaseBy}
-                onChange={(e) => setReleaseBy(String(e.target.value))}
-                inputRef={releaseByInputRef}
-              >
-                {employees.map((employee) => (
-                  <MenuItem key={employee.id} value={employee.id}>
-                    {employee.name}
+            <Stack direction="row" spacing={0.5} alignItems="flex-start">
+              <FormControl fullWidth size="small" required>
+                <InputLabel>Release By</InputLabel>
+                <Select
+                  label="Release By"
+                  displayEmpty
+                  value={releaseBy}
+                  onChange={(e) => setReleaseBy(String(e.target.value))}
+                  inputRef={releaseByInputRef}
+                >
+                  <MenuItem value="">
+                    <em>Select employee</em>
                   </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+                  {employees.map((employee) => (
+                    <MenuItem key={employee.id} value={employee.id}>
+                      {employee.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {releaseBy ? (
+                <Tooltip title="Clear release by">
+                  <IconButton
+                    aria-label="clear release by"
+                    size="small"
+                    sx={{ mt: 0.25 }}
+                    onClick={() => setReleaseBy("")}
+                  >
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              ) : null}
+            </Stack>
           ) : null}
 
           {actionError ? <Alert severity="error">{actionError}</Alert> : null}
@@ -1575,7 +1554,11 @@ function TransactionTable({
           <Button
             variant="contained"
             onClick={handleSaveMark}
-            disabled={actionLoading || (markModalType === "pickup" && !releaseBy)}
+            disabled={
+              actionLoading ||
+              (markModalType === "pickup" &&
+                (!markDateTime?.isValid() || !releaseBy))
+            }
           >
             {UI_TEXT.SAVE}
           </Button>
