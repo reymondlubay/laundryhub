@@ -152,7 +152,7 @@ const Transaction = () => {
 
   const autocompleteOptions = React.useMemo(() => {
     const q = searchText.trim().toLowerCase();
-    if (q.length < 3) return [];
+    if (q.length < 2) return [];
     return customerSuggestions
       .filter((c) => c.name.toLowerCase().includes(q))
       .slice(0, 50);
@@ -166,7 +166,7 @@ const Transaction = () => {
   );
 
   const [comboOpen, setComboOpen] = React.useState(false);
-  const canShowSuggestionList = searchText.trim().length >= 3;
+  const canShowSuggestionList = searchText.trim().length >= 2;
   const suggestionListOpen = comboOpen && canShowSuggestionList;
 
   const handleClearCustomerSearch = () => {
@@ -208,7 +208,7 @@ const Transaction = () => {
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  placeholder="Type at least 3 characters for suggestions…"
+                  placeholder="Type at least 2 characters for suggestions…"
                   onKeyDown={handleKeyDown}
                   InputProps={{
                     ...params.InputProps,

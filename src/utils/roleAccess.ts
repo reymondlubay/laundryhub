@@ -18,6 +18,7 @@ const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
     "/users",
     "/settings/database",
     "/settings/addons-pricing",
+    "/extra/audit-log",
   ],
   [USER_ROLE_EMPLOYEE]: ["/dashboard", "/transaction", "/customer"],
 };

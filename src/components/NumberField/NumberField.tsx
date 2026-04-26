@@ -89,7 +89,7 @@ export default function NumberField({
                   "& button": {
                     py: 0,
                     flex: 1,
-                    borderRadius: 0.5,
+                    borderRadius: 0,
                   },
                 }}
               >

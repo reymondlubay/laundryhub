@@ -81,11 +81,10 @@ const Login: React.FC = () => {
         }}
       >
         <Paper
-          elevation={3}
+          elevation={0}
           sx={{
-            padding: 4,
+            p: 3,
             width: "100%",
-            borderRadius: 2,
           }}
         >
           <Typography

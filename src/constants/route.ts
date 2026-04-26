@@ -10,7 +10,7 @@ const route = {
   USERS: "/users",
   SETTINGS: "/settings/database",
   SETTINGS_ADDONS_PRICING: "/settings/addons-pricing",
-  LOGS: "/logs",
+  AUDIT_LOG: "/extra/audit-log",
 };
 
 export default route;

@@ -249,7 +249,7 @@ const CustomerPage: React.FC = () => {
 
       <Paper>
         {loading ? (
-          <TableContainer sx={{ maxHeight: 560 }}>
+          <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
             <Table size="small" stickyHeader>
               <TableHeaderSkeleton columns={5} />
               <TableSkeleton columns={5} rows={8} />
@@ -257,7 +257,7 @@ const CustomerPage: React.FC = () => {
           </TableContainer>
         ) : (
           <>
-            <TableContainer sx={{ maxHeight: 560 }}>
+            <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>

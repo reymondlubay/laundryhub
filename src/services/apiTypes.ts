@@ -23,4 +23,6 @@ export type Payment = {
   paymentDate: Date;
   amount: number;
   mode: PaymentMode;
+  /** Original row time from API; sent on update so replacePaymentDetails preserves it. */
+  createdAt?: string;
 };

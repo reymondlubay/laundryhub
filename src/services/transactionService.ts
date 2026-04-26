@@ -83,6 +83,7 @@ export interface CreateTransactionRequest {
     paymentDate: string;
     amount: number;
     mode: string;
+    createdAt?: string;
   }>;
 }
 
@@ -238,6 +239,7 @@ export interface UpdateTransactionRequest {
     paymentDate: string;
     amount: number;
     mode: string;
+    createdAt?: string;
   }>;
   replacePaymentDetails?: boolean;
 }

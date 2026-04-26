@@ -531,18 +531,35 @@ function TransactionTableInner({
         const existingPayments =
           selectedTransactionForPayment.paymentDetails || [];
         const updatedPaymentDetails = [...existingPayments, payment].map(
-          (paymentItem) => ({
-            paymentDate:
-              toApiDateTimeString(
-                paymentItem.paymentDate instanceof Date
-                  ? paymentItem.paymentDate
-                  : paymentItem.paymentDate,
-              ) ?? String(paymentItem.paymentDate),
-            amount: paymentItem.amount,
-            mode: toBackendPaymentMode(
-              paymentItem.mode == null ? undefined : String(paymentItem.mode),
-            ),
-          }),
+          (paymentItem) => {
+            const p = paymentItem as {
+              paymentDate: string | Date;
+              amount: number;
+              mode: string;
+              createdAt?: string;
+            };
+            const row: {
+              paymentDate: string;
+              amount: number;
+              mode: string;
+              createdAt?: string;
+            } = {
+              paymentDate:
+                toApiDateTimeString(
+                  p.paymentDate instanceof Date
+                    ? dayjs(p.paymentDate)
+                    : dayjs(p.paymentDate),
+                ) ?? String(p.paymentDate),
+              amount: Number(p.amount),
+              mode: toBackendPaymentMode(
+                p.mode == null ? undefined : String(p.mode),
+              ),
+            };
+            if (p.createdAt) {
+              row.createdAt = p.createdAt;
+            }
+            return row;
+          },
         );
 
         // Only send paymentDetails, no loadDetails since we're just updating payments
@@ -818,7 +835,7 @@ function TransactionTableInner({
                 padding: 0.5,
                 px: 1,
                 lineHeight: 1.5,
-                borderRadius: 1,
+                borderRadius: 0,
               }}
             >
               <span>{dayjs(params.value).format("MM-DD-YY")}</span>

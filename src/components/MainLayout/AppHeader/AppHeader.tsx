@@ -16,12 +16,16 @@ const AppHeader = () => {
   const { collapsed, toggleSidebar } = useSidebar();
 
   return (
-    <Box sx={{ flexGrow: 1 }}>
+    <Box sx={{ flexShrink: 0 }}>
       <AppBar
         position="static"
-        sx={{
-          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-        }}
+        elevation={0}
+        sx={(theme) => ({
+          boxShadow:
+            theme.palette.mode === "dark"
+              ? "0 1px 0 rgba(255,255,255,0.06)"
+              : "0 1px 0 rgba(26, 39, 52, 0.08)",
+        })}
       >
         <Toolbar>
           <Grid
@@ -69,7 +73,7 @@ const AppHeader = () => {
                 onClick={toggleTheme}
                 sx={{
                   backgroundColor: "action.hover",
-                  borderRadius: "12px",
+                  borderRadius: 0,
                   width: 40,
                   height: 40,
                   display: "flex",

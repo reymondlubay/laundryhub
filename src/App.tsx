@@ -26,6 +26,7 @@ const SettingsDatabasePage = lazy(() => import("./pages/Settings/Database"));
 const SettingsAddonsPricingPage = lazy(
   () => import("./pages/Settings/AddonsPricing"),
 );
+const AuditLogPage = lazy(() => import("./pages/AuditLog/AuditLog"));
 
 function App() {
   return (
@@ -88,6 +89,18 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <UsersPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.AUDIT_LOG}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <AuditLogPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>
