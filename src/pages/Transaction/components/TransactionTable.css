@@ -27,6 +27,24 @@
   text-align: center;
 }
 
+.transaction-grouped-grid .ag-row .ag-cell.tx-customer-cell {
+  align-items: flex-start;
+}
+
+.transaction-grouped-grid .ag-cell.tx-customer-cell,
+.transaction-grouped-grid .ag-cell.tx-customer-cell .ag-cell-wrapper,
+.transaction-grouped-grid .ag-cell.tx-customer-cell .ag-cell-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.transaction-grouped-grid .ag-cell.tx-customer-cell .ag-cell-wrapper,
+.transaction-grouped-grid .ag-cell.tx-customer-cell .ag-cell-value {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
 /* Merge rows within the same transaction group only */
 .transaction-grouped-grid .ag-row.tx-main-row:not(.tx-last-row) .ag-cell {
   border-bottom: none !important;
