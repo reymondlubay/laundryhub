@@ -33,6 +33,7 @@ import {
   PAYMENT_MODE_GCASH,
 } from "../../constants/payment";
 import { UI_TEXT } from "../../constants/messages";
+import { toPascalCase } from "../../utils/stringUtils";
 
 type PaymentModalProps = {
   isOpen: boolean;
@@ -40,6 +41,8 @@ type PaymentModalProps = {
   onSave: (payment: Omit<Payment, "id">) => void;
   editingPayment?: Payment;
   isEditMode?: boolean;
+  /** Shown as a confirmation line under the title (e.g. transaction table). */
+  customerName?: string;
   balance?: number;
   history?: Array<{
     id?: string;
@@ -64,6 +67,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onSave,
   editingPayment,
   isEditMode = false,
+  customerName,
   balance,
   history = [],
   positionTop = false,
@@ -151,63 +155,55 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             position: positionTop ? "fixed" : "relative",
             top: positionTop ? 20 : "auto",
             margin: positionTop ? 0 : undefined,
-            maxHeight: "90vh",
+            maxHeight: positionTop ? "calc(100vh - 40px)" : "90vh",
             display: "flex",
             flexDirection: "column",
           },
         },
       }}
     >
-      <DialogTitle>
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 1.5,
-            minWidth: 0,
-          }}
-        >
-          <Typography
-            variant="h6"
-            component="div"
-            sx={{ fontWeight: 600, minWidth: 0 }}
-          >
-            {isEditMode ? "Edit Payment" : "Add Payment"}
-          </Typography>
-
-          {typeof balance === "number" ? (
-            <Chip
-              label={`Balance: ${formatCurrency(balance)}`}
-              sx={(theme) => ({
-                height: 34,
-                px: 0.75,
-                borderRadius: 2,
-                fontWeight: 800,
-                fontSize: "0.95rem",
-                letterSpacing: 0.2,
-                borderWidth: 2,
-                borderStyle: "solid",
-                borderColor:
-                  theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.35)"
-                    : "rgba(0,0,0,0.2)",
-                bgcolor:
-                  theme.palette.mode === "dark"
-                    ? "#000"
-                    : "rgba(25, 118, 210, 0.08)",
-                color:
-                  theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.95)"
-                    : "rgba(0,0,0,0.85)",
-                "& .MuiChip-label": {
-                  px: 1,
-                  py: 0,
-                },
-              })}
-            />
-          ) : null}
-        </Box>
+      <DialogTitle
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1.5,
+          minWidth: 0,
+          flexWrap: "wrap",
+        }}
+      >
+        {isEditMode ? "Edit payment" : "Add payment"}
+        {typeof balance === "number" ? (
+          <Chip
+            label={`Balance: ${formatCurrency(balance)}`}
+            sx={(theme) => ({
+              height: 34,
+              px: 0.75,
+              borderRadius: 0,
+              fontWeight: 700,
+              fontSize: "0.9rem",
+              letterSpacing: 0.05,
+              borderWidth: 1,
+              borderStyle: "solid",
+              borderColor:
+                theme.palette.mode === "dark"
+                  ? "rgba(255,255,255,0.35)"
+                  : theme.palette.primary.main,
+              bgcolor:
+                theme.palette.mode === "dark"
+                  ? "#000"
+                  : "rgba(232, 238, 245, 0.95)",
+              color:
+                theme.palette.mode === "dark"
+                  ? "rgba(255,255,255,0.95)"
+                  : theme.palette.text.primary,
+              "& .MuiChip-label": {
+                px: 1,
+                py: 0,
+              },
+            })}
+          />
+        ) : null}
       </DialogTitle>
       <DialogContent
         sx={{
@@ -218,6 +214,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           overflow: "auto",
         }}
       >
+        {customerName?.trim() ? (
+          <Typography variant="body1" sx={{ fontWeight: 600 }}>
+            {isEditMode
+              ? `Edit this payment for ${toPascalCase(customerName.trim())}?`
+              : `Add a payment for ${toPascalCase(customerName.trim())}?`}
+          </Typography>
+        ) : null}
         <Box
           sx={{
             display: "flex",

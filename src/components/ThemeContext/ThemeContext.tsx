@@ -1,4 +1,4 @@
-// src/context/ThemeContext.tsx
+// src/components/ThemeContext/ThemeContext.tsx
 import { createContext, useContext, useMemo, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { ThemeProvider, createTheme, CssBaseline } from "@mui/material";
@@ -15,22 +15,43 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export const useThemeContext = () => useContext(ThemeContext);
 
+/** Light mode: cool slate / blue-gray (distinct from dark: airy surfaces + deeper steel primary). */
+const LIGHT = {
+  canvas: "#dce4ed",
+  surface: "#e8eef5",
+  elevated: "#f1f5f9",
+  ink: "#1a2430",
+  muted: "#5c6d7e",
+  /** Table header strip — slightly deeper than surface */
+  tableHead: "#d2dde8",
+} as const;
+
+/** Dark mode: previous cool slate / blue-gray (pre–Lush Forest). */
+const DARK = {
+  canvas: "#0f141a",
+  surface: "#161d26",
+  elevated: "#1e2733",
+  accent: "#8eb6d8",
+  ink: "#e2eaf3",
+  inkMuted: "#9aacbd",
+} as const;
+
+const fontStack = '"Montserrat", "Helvetica Neue", Arial, sans-serif';
+
 export const CustomThemeProvider = ({ children }: { children: ReactNode }) => {
-  // ✅ Load from localStorage on initial render
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const storedTheme = localStorage.getItem("darkMode");
-    return storedTheme === "true"; // convert string to boolean
+    return storedTheme === "true";
   });
 
   const toggleTheme = () => {
     setDarkMode((prev) => {
       const newMode = !prev;
-      localStorage.setItem("darkMode", String(newMode)); // ✅ Save to localStorage
+      localStorage.setItem("darkMode", String(newMode));
       return newMode;
     });
   };
 
-  // ✅ Optional: Sync with system preference if no localStorage found
   useEffect(() => {
     const storedTheme = localStorage.getItem("darkMode");
     if (storedTheme === null) {
@@ -42,107 +63,211 @@ export const CustomThemeProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // ✅ Prevent theme recreation on every render
   const theme = useMemo(
     () =>
       createTheme({
+        shape: { borderRadius: 0 },
+        typography: {
+          fontFamily: fontStack,
+          h1: { fontFamily: fontStack },
+          h2: { fontFamily: fontStack },
+          h3: { fontFamily: fontStack },
+          h4: { fontFamily: fontStack },
+          h5: { fontFamily: fontStack },
+          h6: { fontFamily: fontStack },
+          subtitle1: { fontFamily: fontStack },
+          subtitle2: { fontFamily: fontStack },
+          body1: { fontFamily: fontStack },
+          body2: { fontFamily: fontStack },
+          button: {
+            fontFamily: fontStack,
+            textTransform: "none",
+            fontWeight: 600,
+          },
+          caption: { fontFamily: fontStack },
+          overline: { fontFamily: fontStack },
+        },
         palette: {
           mode: darkMode ? "dark" : "light",
           ...(darkMode
             ? {
-                // Dark mode colors
                 primary: {
-                  main: "#90caf9", // Light blue for better contrast
+                  main: DARK.accent,
+                  light: "#aacae6",
+                  dark: "#6e9bc0",
                 },
                 secondary: {
-                  main: "#f48fb1", // Light pink
+                  main: DARK.inkMuted,
+                  light: "#b8c5d4",
+                  dark: "#7d8fa3",
                 },
                 background: {
-                  default: "#121212",
-                  paper: "#1e1e1e",
+                  default: DARK.canvas,
+                  paper: DARK.surface,
                 },
                 text: {
-                  primary: "#ffffff",
-                  secondary: "#b0b0b0",
+                  primary: DARK.ink,
+                  secondary: DARK.inkMuted,
+                },
+                divider: "rgba(226, 234, 243, 0.1)",
+                action: {
+                  hover: "rgba(142, 182, 216, 0.12)",
+                  selected: "rgba(142, 182, 216, 0.18)",
+                  disabledBackground: "rgba(226, 234, 243, 0.06)",
                 },
               }
             : {
-                // Light mode colors
                 primary: {
-                  main: "#1976d2",
+                  main: "#3a5f7a",
+                  light: "#5a7a96",
+                  dark: "#2a4a62",
+                  contrastText: "#ffffff",
                 },
                 secondary: {
-                  main: "#dc004e",
+                  main: "#6b8299",
+                  light: "#8a9db3",
+                  dark: "#4e6276",
+                  contrastText: "#ffffff",
                 },
                 background: {
-                  default: "#ffffff",
-                  paper: "#f5f5f5",
+                  default: LIGHT.canvas,
+                  paper: LIGHT.surface,
                 },
                 text: {
-                  primary: "#000000",
-                  secondary: "#666666",
+                  primary: LIGHT.ink,
+                  secondary: LIGHT.muted,
+                },
+                divider: "rgba(26, 36, 48, 0.12)",
+                action: {
+                  hover: "rgba(58, 95, 122, 0.09)",
+                  selected: "rgba(58, 95, 122, 0.14)",
+                  disabledBackground: "rgba(26, 36, 48, 0.06)",
                 },
               }),
         },
         components: {
-          MuiAppBar: {
+          MuiCssBaseline: {
             styleOverrides: {
-              root: {
-                backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
-                color: darkMode ? "#ffffff" : "#000000",
-                boxShadow: darkMode
-                  ? "0 2px 8px rgba(0,0,0,0.3)"
-                  : "0 2px 8px rgba(0,0,0,0.1)",
-              },
+              body: { fontFamily: fontStack },
+            },
+          },
+          MuiButton: {
+            defaultProps: { disableElevation: true },
+            styleOverrides: {
+              root: { borderRadius: 0 },
+            },
+          },
+          MuiIconButton: {
+            styleOverrides: {
+              root: { borderRadius: 0 },
+            },
+          },
+          MuiOutlinedInput: {
+            styleOverrides: {
+              root: { borderRadius: 0 },
+            },
+          },
+          MuiInputBase: {
+            styleOverrides: {
+              root: { borderRadius: 0 },
+            },
+          },
+          MuiFilledInput: {
+            styleOverrides: {
+              root: { borderRadius: 0 },
+            },
+          },
+          MuiChip: {
+            styleOverrides: {
+              root: { borderRadius: 0 },
+            },
+          },
+          MuiDialog: {
+            styleOverrides: {
+              paper: ({ theme }) => ({
+                borderRadius: 0,
+                backgroundImage: "none",
+                backgroundColor: theme.palette.background.paper,
+                boxShadow: "none",
+                border: `1px solid ${theme.palette.divider}`,
+              }),
             },
           },
           MuiPaper: {
+            defaultProps: { elevation: 0, square: true },
             styleOverrides: {
-              root: {
-                backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
-                color: darkMode ? "#ffffff" : "#000000",
-              },
+              root: ({ theme }) => ({
+                borderRadius: 0,
+                backgroundImage: "none",
+                backgroundColor: theme.palette.background.paper,
+                color: theme.palette.text.primary,
+                boxShadow: "none",
+                border: `1px solid ${theme.palette.divider}`,
+              }),
+            },
+          },
+          MuiAppBar: {
+            defaultProps: { elevation: 0 },
+            styleOverrides: {
+              root: ({ theme }) => ({
+                borderRadius: 0,
+                backgroundColor: theme.palette.background.paper,
+                color: theme.palette.text.primary,
+                backgroundImage: "none",
+                boxShadow: "none",
+                borderBottom: `1px solid ${theme.palette.divider}`,
+              }),
             },
           },
           MuiTableContainer: {
             styleOverrides: {
-              root: {
-                backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
-              },
+              root: ({ theme }) => ({
+                backgroundColor: theme.palette.background.paper,
+                borderRadius: 0,
+                border: `1px solid ${theme.palette.divider}`,
+              }),
             },
           },
           MuiTableHead: {
             styleOverrides: {
-              root: {
-                backgroundColor: darkMode ? "#333333" : "#f5f5f5",
+              root: ({ theme }) => ({
+                backgroundColor:
+                  theme.palette.mode === "dark"
+                    ? DARK.elevated
+                    : LIGHT.tableHead,
                 "& .MuiTableCell-head": {
-                  color: darkMode ? "#ffffff" : "#000000",
+                  color: theme.palette.text.primary,
                   fontWeight: 600,
+                  borderBottomColor: theme.palette.divider,
                 },
-              },
+              }),
             },
           },
           MuiTableBody: {
             styleOverrides: {
-              root: {
+              root: ({ theme }) => ({
                 "& .MuiTableRow-root": {
                   "&:nth-of-type(odd)": {
-                    backgroundColor: darkMode ? "#2a2a2a" : "#fafafa",
+                    backgroundColor:
+                      theme.palette.mode === "dark"
+                        ? DARK.elevated
+                        : LIGHT.elevated,
                   },
                   "&:nth-of-type(even)": {
-                    backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
+                    backgroundColor: theme.palette.background.paper,
                   },
                   "&:hover": {
-                    backgroundColor: darkMode ? "#333333" : "#f0f0f0",
+                    backgroundColor:
+                      theme.palette.mode === "dark"
+                        ? "rgba(142, 182, 216, 0.08)"
+                        : "rgba(58, 95, 122, 0.08)",
                   },
                 },
                 "& .MuiTableCell-body": {
-                  color: darkMode ? "#ffffff" : "#000000",
-                  borderBottom: darkMode
-                    ? "1px solid #333333"
-                    : "1px solid #e0e0e0",
+                  color: theme.palette.text.primary,
+                  borderBottomColor: theme.palette.divider,
                 },
-              },
+              }),
             },
           },
         },

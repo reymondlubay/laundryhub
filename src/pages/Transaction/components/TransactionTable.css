@@ -20,6 +20,13 @@
   height: 100%;
 }
 
+.transaction-grouped-grid .ag-cell.tx-cell-center,
+.transaction-grouped-grid .ag-cell.tx-cell-center .ag-cell-wrapper,
+.transaction-grouped-grid .ag-cell.tx-cell-center .ag-cell-value {
+  justify-content: center;
+  text-align: center;
+}
+
 /* Merge rows within the same transaction group only */
 .transaction-grouped-grid .ag-row.tx-main-row:not(.tx-last-row) .ag-cell {
   border-bottom: none !important;

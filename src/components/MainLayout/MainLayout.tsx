@@ -1,20 +1,38 @@
 import React from "react";
 import SidebarMenu from "./Sidebar/Sidebar";
-import { Container, Paper } from "@mui/material";
+import { Box, Container } from "@mui/material";
 import AppHeader from "./AppHeader/AppHeader";
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div style={{ display: "flex" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
       <SidebarMenu />
-      <Container maxWidth="xl" style={{ padding: 0, flex: 1 }}>
+      <Container
+        maxWidth="xl"
+        disableGutters
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          p: 0,
+        }}
+      >
         <AppHeader />
-
-        <Paper elevation={1} style={{ margin: 4, padding: 8 }}>
+        <Box
+          component="main"
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            bgcolor: "background.paper",
+            px: { xs: 1.5, sm: 2.5 },
+            py: { xs: 1.5, sm: 2 },
+          }}
+        >
           {children}
-        </Paper>
+        </Box>
       </Container>
-    </div>
+    </Box>
   );
 };
 

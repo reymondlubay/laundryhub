@@ -16,6 +16,7 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  Typography,
 } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
 import EditIcon from "@mui/icons-material/Edit";
@@ -92,7 +93,37 @@ interface FlatTransactionRow {
   isDelivered: boolean;
   releasedBy: string;
   action: string;
+  /** One entry per load line; used to stack Customer / KG / Load in a single grid row. */
+  loadLines: Array<{ loadType: string; kg: number; loads: number }>;
 }
+
+/** Shared layout so Customer, KG, and Load rows line up for multi-load cells. */
+const TX_MULTI_LOAD_STACK_SX = {
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: 1.5,
+  justifyContent: "center",
+  width: "100%",
+};
+
+/** One load block in Customer column: name, then load type on next line. */
+const txMultiLoadCustomerLineSx = {
+  display: "flex",
+  flexDirection: "column" as const,
+  alignItems: "flex-start",
+  justifyContent: "center",
+  minHeight: 40,
+  lineHeight: 1.25,
+  gap: 0.15,
+};
+
+/** One load line in KG / Load columns (single value, aligns with customer block). */
+const txMultiLoadMetricLineSx = {
+  display: "flex",
+  alignItems: "center",
+  minHeight: 40,
+  lineHeight: 1.3,
+};
 
 const STATUS_CELL_STYLES = {
   loaded: {
@@ -196,8 +227,7 @@ const getNoteDetails = (row?: FlatTransactionRow): string[] => {
 };
 
 /**
- * Flatten a transaction into multiple visual rows (one row per load detail)
- * while keeping transaction-level fields on the first row only.
+ * One grid row per transaction. Multiple load details are stacked in Customer / KG / Load cells.
  */
 function flattenTransactionRows(
   transaction: Transaction,
@@ -300,6 +330,15 @@ function flattenTransactionRows(
       "-"
     : "-";
 
+  const loadLines =
+    loadDetails.length === 0
+      ? []
+      : loadDetails.map((load) => ({
+          loadType: load.type || "Load",
+          kg: Number(load.kg || 0),
+          loads: Number(load.loads || 0),
+        }));
+
   if (loadDetails.length === 0) {
     return [
       {
@@ -331,45 +370,46 @@ function flattenTransactionRows(
         isDelivered,
         releasedBy,
         action: "",
+        loadLines,
       },
     ];
   }
 
-  return loadDetails.map((load, index) => {
-    const type = load.type || "Load";
-    const isFirstRow = index === 0;
+  const first = loadLines[0]!;
 
-    return {
-      id: `${transactionId}-${load.id || index}`,
+  return [
+    {
+      id: `${transactionId}-0`,
       transactionId,
-      isFirstRow,
-      isLastRow: index === loadDetails.length - 1,
+      isFirstRow: true,
+      isLastRow: true,
       hasDateLoaded,
       hasEstimatedPickup,
       hasDatePickup,
-      dateReceived: isFirstRow ? dateReceived : null,
-      dateLoaded: isFirstRow ? dateLoaded : null,
-      estimatedPickup: isFirstRow ? estimatedPickup : null,
+      dateReceived,
+      dateLoaded,
+      estimatedPickup,
       customer: customerName,
-      loadType: type,
-      kg: Number(load.kg || 0),
-      loads: Number(load.loads || 0),
-      price: isFirstRow ? totalPrice : null,
-      totalPaid: isFirstRow ? totalPaid : null,
-      balance: isFirstRow ? balance : null,
-      paymentHistory: isFirstRow ? paymentHistory : [],
-      datePaid: isFirstRow ? datePaid : null,
-      datePickup: isFirstRow ? datePickup : null,
-      notes: isFirstRow ? transaction.notes || "-" : "",
-      whitePrice: isFirstRow ? whitePrice : 0,
-      fabconQty: isFirstRow ? fabconQty : 0,
-      detergentQty: isFirstRow ? detergentQty : 0,
-      colorSafeQty: isFirstRow ? colorSafeQty : 0,
-      isDelivered: isFirstRow ? isDelivered : false,
-      releasedBy: isFirstRow ? releasedBy : "",
+      loadType: first.loadType,
+      kg: first.kg,
+      loads: first.loads,
+      price: totalPrice,
+      totalPaid,
+      balance,
+      paymentHistory,
+      datePaid,
+      datePickup,
+      notes: transaction.notes || "-",
+      whitePrice,
+      fabconQty,
+      detergentQty,
+      colorSafeQty,
+      isDelivered,
+      releasedBy,
       action: "",
-    };
-  });
+      loadLines,
+    },
+  ];
 }
 
 export type TransactionTableProps = {
@@ -387,7 +427,7 @@ export type TransactionTableProps = {
   flashRowRequest?: { transactionId: string; nonce: number } | null;
 };
 
-function TransactionTable({
+function TransactionTableInner({
   transactions,
   loading,
   error,
@@ -530,18 +570,35 @@ function TransactionTable({
         const existingPayments =
           selectedTransactionForPayment.paymentDetails || [];
         const updatedPaymentDetails = [...existingPayments, payment].map(
-          (paymentItem) => ({
-            paymentDate:
-              toApiDateTimeString(
-                paymentItem.paymentDate instanceof Date
-                  ? paymentItem.paymentDate
-                  : paymentItem.paymentDate,
-              ) ?? String(paymentItem.paymentDate),
-            amount: paymentItem.amount,
-            mode: toBackendPaymentMode(
-              paymentItem.mode == null ? undefined : String(paymentItem.mode),
-            ),
-          }),
+          (paymentItem) => {
+            const p = paymentItem as {
+              paymentDate: string | Date;
+              amount: number;
+              mode: string;
+              createdAt?: string;
+            };
+            const row: {
+              paymentDate: string;
+              amount: number;
+              mode: string;
+              createdAt?: string;
+            } = {
+              paymentDate:
+                toApiDateTimeString(
+                  p.paymentDate instanceof Date
+                    ? dayjs(p.paymentDate)
+                    : dayjs(p.paymentDate),
+                ) ?? String(p.paymentDate),
+              amount: Number(p.amount),
+              mode: toBackendPaymentMode(
+                p.mode == null ? undefined : String(p.mode),
+              ),
+            };
+            if (p.createdAt) {
+              row.createdAt = p.createdAt;
+            }
+            return row;
+          },
         );
 
         // Only send paymentDetails, no loadDetails since we're just updating payments
@@ -801,6 +858,7 @@ function TransactionTable({
         headerName: "Date Received",
         field: "dateReceived",
         width: 140,
+        cellClass: "tx-cell-center",
 
         sortable: false,
         suppressMovable: true,
@@ -811,13 +869,14 @@ function TransactionTable({
                 ...getStatusCellStyle(params.data),
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "flex-start",
+                alignItems: "center",
                 justifyContent: "center",
                 width: "100%",
                 padding: 0.5,
                 px: 1,
                 lineHeight: 1.5,
-                borderRadius: 1,
+                borderRadius: 0,
+                textAlign: "center",
               }}
             >
               <span>{dayjs(params.value).format("MM-DD-YY")}</span>
@@ -853,12 +912,33 @@ function TransactionTable({
                 flexDirection: "column",
                 justifyContent: "center",
                 minWidth: 0,
+                gap: 0,
               }}
             >
-              <span>{params.data?.customer || "-"}</span>
-              {params.data?.loadType ? (
-                <span style={{ opacity: 0.7 }}>({params.data.loadType})</span>
-              ) : null}
+              {params.data?.loadLines && params.data.loadLines.length > 1 ? (
+                <Box sx={TX_MULTI_LOAD_STACK_SX}>
+                  {params.data.loadLines.map((line, i) => (
+                    <Box
+                      key={`${params.data?.transactionId}-load-${i}`}
+                      sx={txMultiLoadCustomerLineSx}
+                    >
+                      <span>{params.data?.customer || "-"}</span>
+                      <Box component="span" sx={{ opacity: 0.75 }}>
+                        ({line.loadType})
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              ) : (
+                <>
+                  <span>{params.data?.customer || "-"}</span>
+                  {params.data?.loadType ? (
+                    <span style={{ opacity: 0.7 }}>
+                      ({params.data.loadType})
+                    </span>
+                  ) : null}
+                </>
+              )}
             </Box>
             {params.data?.isFirstRow && params.data?.estimatedPickup ? (
               <Tooltip
@@ -926,6 +1006,24 @@ function TransactionTable({
 
         sortable: false,
         suppressMovable: true,
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
+          const lines = params.data?.loadLines;
+          if (lines && lines.length > 1) {
+            return (
+              <Box sx={TX_MULTI_LOAD_STACK_SX}>
+                {lines.map((line, i) => (
+                  <Box
+                    key={`kg-${params.data?.transactionId}-${i}`}
+                    sx={txMultiLoadMetricLineSx}
+                  >
+                    {line.kg}
+                  </Box>
+                ))}
+              </Box>
+            );
+          }
+          return params.value ?? "";
+        },
       },
       {
         headerName: "Load",
@@ -934,23 +1032,56 @@ function TransactionTable({
 
         sortable: false,
         suppressMovable: true,
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
+          const lines = params.data?.loadLines;
+          if (lines && lines.length > 1) {
+            return (
+              <Box sx={TX_MULTI_LOAD_STACK_SX}>
+                {lines.map((line, i) => (
+                  <Box
+                    key={`ld-${params.data?.transactionId}-${i}`}
+                    sx={txMultiLoadMetricLineSx}
+                  >
+                    {line.loads}
+                  </Box>
+                ))}
+              </Box>
+            );
+          }
+          return params.value ?? "";
+        },
       },
       {
         headerName: "Price",
         field: "price",
         width: 100,
+        cellClass: "tx-cell-center",
 
         sortable: false,
         suppressMovable: true,
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
           if (!params.data?.isFirstRow || params.value == null) return "";
-          return `₱${Number(params.value).toFixed(2)}`;
+          return (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                height: "100%",
+                textAlign: "center",
+              }}
+            >
+              ₱{Number(params.value).toFixed(2)}
+            </Box>
+          );
         },
       },
       {
         headerName: "Date Loaded",
         field: "dateLoaded",
         width: 130,
+        cellClass: "tx-cell-center",
         sortable: false,
         suppressMovable: true,
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) =>
@@ -959,10 +1090,12 @@ function TransactionTable({
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "flex-start",
+                alignItems: "center",
                 justifyContent: "center",
+                width: "100%",
                 padding: 0.5,
                 lineHeight: 1.5,
+                textAlign: "center",
               }}
             >
               <span>{dayjs(params.value).format("MM-DD-YY")}</span>
@@ -975,7 +1108,8 @@ function TransactionTable({
       {
         headerName: "Date Paid",
         field: "datePaid",
-        width: 130,
+        width: 112,
+        minWidth: 100,
         sortable: false,
         suppressMovable: true,
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
@@ -1008,86 +1142,95 @@ function TransactionTable({
             </Box>
           );
 
-          return (
+          const showIcons = hasBalance || hasPaidOrOver;
+
+          const iconCluster = showIcons ? (
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.25,
+                flexShrink: 0,
+              }}
+            >
+              {hasBalance ? (
+                <Tooltip title={tooltipTitle} arrow>
+                  <Box
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: 20,
+                    }}
+                  >
+                    <WarningAmberIcon
+                      sx={{
+                        color: "#f44336",
+                        fontSize: 16,
+                        display: "block",
+                      }}
+                    />
+                  </Box>
+                </Tooltip>
+              ) : null}
+              {hasPaidOrOver ? (
+                <Tooltip title={tooltipTitle} arrow>
+                  <Box
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: 20,
+                    }}
+                  >
+                    <HistoryIcon
+                      sx={{
+                        color: "#4caf50",
+                        fontSize: 16,
+                        display: "block",
+                      }}
+                    />
+                  </Box>
+                </Tooltip>
+              ) : null}
+            </Box>
+          ) : null;
+
+          const dateTimeStack = (
             <Box
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "flex-start",
+                alignItems: showIcons ? "flex-start" : "center",
                 justifyContent: "center",
-                padding: 0.5,
-                lineHeight: 1.5,
-                width: "100%",
+                minWidth: 0,
+                ...(showIcons ? { flex: 1 } : { width: "100%" }),
+                textAlign: showIcons ? "left" : "center",
               }}
             >
               <span>{dayjs(params.value).format("MM-DD-YY")}</span>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  width: "100%",
-                  gap: 1,
-                  minHeight: 22,
-                }}
-              >
-                <span>{dayjs(params.value).format("h:mm A")}</span>
-                <Box
-                  component="span"
-                  sx={{
-                    width: 20,
-                    height: 20,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {hasBalance ? (
-                    <Tooltip title={tooltipTitle} arrow>
-                      <Box
-                        component="span"
-                        sx={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          height: 16,
-                        }}
-                      >
-                        <WarningAmberIcon
-                          sx={{
-                            color: "#f44336",
-                            fontSize: 16,
-                            display: "block",
-                            verticalAlign: "middle",
-                          }}
-                        />
-                      </Box>
-                    </Tooltip>
-                  ) : null}
-                  {hasPaidOrOver ? (
-                    <Tooltip title={tooltipTitle} arrow>
-                      <Box
-                        component="span"
-                        sx={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          height: 16,
-                        }}
-                      >
-                        <HistoryIcon
-                          sx={{
-                            color: "#4caf50",
-                            fontSize: 16,
-                            display: "block",
-                            verticalAlign: "middle",
-                          }}
-                        />
-                      </Box>
-                    </Tooltip>
-                  ) : null}
-                </Box>
-              </Box>
+              <span>{dayjs(params.value).format("h:mm A")}</span>
+            </Box>
+          );
+
+          return (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: showIcons ? "space-between" : "center",
+                gap: 0.5,
+                py: 0.25,
+                px: 0,
+                width: "100%",
+                lineHeight: 1.45,
+              }}
+            >
+              {dateTimeStack}
+              {iconCluster}
             </Box>
           );
         },
@@ -1097,6 +1240,7 @@ function TransactionTable({
         field: "datePickup",
         sortable: false,
         width: 130,
+        cellClass: "tx-cell-center",
         suppressMovable: true,
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) =>
           params.data?.isFirstRow && params.value ? (
@@ -1104,10 +1248,12 @@ function TransactionTable({
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "flex-start",
+                alignItems: "center",
                 justifyContent: "center",
+                width: "100%",
                 padding: 0.5,
                 lineHeight: 1.5,
+                textAlign: "center",
               }}
             >
               <span>{dayjs(params.value).format("MM-DD-YY")}</span>
@@ -1174,12 +1320,13 @@ function TransactionTable({
         pinned: "right",
         width: 260,
         minWidth: 260,
+        cellClass: "tx-cell-center",
         suppressMovable: true,
         cellStyle: {
-          alignContent: "flex-start",
+          alignContent: "center",
           display: "flex",
           alignItems: "center",
-          justifyContent: "flex-start",
+          justifyContent: "center",
         },
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
           if (!params.data?.isFirstRow) return "";
@@ -1192,9 +1339,10 @@ function TransactionTable({
             <Stack
               direction="row"
               spacing={0.5}
-              justifyContent="flex-start"
+              justifyContent="center"
               alignItems="center"
               alignContent="center"
+              sx={{ width: "100%" }}
             >
               <Tooltip
                 title={loadDisabled ? "Already loaded" : "Mark as loaded"}
@@ -1351,7 +1499,11 @@ function TransactionTable({
     return classes.join(" ");
   };
 
-  const getRowHeight = () => 72;
+  const getRowHeight = useCallback((params: { data?: FlatTransactionRow }) => {
+    const n = params.data?.loadLines?.length ?? 0;
+    if (n <= 1) return 72;
+    return Math.min(260, Math.max(72, 40 + n * 44));
+  }, []);
 
   // Show error state
   if (error || deleteError) {
@@ -1423,6 +1575,7 @@ function TransactionTable({
         isOpen={paymentModalOpen}
         onClose={handleClosePaymentModal}
         onSave={handleSavePayment}
+        customerName={selectedTransactionForPayment?.customer?.name}
         balance={
           selectedTransactionForPayment
             ? getTransactionTotals(selectedTransactionForPayment, addonsPricing)
@@ -1463,6 +1616,17 @@ function TransactionTable({
             overflow: "auto",
           }}
         >
+          {selectedTransactionForMark?.customer?.name ? (
+            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+              {markModalType === "loaded"
+                ? `Mark ${toPascalCase(
+                    selectedTransactionForMark.customer.name,
+                  )} as loaded?`
+                : `Mark ${toPascalCase(
+                    selectedTransactionForMark.customer.name,
+                  )} as picked up?`}
+            </Typography>
+          ) : null}
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DateTimePicker
               label={markModalType === "loaded" ? "Loaded Date" : "Pickup Date"}
@@ -1574,4 +1738,5 @@ function TransactionTable({
   );
 }
 
+const TransactionTable = React.memo(TransactionTableInner);
 export default TransactionTable;

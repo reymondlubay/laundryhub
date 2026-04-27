@@ -2,11 +2,13 @@ import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
 import {
   FaChartBar,
   FaFileAlt,
+  FaHistory,
   FaShoppingCart,
   FaWarehouse,
   FaUsers,
 } from "react-icons/fa";
 import { Box, Typography } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
 import { useThemeContext } from "../../ThemeContext/ThemeContext";
 import { Link, useLocation } from "react-router-dom";
 import route from "../../../constants/route";
@@ -16,6 +18,8 @@ import { useSidebar } from "./SidebarContext";
 
 export default function SidebarMenu() {
   const { darkMode } = useThemeContext();
+  const theme = useTheme();
+  const { primary, text, background } = theme.palette;
   const { collapsed } = useSidebar();
   const location = useLocation();
   const isAdminUser = isAdmin();
@@ -25,18 +29,11 @@ export default function SidebarMenu() {
   return (
     <Sidebar
       collapsed={collapsed}
-      backgroundColor={
-        darkMode ? "rgba(30, 30, 30, 0.95)" : "rgba(255, 255, 255, 0.95)"
-      }
+      backgroundColor={alpha(background.paper, darkMode ? 0.98 : 0.97)}
       className={`sidebar-container ${darkMode ? "dark" : "light"}`}
       rootStyles={{
-        transition: "all 0.3s ease",
-        borderRight: darkMode
-          ? "1px solid rgba(255,255,255,0.12)"
-          : "1px solid rgba(0,0,0,0.08)",
-        boxShadow: darkMode
-          ? "2px 0 10px rgba(0,0,0,0.5)"
-          : "2px 0 10px rgba(0,0,0,0.08)",
+        transition: "background-color 0.2s ease, color 0.2s ease",
+        borderRight: `1px solid ${theme.palette.divider}`,
       }}
     >
       {/* HEADER */}
@@ -55,16 +52,17 @@ export default function SidebarMenu() {
             sx={{
               width: 36,
               height: 36,
-              background: "linear-gradient(135deg, #3b82f6, #06b6d4)",
-              borderRadius: 2,
+              background: `linear-gradient(135deg, ${primary.dark}, ${primary.light})`,
+              borderRadius: 0,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#fff",
+              color: theme.palette.primary.contrastText,
               fontWeight: "bold",
               fontSize: "18px",
               flexShrink: 0,
-              boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
+              boxShadow: "none",
+              border: `1px solid ${theme.palette.divider}`,
             }}
           >
             LH
@@ -74,7 +72,7 @@ export default function SidebarMenu() {
             <Typography
               sx={{
                 fontWeight: "bold",
-                color: "#3b82f6",
+                color: primary.main,
                 textTransform: "uppercase",
                 whiteSpace: "nowrap",
                 letterSpacing: 0.5,
@@ -94,7 +92,7 @@ export default function SidebarMenu() {
             sx={{
               fontWeight: 600,
               textTransform: "uppercase",
-              color: darkMode ? "#9ca3af" : "#6b7280",
+              color: text.secondary,
               letterSpacing: 0.5,
             }}
           >
@@ -108,26 +106,23 @@ export default function SidebarMenu() {
         menuItemStyles={{
           button: ({ active }) => ({
             backgroundColor: active
-              ? darkMode
-                ? "rgba(59,130,246,0.2)"
-                : "rgba(59,130,246,0.1)"
+              ? alpha(primary.main, darkMode ? 0.22 : 0.12)
               : "transparent",
-            color: active ? "#3b82f6" : darkMode ? "#f3f4f6" : "#1f2937",
-            borderRadius: "8px",
-            margin: "2px 8px",
+            color: active ? primary.main : text.primary,
+            borderRadius: 0,
+            margin: "1px 6px",
             "&:hover": {
-              backgroundColor: darkMode
-                ? "rgba(59,130,246,0.15)"
-                : "rgba(59,130,246,0.08)",
-              color: "#3b82f6",
+              backgroundColor: alpha(primary.main, darkMode ? 0.16 : 0.1),
+              color: primary.main,
             },
           }),
           subMenuContent: {
-            backgroundColor: darkMode
-              ? "rgba(10, 10, 10, 0.55)"
-              : "rgba(245, 249, 255, 0.9)",
-            borderRadius: 8,
-            margin: "2px 8px",
+            backgroundColor: alpha(
+              background.default,
+              darkMode ? 0.92 : 0.88,
+            ),
+            borderRadius: 0,
+            margin: "1px 6px",
           },
         }}
       >
@@ -162,10 +157,8 @@ export default function SidebarMenu() {
             defaultOpen={activePath.startsWith("/reports")}
             rootStyles={{
               color: activePath.startsWith("/reports")
-                ? "#3b82f6"
-                : darkMode
-                  ? "#f3f4f6"
-                  : "#1f2937",
+                ? primary.main
+                : text.primary,
             }}
           >
             <MenuItem
@@ -198,7 +191,7 @@ export default function SidebarMenu() {
             sx={{
               fontWeight: 600,
               textTransform: "uppercase",
-              color: darkMode ? "#9ca3af" : "#6b7280",
+              color: text.secondary,
               letterSpacing: 0.5,
             }}
           >
@@ -210,20 +203,19 @@ export default function SidebarMenu() {
       <Menu
         menuItemStyles={{
           button: {
-            color: darkMode ? "#f3f4f6" : "#1f2937",
+            color: text.primary,
             "&:hover": {
-              backgroundColor: darkMode
-                ? "rgba(59,130,246,0.15)"
-                : "rgba(59,130,246,0.08)",
-              color: "#3b82f6",
+              backgroundColor: alpha(primary.main, darkMode ? 0.16 : 0.1),
+              color: primary.main,
             },
           },
           subMenuContent: {
-            backgroundColor: darkMode
-              ? "rgba(10, 10, 10, 0.55)"
-              : "rgba(245, 249, 255, 0.9)",
-            borderRadius: 8,
-            margin: "2px 8px",
+            backgroundColor: alpha(
+              background.default,
+              darkMode ? 0.92 : 0.88,
+            ),
+            borderRadius: 0,
+            margin: "1px 6px",
           },
         }}
       >
@@ -237,16 +229,23 @@ export default function SidebarMenu() {
           </MenuItem>
         ) : null}
         {isAdminUser ? (
+          <MenuItem
+            component={<Link to={route.AUDIT_LOG} />}
+            icon={<FaHistory />}
+            active={activePath === route.AUDIT_LOG}
+          >
+            Audit Log
+          </MenuItem>
+        ) : null}
+        {isAdminUser ? (
           <SubMenu
             label="Settings"
             icon={<FaWarehouse />}
             defaultOpen={activePath.startsWith("/settings")}
             rootStyles={{
               color: activePath.startsWith("/settings")
-                ? "#3b82f6"
-                : darkMode
-                  ? "#f3f4f6"
-                  : "#1f2937",
+                ? primary.main
+                : text.primary,
             }}
           >
             <MenuItem

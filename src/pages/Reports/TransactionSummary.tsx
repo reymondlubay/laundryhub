@@ -5,6 +5,7 @@ import {
   Alert,
   Box,
   CircularProgress,
+  Divider,
   FormControl,
   Grid,
   InputLabel,
@@ -223,7 +224,6 @@ const matchesFilter = (
 
   const dateLoaded = getTransactionFieldDate(transaction, "dateLoaded");
   const datePickup = getTransactionFieldDate(transaction, "datePickup");
-  const balance = getBalance(transaction);
   const totalPaid =
     transaction.paymentDetails?.reduce(
       (sum, p) => sum + Number(p.amount || 0),
@@ -233,10 +233,17 @@ const matchesFilter = (
   switch (status) {
     case "pending":
       return !dateLoaded;
-    case "with-balance":
-      return balance > 0;
-    case "unpaid":
+    case "with-balance": {
+      const total = getTransactionGrandTotal(transaction);
+      const paymentRows = transaction.paymentDetails?.length ?? 0;
+      if (paymentRows < 1 || totalPaid <= 0) return false;
+      return totalPaid < total;
+    }
+    case "unpaid": {
+      const paymentRows = transaction.paymentDetails?.length ?? 0;
+      if (paymentRows === 0) return true;
       return totalPaid === 0;
+    }
     case "not-picked":
       return !datePickup;
     case "backdate-payment":
@@ -348,6 +355,46 @@ const TransactionSummary = () => {
       page * rowsPerPage + rowsPerPage,
     );
   }, [filteredTransactions, page, rowsPerPage]);
+
+  const filterSummary = React.useMemo(() => {
+    const list = filteredTransactions;
+    const customerIds = new Set<string>();
+    let totalLoads = 0;
+    let totalKg = 0;
+    let totalPrice = 0;
+    let totalPaid = 0;
+    let totalUnpaidBalance = 0;
+    let pickedUpCount = 0;
+    let notPickedUpCount = 0;
+
+    for (const t of list) {
+      const tx = t as TransactionWithLegacyFields;
+      const cid = t.customerId || tx.customerid;
+      if (cid) customerIds.add(String(cid));
+
+      totalLoads += getTotalLoads(t);
+      totalKg += getTotalKg(t);
+      totalPrice += getTransactionGrandTotal(t);
+      totalPaid += getTotalPaid(t);
+      totalUnpaidBalance += getBalance(t);
+
+      const pickup = getTransactionFieldDate(t, "datePickup");
+      if (pickup) pickedUpCount += 1;
+      else notPickedUpCount += 1;
+    }
+
+    return {
+      transactionCount: list.length,
+      distinctCustomers: customerIds.size,
+      totalLoads,
+      totalKg,
+      totalPrice,
+      totalPaid,
+      totalUnpaidBalance,
+      pickedUpCount,
+      notPickedUpCount,
+    };
+  }, [filteredTransactions]);
 
   const handlePageChange = (
     _event: React.MouseEvent<HTMLButtonElement> | null,
@@ -472,7 +519,7 @@ const TransactionSummary = () => {
         <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
           <CircularProgress />
         </Box>
-      ) : paginatedTransactions.length === 0 ? (
+      ) : filteredTransactions.length === 0 ? (
         <Alert severity="info">No transactions found.</Alert>
       ) : (
         <TableContainer component={Paper} sx={{ mb: 2 }}>
@@ -653,6 +700,54 @@ const TransactionSummary = () => {
           />
         </TableContainer>
       )}
+
+      {!loading ? (
+        <Paper sx={{ p: 2.5, mt: 1 }} variant="outlined">
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            {dateFrom.format("MMM D, YYYY")} to {dateTo.format("MMM D, YYYY")}{" "}
+            summary
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", mb: 1 }}
+          >
+            Based on the current filters (same scope as the table, not only the
+            visible page).
+          </Typography>
+          <Divider sx={{ my: 1.5 }} />
+          <Grid container spacing={1.5} columns={{ xs: 12, sm: 12 }}>
+            {[
+              ["Total transactions", String(filterSummary.transactionCount)],
+              [
+                "Total customers (distinct)",
+                String(filterSummary.distinctCustomers),
+              ],
+              ["Total loads", formatAmount(filterSummary.totalLoads)],
+              ["Total kg", filterSummary.totalKg.toFixed(2)],
+              ["Total price", formatCurrency(filterSummary.totalPrice)],
+              ["Total amount paid", formatCurrency(filterSummary.totalPaid)],
+              [
+                "Total unpaid (balances)",
+                formatCurrency(filterSummary.totalUnpaidBalance),
+              ],
+              ["Picked up (count)", String(filterSummary.pickedUpCount)],
+              ["Not picked up (count)", String(filterSummary.notPickedUpCount)],
+            ].map(([label, value]) => (
+              <Grid size={{ xs: 12, sm: 6 }} key={label}>
+                <Stack direction="row" justifyContent="space-between" gap={2}>
+                  <Typography variant="body2" color="text.secondary">
+                    {label}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {value}
+                  </Typography>
+                </Stack>
+              </Grid>
+            ))}
+          </Grid>
+        </Paper>
+      ) : null}
     </Box>
   );
 };

@@ -225,6 +225,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
           payment.mode === PAYMENT_MODE_GCASH_BACKEND
             ? PAYMENT_MODE_GCASH
             : PAYMENT_MODE_CASH,
+        ...(payment.createdAt ? { createdAt: payment.createdAt } : {}),
       }),
     );
 
@@ -476,6 +477,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 )!,
                 amount: Number(payment.amount || 0),
                 mode: toBackendPaymentMode(payment.mode),
+                ...(payment.createdAt
+                  ? { createdAt: payment.createdAt }
+                  : {}),
               })),
             };
 
