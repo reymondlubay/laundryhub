@@ -106,15 +106,32 @@ const TX_MULTI_LOAD_STACK_SX = {
   width: "100%",
 };
 
+/** Compact action icons: smaller hit target and glyph size for a narrow pinned column. */
+const TX_ACTION_ICON_BUTTON_SX = {
+  p: 0.35,
+  minWidth: 30,
+  width: 30,
+  height: 30,
+  "& .MuiSvgIcon-root": { fontSize: 20 },
+} as const;
+
+const TX_CUSTOMER_TEXT_WRAP_SX = {
+  overflowWrap: "anywhere" as const,
+  wordBreak: "break-word" as const,
+  whiteSpace: "normal" as const,
+  maxWidth: "100%",
+};
+
 /** One load block in Customer column: name, then load type on next line. */
 const txMultiLoadCustomerLineSx = {
   display: "flex",
   flexDirection: "column" as const,
   alignItems: "flex-start",
   justifyContent: "center",
-  minHeight: 40,
+  minHeight: 0,
   lineHeight: 1.25,
   gap: 0.15,
+  ...TX_CUSTOMER_TEXT_WRAP_SX,
 };
 
 /** One load line in KG / Load columns (single value, aligns with customer block). */
@@ -124,6 +141,34 @@ const txMultiLoadMetricLineSx = {
   minHeight: 40,
   lineHeight: 1.3,
 };
+
+/** ~chars per line in the customer text area (column minus icons). Used for row height. */
+const CUSTOMER_WRAP_CHARS = 18;
+
+function countWrappedLines(text: string, charsPerLine: number): number {
+  const t = text || "";
+  if (t.length === 0) return 0;
+  return Math.max(1, Math.ceil(t.length / charsPerLine));
+}
+
+function estimateCustomerContentLines(data: FlatTransactionRow): number {
+  const name = data.customer || "";
+  const loads = data.loadLines;
+  if (loads && loads.length > 1) {
+    let sum = 0;
+    for (const line of loads) {
+      sum +=
+        countWrappedLines(name, CUSTOMER_WRAP_CHARS) +
+        countWrappedLines(`(${line.loadType})`, CUSTOMER_WRAP_CHARS);
+    }
+    return Math.max(sum, loads.length * 2);
+  }
+  const typePart = data.loadType ? `(${data.loadType})` : "";
+  return (
+    countWrappedLines(name, CUSTOMER_WRAP_CHARS) +
+    (typePart ? countWrappedLines(typePart, CUSTOMER_WRAP_CHARS) : 0)
+  );
+}
 
 const STATUS_CELL_STYLES = {
   loaded: {
@@ -889,7 +934,9 @@ function TransactionTableInner({
       {
         headerName: "Customer",
         field: "customer",
-        width: 220,
+        width: 172,
+        minWidth: 150,
+        cellClass: "tx-customer-cell",
 
         filter: true,
         sortable: false,
@@ -898,12 +945,13 @@ function TransactionTableInner({
           <Box
             sx={{
               display: "flex",
-              alignItems: "center",
+              alignItems: "flex-start",
               justifyContent: "space-between",
-              gap: 1,
+              gap: 0.5,
               lineHeight: 1.25,
               py: 0.25,
               width: "100%",
+              minWidth: 0,
             }}
           >
             <Box
@@ -911,8 +959,10 @@ function TransactionTableInner({
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "center",
+                flex: 1,
                 minWidth: 0,
                 gap: 0,
+                ...TX_CUSTOMER_TEXT_WRAP_SX,
               }}
             >
               {params.data?.loadLines && params.data.loadLines.length > 1 ? (
@@ -922,8 +972,16 @@ function TransactionTableInner({
                       key={`${params.data?.transactionId}-load-${i}`}
                       sx={txMultiLoadCustomerLineSx}
                     >
-                      <span>{params.data?.customer || "-"}</span>
-                      <Box component="span" sx={{ opacity: 0.75 }}>
+                      <Box
+                        component="span"
+                        sx={{ display: "block", ...TX_CUSTOMER_TEXT_WRAP_SX }}
+                      >
+                        {params.data?.customer || "-"}
+                      </Box>
+                      <Box
+                        component="span"
+                        sx={{ display: "block", opacity: 0.75, ...TX_CUSTOMER_TEXT_WRAP_SX }}
+                      >
                         ({line.loadType})
                       </Box>
                     </Box>
@@ -931,11 +989,20 @@ function TransactionTableInner({
                 </Box>
               ) : (
                 <>
-                  <span>{params.data?.customer || "-"}</span>
+                  <Box component="span" sx={{ display: "block", ...TX_CUSTOMER_TEXT_WRAP_SX }}>
+                    {params.data?.customer || "-"}
+                  </Box>
                   {params.data?.loadType ? (
-                    <span style={{ opacity: 0.7 }}>
+                    <Box
+                      component="span"
+                      sx={{
+                        display: "block",
+                        opacity: 0.7,
+                        ...TX_CUSTOMER_TEXT_WRAP_SX,
+                      }}
+                    >
                       ({params.data.loadType})
-                    </span>
+                    </Box>
                   ) : null}
                 </>
               )}
@@ -952,10 +1019,13 @@ function TransactionTableInner({
                   sx={{
                     display: "inline-flex",
                     alignItems: "center",
+                    alignSelf: "flex-start",
+                    mt: 0.125,
                     color: "#f44336",
+                    flexShrink: 0,
                   }}
                 >
-                  <AccessTimeIcon sx={{ fontSize: 16 }} />
+                  <AccessTimeIcon sx={{ fontSize: 15 }} />
                 </Box>
               </Tooltip>
             ) : null}
@@ -986,11 +1056,14 @@ function TransactionTableInner({
                         sx={{
                           display: "inline-flex",
                           alignItems: "center",
+                          alignSelf: "flex-start",
+                          mt: 0.125,
                           color: "#f44336",
                           cursor: "pointer",
+                          flexShrink: 0,
                         }}
                       >
-                        <InfoOutlinedIcon sx={{ fontSize: 16 }} />
+                        <InfoOutlinedIcon sx={{ fontSize: 15 }} />
                       </Box>
                     </Tooltip>
                   );
@@ -1318,8 +1391,8 @@ function TransactionTableInner({
         field: "action",
         sortable: false,
         pinned: "right",
-        width: 260,
-        minWidth: 260,
+        width: 182,
+        minWidth: 172,
         cellClass: "tx-cell-center",
         suppressMovable: true,
         cellStyle: {
@@ -1327,6 +1400,8 @@ function TransactionTableInner({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          paddingLeft: 2,
+          paddingRight: 2,
         },
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
           if (!params.data?.isFirstRow) return "";
@@ -1338,11 +1413,11 @@ function TransactionTableInner({
           return (
             <Stack
               direction="row"
-              spacing={0.5}
+              spacing={0.125}
               justifyContent="center"
               alignItems="center"
               alignContent="center"
-              sx={{ width: "100%" }}
+              sx={{ width: "100%", flexWrap: "nowrap" }}
             >
               <Tooltip
                 title={loadDisabled ? "Already loaded" : "Mark as loaded"}
@@ -1350,8 +1425,10 @@ function TransactionTableInner({
                 <span>
                   <IconButton
                     aria-label="mark-loaded"
+                    size="small"
                     color="secondary"
                     disabled={loadDisabled}
+                    sx={TX_ACTION_ICON_BUTTON_SX}
                     onClick={() => {
                       const transaction = transactions.find(
                         (t) => t.id === params.data?.transactionId,
@@ -1379,8 +1456,10 @@ function TransactionTableInner({
                 <span>
                   <IconButton
                     aria-label="mark-paid"
+                    size="small"
                     color="primary"
                     disabled={payDisabled}
+                    sx={TX_ACTION_ICON_BUTTON_SX}
                     onClick={() => {
                       const transaction = transactions.find(
                         (t) => t.id === params.data?.transactionId,
@@ -1401,8 +1480,10 @@ function TransactionTableInner({
                 <span>
                   <IconButton
                     aria-label="mark-pickup"
+                    size="small"
                     color="info"
                     disabled={pickupDisabled}
+                    sx={TX_ACTION_ICON_BUTTON_SX}
                     onClick={() => {
                       const transaction = transactions.find(
                         (t) => t.id === params.data?.transactionId,
@@ -1417,12 +1498,18 @@ function TransactionTableInner({
                 </span>
               </Tooltip>
 
-              <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />
+              <Divider
+                orientation="vertical"
+                flexItem
+                sx={{ my: 0.25, mx: 0, borderColor: "divider" }}
+              />
 
               <Tooltip title="Edit">
                 <IconButton
                   aria-label="edit"
+                  size="small"
                   color="success"
+                  sx={TX_ACTION_ICON_BUTTON_SX}
                   onClick={() => {
                     const transaction = transactions.find(
                       (t) => t.id === params.data?.transactionId,
@@ -1440,7 +1527,9 @@ function TransactionTableInner({
               <Tooltip title="Delete">
                 <IconButton
                   aria-label="delete"
+                  size="small"
                   color="error"
+                  sx={TX_ACTION_ICON_BUTTON_SX}
                   onClick={() => {
                     if (params.data?.transactionId) {
                       handleDeleteTransactionClick(params.data.transactionId);
@@ -1500,9 +1589,13 @@ function TransactionTableInner({
   };
 
   const getRowHeight = useCallback((params: { data?: FlatTransactionRow }) => {
-    const n = params.data?.loadLines?.length ?? 0;
-    if (n <= 1) return 72;
-    return Math.min(260, Math.max(72, 40 + n * 44));
+    const data = params.data;
+    if (!data) return 72;
+    const textLines = estimateCustomerContentLines(data);
+    const nLoads = data.loadLines?.length ?? 0;
+    const stackGapPx = nLoads > 1 ? (nLoads - 1) * 12 : 0;
+    const h = 36 + textLines * 16 + stackGapPx;
+    return Math.min(300, Math.max(72, h));
   }, []);
 
   // Show error state
