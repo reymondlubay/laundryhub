@@ -21,6 +21,7 @@ import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HistoryIcon from "@mui/icons-material/History";
 import dayjs from "dayjs";
@@ -35,6 +36,7 @@ import transactionService, {
   type Transaction,
 } from "../../services/transactionService";
 import { toPascalCase } from "../../utils/stringUtils";
+import { getTransactionNoteDetailLines } from "../../utils/transactionNoteDetails";
 
 type DashboardCard = {
   key: string;
@@ -718,7 +720,7 @@ const Dashboard = () => {
                                   alignItems: "center",
                                   justifyContent: "space-between",
                                   width: "100%",
-                                  gap: 1,
+                                  gap: 0.75,
                                 }}
                               >
                                 <span>
@@ -726,36 +728,86 @@ const Dashboard = () => {
                                     transaction.customer?.name || "-",
                                   )}
                                 </span>
-                                {dayjs(
-                                  getTransactionDate(
-                                    transaction,
-                                    "estimatedPickup",
-                                  ),
-                                ).isValid() ? (
-                                  <Tooltip
-                                    title={dayjs(
-                                      getTransactionDate(
+                                <Stack
+                                  direction="row"
+                                  spacing={0.25}
+                                  alignItems="center"
+                                  sx={{ flexShrink: 0 }}
+                                >
+                                  {(() => {
+                                    const noteDetails =
+                                      getTransactionNoteDetailLines(
                                         transaction,
-                                        "estimatedPickup",
-                                      ),
-                                    ).format("MM-DD-YY h:mm A")}
-                                    arrow
-                                  >
-                                    <Box
-                                      component="span"
-                                      sx={{
-                                        width: 18,
-                                        height: 18,
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        color: "#f44336",
-                                      }}
+                                      );
+                                    if (noteDetails.length === 0) return null;
+                                    return (
+                                      <Tooltip
+                                        title={
+                                          <Box
+                                            sx={{
+                                              display: "flex",
+                                              flexDirection: "column",
+                                              gap: 0.25,
+                                            }}
+                                          >
+                                            {noteDetails.map((line, idx) => (
+                                              <span
+                                                key={`${transaction.id}-nd-${idx}`}
+                                              >
+                                                {line}
+                                              </span>
+                                            ))}
+                                          </Box>
+                                        }
+                                        arrow
+                                      >
+                                        <Box
+                                          component="span"
+                                          sx={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            color: "#f44336",
+                                            cursor: "pointer",
+                                          }}
+                                        >
+                                          <InfoOutlinedIcon
+                                            sx={{ fontSize: 16 }}
+                                          />
+                                        </Box>
+                                      </Tooltip>
+                                    );
+                                  })()}
+                                  {dayjs(
+                                    getTransactionDate(
+                                      transaction,
+                                      "estimatedPickup",
+                                    ),
+                                  ).isValid() ? (
+                                    <Tooltip
+                                      title={dayjs(
+                                        getTransactionDate(
+                                          transaction,
+                                          "estimatedPickup",
+                                        ),
+                                      ).format("MM-DD-YY h:mm A")}
+                                      arrow
                                     >
-                                      <AccessTimeIcon sx={{ fontSize: 16 }} />
-                                    </Box>
-                                  </Tooltip>
-                                ) : null}
+                                      <Box
+                                        component="span"
+                                        sx={{
+                                          width: 18,
+                                          height: 18,
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          color: "#f44336",
+                                        }}
+                                      >
+                                        <AccessTimeIcon sx={{ fontSize: 16 }} />
+                                      </Box>
+                                    </Tooltip>
+                                  ) : null}
+                                </Stack>
                               </Box>
                             </TableCell>
                             <TableCell
