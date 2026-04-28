@@ -58,6 +58,7 @@ import TransactionDeleteDialog, {
   type DeleteReason,
 } from "../../../components/TransactionDeleteDialog/TransactionDeleteDialog";
 import { getAddonsTotal, getStoredSnapshots } from "../../../utils/pricing";
+import { getTransactionNoteDetailLines } from "../../../utils/transactionNoteDetails";
 import "./TransactionTable.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -255,21 +256,8 @@ const isAddPaymentDisabled = (row?: FlatTransactionRow): boolean => {
   return false;
 };
 
-const getNoteDetails = (row?: FlatTransactionRow): string[] => {
-  if (!row) return [];
-  const noteText = row.notes && row.notes !== "-" ? String(row.notes) : "";
-  const details: string[] = [];
-
-  if (row.isDelivered) details.push("Delivery");
-  if (row.whitePrice > 0)
-    details.push(`Add White +${formatAmount(row.whitePrice)}`);
-  if (row.fabconQty > 0) details.push(`Fabcon x${row.fabconQty}`);
-  if (row.detergentQty > 0) details.push(`Detergent x${row.detergentQty}`);
-  if (row.colorSafeQty > 0) details.push(`Color Safe x${row.colorSafeQty}`);
-  if (noteText) details.push(`Notes ${noteText}`);
-
-  return details;
-};
+const getNoteDetails = (row?: FlatTransactionRow): string[] =>
+  getTransactionNoteDetailLines(row);
 
 /**
  * One grid row per transaction. Multiple load details are stacked in Customer / KG / Load cells.
