@@ -37,10 +37,23 @@ npm -v
 ```powershell
 cd C:\Projects\laundryhub
 npm install
-npm run build
+npm run deploy:all
 ```
 
-Output: `C:\Projects\laundryhub\dist`
+This project supports two production builds (two `.env` files) with separate output folders:
+- Local build output: `C:\Projects\Laundryhub\publish\laundry-local`
+- Network build output: `C:\Projects\Laundryhub\publish\laundry-network`
+
+The `deploy:*` scripts copy the build outputs into these final publish folders:
+- `C:\Projects\Laundryhub Prod\Published\laundry-local`
+- `C:\Projects\Laundryhub Prod\Published\laundry-network`
+
+Scripts:
+- `npm run build:laundry-local` (uses Vite `--mode laundry-local`, loads `.env` + `.env.laundry-local`)
+- `npm run build:laundry-network` (uses Vite `--mode laundry-network`, loads `.env` + `.env.laundry-network`)
+- `npm run deploy:laundry-local` (builds local then copies to the local Published folder)
+- `npm run deploy:laundry-network` (builds network then copies to the network Published folder)
+- `npm run deploy:all` (runs both deploys)
 
 ### Backend
 
@@ -175,7 +188,9 @@ For both:
 ### Frontend App
 
 - Site: Default Web Site (or your own site)
-- Physical path: `C:\Projects\laundryhub\dist`
+- Physical path (choose one depending on what you want IIS to serve):
+  - Local: `C:\Projects\Laundryhub Prod\Published\laundry-local`
+  - Network: `C:\Projects\Laundryhub Prod\Published\laundry-network`
 - App pool: `LaundryHubFrontend`
 
 ### API Proxy App
@@ -188,7 +203,9 @@ For both:
 
 ## 8.1 Frontend web.config (React SPA)
 
-Place in `C:\Projects\laundryhub\dist\web.config`.
+Place `web.config` in the folder IIS serves:
+- Local: `C:\Projects\Laundryhub Prod\Published\laundry-local\web.config`
+- Network: `C:\Projects\Laundryhub Prod\Published\laundry-network\web.config`
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -252,7 +269,7 @@ Then rebuild frontend:
 
 ```powershell
 cd C:\Projects\laundryhub
-npm run build
+npm run deploy:all
 ```
 
 ## 10. Bindings, DNS, SSL
@@ -371,7 +388,7 @@ Recommended:
 
 For each new release:
 1. Build frontend and backend
-2. Copy new `dist` files to server
+2. Copy/publish new frontend files to the Published folder(s)
 3. Keep `.env` unchanged
 4. Restart backend service
 5. Recycle IIS app pools
