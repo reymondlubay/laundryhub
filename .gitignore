@@ -10,7 +10,11 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+publish
 *.local
+.env
+.env.laundry-local
+.env.laundry-network
 
 
 # Editor directories and files
