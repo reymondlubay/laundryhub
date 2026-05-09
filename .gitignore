@@ -6,7 +6,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
+.env
 node_modules
 dist
 dist-ssr
@@ -15,6 +15,7 @@ publish
 .env
 .env.laundry-local
 .env.laundry-network
+
 
 # Editor directories and files
 .vscode/*
