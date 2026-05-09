@@ -193,6 +193,56 @@ const formatAmount = (amount: number): string => {
   return Number.isInteger(amount) ? `${amount}` : amount.toFixed(2);
 };
 
+function gcd(a: number, b: number): number {
+  let x = Math.abs(a);
+  let y = Math.abs(b);
+  while (y) {
+    const t = x % y;
+    x = y;
+    y = t;
+  }
+  return x || 1;
+}
+
+function toMixedFraction(value: number): string {
+  if (!Number.isFinite(value)) return "";
+  if (Number.isInteger(value)) return String(value);
+
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+  const whole = Math.floor(abs);
+  const frac = abs - whole;
+
+  // Prefer common denominators used for weights.
+  const candidates = [2, 4, 8, 16];
+  let best: { num: number; den: number; err: number } | null = null;
+
+  for (const den of candidates) {
+    const num = Math.round(frac * den);
+    const err = Math.abs(frac - num / den);
+    if (best == null || err < best.err) best = { num, den, err };
+  }
+
+  if (!best) return `${value}`;
+
+  // If fraction rounds to whole, carry to integer.
+  if (best.num === best.den) {
+    return `${sign}${whole + 1}`;
+  }
+
+  // If close enough to 0, show integer.
+  if (best.num === 0 || best.err > 1e-6) {
+    return `${sign}${whole}`;
+  }
+
+  const g = gcd(best.num, best.den);
+  const num = best.num / g;
+  const den = best.den / g;
+
+  if (whole === 0) return `${sign}${num}/${den}`;
+  return `${sign}${whole} ${num}/${den}`;
+}
+
 const getTransactionTotals = (
   transaction: Transaction,
   addonsPricing: AddonsPricing,
@@ -1077,13 +1127,15 @@ function TransactionTableInner({
                     key={`kg-${params.data?.transactionId}-${i}`}
                     sx={txMultiLoadMetricLineSx}
                   >
-                    {line.kg}
+                    {toMixedFraction(line.kg)}
                   </Box>
                 ))}
               </Box>
             );
           }
-          return params.value ?? "";
+          return typeof params.value === "number"
+            ? toMixedFraction(params.value)
+            : params.value ?? "";
         },
       },
       {

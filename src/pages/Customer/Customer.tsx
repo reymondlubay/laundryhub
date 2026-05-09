@@ -30,7 +30,7 @@ import {
   FORM_ERRORS,
   UI_TEXT,
 } from "../../constants/messages";
-import { toPascalCase } from "../../utils/stringUtils";
+import { toPascalCase, toTitleCaseWords } from "../../utils/stringUtils";
 import customerService, {
   type CreateCustomerPayload,
   type Customer,
@@ -152,7 +152,7 @@ const CustomerPage: React.FC = () => {
 
       if (editingCustomer) {
         const payload: UpdateCustomerPayload = {
-          name: form.name.trim(),
+          name: toTitleCaseWords(form.name.trim()),
           mobileNumber: form.mobileNumber.trim() || undefined,
           address: form.address.trim() || undefined,
           notes: form.notes.trim() || undefined,
@@ -161,7 +161,7 @@ const CustomerPage: React.FC = () => {
         await customerService.update(editingCustomer.id, payload);
       } else {
         const payload: CreateCustomerPayload = {
-          name: form.name.trim(),
+          name: toTitleCaseWords(form.name.trim()),
           mobileNumber: form.mobileNumber.trim() || undefined,
           address: form.address.trim() || undefined,
           notes: form.notes.trim() || undefined,

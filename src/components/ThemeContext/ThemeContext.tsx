@@ -151,6 +151,13 @@ export const CustomThemeProvider = ({ children }: { children: ReactNode }) => {
               body: { fontFamily: fontStack },
             },
           },
+          MuiTextField: {
+            defaultProps: {
+              // Disable browser autofill across the app by default.
+              // Login page explicitly opts in via autoComplete="username/current-password".
+              autoComplete: "off",
+            },
+          },
           MuiButton: {
             defaultProps: { disableElevation: true },
             styleOverrides: {

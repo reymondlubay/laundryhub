@@ -59,6 +59,7 @@ import {
   PAYMENT_MODE_GCASH_BACKEND,
   toBackendPaymentMode,
 } from "../../../../constants/payment";
+import { toTitleCaseWords } from "../../../../utils/stringUtils";
 
 type TransactionModalProps = {
   isOpen: boolean;
@@ -116,6 +117,22 @@ function isPickupFilled(p: unknown): boolean {
   return dayjs(p as string | number).isValid();
 }
 
+/** Coerce blank/invalid numeric inputs (e.g. cleared NumberField → NaN) for Yup. */
+function yupCoerceNonNegative(_value: unknown, originalValue: unknown): number {
+  if (
+    originalValue === "" ||
+    originalValue === null ||
+    originalValue === undefined
+  ) {
+    return 0;
+  }
+  const n =
+    typeof originalValue === "number"
+      ? originalValue
+      : Number(originalValue);
+  return Number.isFinite(n) ? n : 0;
+}
+
 const TransactionModal: React.FC<TransactionModalProps> = ({
   isOpen,
   handleClose,
@@ -128,6 +145,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const [customers, setCustomers] = React.useState<Customer[]>([]);
   const [employees, setEmployees] = React.useState<EmployeeOption[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const submitLockRef = React.useRef(false);
   const [addCustomerOpen, setAddCustomerOpen] = React.useState(false);
   const [addingCustomer, setAddingCustomer] = React.useState(false);
   const [newCustomerError, setNewCustomerError] = React.useState<string>("");
@@ -139,6 +157,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       notes: "",
     });
   const [payments, setPayments] = React.useState<Payment[]>([]);
+  const [customerInputValue, setCustomerInputValue] = React.useState<string>("");
+  const customerInputValueRef = React.useRef<string>("");
 
   const isEditing = !!transaction;
 
@@ -308,7 +328,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       releaseBy: tx.releasedBy || tx.releasedby || "",
       notes: transaction.notes || "",
     };
-  }, [transaction]);
+  }, [isOpen, transaction]);
 
   const today = dayjs().endOf("day").toDate();
   const validationSchema = Yup.object().shape({
@@ -328,15 +348,29 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     items: Yup.array().of(
       Yup.object().shape({
         type: Yup.string().required(),
-        kg: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
-        loads: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
-        price: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+        kg: Yup.number()
+          .transform(yupCoerceNonNegative)
+          .min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+        loads: Yup.number()
+          .transform(yupCoerceNonNegative)
+          .min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+        price: Yup.number()
+          .transform(yupCoerceNonNegative)
+          .min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
       }),
     ),
-    whitePrice: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
-    fabcon: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
-    detergent: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
-    cs: Yup.number().min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+    whitePrice: Yup.number()
+      .transform(yupCoerceNonNegative)
+      .min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+    fabcon: Yup.number()
+      .transform(yupCoerceNonNegative)
+      .min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+    detergent: Yup.number()
+      .transform(yupCoerceNonNegative)
+      .min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+    cs: Yup.number()
+      .transform(yupCoerceNonNegative)
+      .min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
     releaseBy: Yup.string().when("datePickup", {
       is: (datePickup: unknown) => isPickupFilled(datePickup),
       then: (schema) =>
@@ -380,7 +414,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       shouldValidate?: boolean,
     ) => Promise<unknown> | void,
   ) => {
-    const name = newCustomerForm.name.trim();
+    const name = toTitleCaseWords(newCustomerForm.name.trim());
     if (!name) {
       setNewCustomerError(FORM_ERRORS.REQUIRED_CUSTOMER_NAME);
       return;
@@ -443,6 +477,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         initialValues={initialValues}
         validationSchema={validationSchema}
         onSubmit={async (values) => {
+          if (submitLockRef.current) return;
+          submitLockRef.current = true;
           try {
             setLoading(true);
 
@@ -457,14 +493,15 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 ? toApiDateTimeString(values.datePickup)
                 : null,
               isDelivered: values.isDelivered,
-              whitePrice: values.whitePrice,
-              fabconQty: values.fabcon,
-              detergentQty: values.detergent,
-              colorSafeQty: values.cs,
+              whitePrice: yupCoerceNonNegative(undefined, values.whitePrice),
+              fabconQty: yupCoerceNonNegative(undefined, values.fabcon),
+              detergentQty: yupCoerceNonNegative(undefined, values.detergent),
+              colorSafeQty: yupCoerceNonNegative(undefined, values.cs),
               releasedBy: hasValidPickup
                 ? values.releaseBy?.trim() || null
                 : null,
-              notes: trimmedNotes || undefined,
+              // Always send `notes` so the API persists updates and can clear the field (JSON omits `undefined`).
+              notes: trimmedNotes,
               loadDetails: values.items.map((item) => ({
                 type: item.type,
                 kg: Number(item.kg || 0),
@@ -548,10 +585,19 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             onError?.(message);
           } finally {
             setLoading(false);
+            submitLockRef.current = false;
           }
         }}
       >
-        {({ values, errors, touched, setFieldValue, handleSubmit }) => {
+        {({
+          values,
+          errors,
+          touched,
+          submitCount,
+          setFieldValue,
+          setFieldTouched,
+          handleSubmit,
+        }) => {
           //const totals = calculateTotals(values);
           //console.log("render:", values);
           const renderDatePicker = (
@@ -628,6 +674,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           <Grid size="grow">
                             <Autocomplete
                               size="small"
+                              inputValue={customerInputValue}
+                              onInputChange={(_, newValue) => {
+                                setCustomerInputValue(newValue);
+                                customerInputValueRef.current = newValue;
+                              }}
                               value={
                                 customers.find(
                                   (c) => c.id === values.customer,
@@ -638,6 +689,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                   "customer",
                                   selectedCustomer?.id || "",
                                 );
+                                setCustomerInputValue(selectedCustomer?.name || "");
+                                customerInputValueRef.current =
+                                  selectedCustomer?.name || "";
                               }}
                               options={customers}
                               getOptionLabel={(option) => option.name}
@@ -649,11 +703,18 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                   {...params}
                                   label="Customer"
                                   error={
-                                    !!errors.customer && !!touched.customer
+                                    !!errors.customer &&
+                                    !!(touched.customer || submitCount > 0)
                                   }
                                   helperText={
-                                    touched.customer ? errors.customer : ""
+                                    touched.customer || submitCount > 0
+                                      ? errors.customer
+                                      : ""
                                   }
+                                  onBlur={(e) => {
+                                    params.inputProps?.onBlur?.(e);
+                                    void setFieldTouched("customer", true);
+                                  }}
                                 />
                               )}
                             />
@@ -663,8 +724,26 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                               <IconButton
                                 size="small"
                                 color="primary"
+                                onMouseDown={(e) => {
+                                  // Prevent the autocomplete input from blurring/resetting before we read the typed value.
+                                  e.preventDefault();
+                                }}
                                 onClick={() => {
                                   resetNewCustomerForm();
+                                  const typed = (
+                                    customerInputValueRef.current || customerInputValue
+                                  ).trim();
+                                  if (typed) {
+                                    const exists = customers.some(
+                                      (c) => c.name.trim().toLowerCase() === typed.toLowerCase(),
+                                    );
+                                    if (!exists) {
+                                      setNewCustomerForm((prev) => ({
+                                        ...prev,
+                                        name: typed,
+                                      }));
+                                    }
+                                  }
                                   setAddCustomerOpen(true);
                                 }}
                               >
@@ -951,6 +1030,15 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           value={values.fabcon}
                           onValueChange={(val) => setFieldValue("fabcon", val)}
                           hideStepper
+                          error={
+                            !!errors.fabcon &&
+                            !!(touched.fabcon || submitCount > 0)
+                          }
+                          helperText={
+                            touched.fabcon || submitCount > 0
+                              ? errors.fabcon
+                              : ""
+                          }
                         />
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
@@ -964,6 +1052,15 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                             setFieldValue("detergent", val)
                           }
                           hideStepper
+                          error={
+                            !!errors.detergent &&
+                            !!(touched.detergent || submitCount > 0)
+                          }
+                          helperText={
+                            touched.detergent || submitCount > 0
+                              ? errors.detergent
+                              : ""
+                          }
                         />
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
@@ -975,6 +1072,13 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           value={values.cs}
                           onValueChange={(val) => setFieldValue("cs", val)}
                           hideStepper
+                          error={
+                            !!errors.cs &&
+                            !!(touched.cs || submitCount > 0)
+                          }
+                          helperText={
+                            touched.cs || submitCount > 0 ? errors.cs : ""
+                          }
                         />
                       </Grid>
 
@@ -1107,6 +1211,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                   variant="contained"
                   size="small"
                   sx={{ minWidth: 100 }}
+                  disabled={loading}
                 >
                   {loading ? UI_TEXT.SAVING : UI_TEXT.SAVE}
                 </Button>
@@ -1114,7 +1219,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
               <Dialog
                 open={addCustomerOpen}
-                onClose={() => {
+                disableEscapeKeyDown
+                onClose={(_, reason) => {
+                  if (reason === "backdropClick" || reason === "escapeKeyDown") {
+                    return;
+                  }
                   if (!addingCustomer) {
                     setAddCustomerOpen(false);
                     resetNewCustomerForm();
@@ -1132,6 +1241,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         size="small"
                         label="Customer Name"
                         value={newCustomerForm.name}
+                        name="lh_new_customer_name"
+                        autoComplete="new-password"
+                        inputProps={{ autoComplete: "new-password" }}
                         error={!!newCustomerError}
                         helperText={newCustomerError || ""}
                         onChange={(e) => {
@@ -1149,6 +1261,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         size="small"
                         label="Mobile Number"
                         value={newCustomerForm.mobileNumber}
+                        name="lh_new_customer_mobile"
+                        autoComplete="new-password"
+                        inputProps={{ autoComplete: "new-password" }}
                         onChange={(e) =>
                           setNewCustomerForm((prev) => ({
                             ...prev,
@@ -1163,6 +1278,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         size="small"
                         label="Address"
                         value={newCustomerForm.address}
+                        name="lh_new_customer_address"
+                        autoComplete="new-password"
+                        inputProps={{ autoComplete: "new-password" }}
                         onChange={(e) =>
                           setNewCustomerForm((prev) => ({
                             ...prev,
@@ -1179,6 +1297,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         multiline
                         rows={3}
                         value={newCustomerForm.notes}
+                        name="lh_new_customer_notes"
+                        autoComplete="new-password"
+                        inputProps={{ autoComplete: "new-password" }}
                         onChange={(e) =>
                           setNewCustomerForm((prev) => ({
                             ...prev,
