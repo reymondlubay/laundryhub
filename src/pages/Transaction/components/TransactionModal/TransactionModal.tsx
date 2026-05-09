@@ -712,7 +712,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                       : ""
                                   }
                                   onBlur={(e) => {
-                                    params.inputProps?.onBlur?.(e);
+                                    params.inputProps?.onBlur?.(
+                                      e as React.FocusEvent<HTMLInputElement>,
+                                    );
                                     void setFieldTouched("customer", true);
                                   }}
                                 />
