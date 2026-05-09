@@ -85,11 +85,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setMode(editingPayment.mode);
     } else {
       setPaymentDate(dayjs());
-      setAmount("");
+      const due = typeof balance === "number" ? Math.max(balance, 0) : 0;
+      setAmount(due > 0 ? due.toFixed(2) : "");
       setMode(DEFAULT_PAYMENT_MODE);
     }
     setErrors({});
-  }, [editingPayment, isEditMode, isOpen]);
+  }, [balance, editingPayment, isEditMode, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
