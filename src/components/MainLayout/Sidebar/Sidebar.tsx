@@ -2,7 +2,6 @@ import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
 import {
   FaChartBar,
   FaFileAlt,
-  FaHistory,
   FaShoppingCart,
   FaWarehouse,
   FaUsers,
@@ -150,6 +149,36 @@ export default function SidebarMenu() {
           Customer
         </MenuItem>
 
+        <SubMenu
+          label="Inventory"
+          icon={<FaWarehouse />}
+          defaultOpen={activePath.startsWith("/inventory")}
+          rootStyles={{
+            color: activePath.startsWith("/inventory")
+              ? primary.main
+              : text.primary,
+          }}
+        >
+          <MenuItem
+            component={<Link to={route.INVENTORY_ITEMS} />}
+            active={activePath === route.INVENTORY_ITEMS}
+          >
+            Inventory Items
+          </MenuItem>
+          <MenuItem
+            component={<Link to={route.INVENTORY_MANAGE} />}
+            active={activePath === route.INVENTORY_MANAGE}
+          >
+            Manage Inventory
+          </MenuItem>
+          <MenuItem
+            component={<Link to={route.INVENTORY_STOCK_USAGE} />}
+            active={activePath === route.INVENTORY_STOCK_USAGE}
+          >
+            Record Stock Usage
+          </MenuItem>
+        </SubMenu>
+
         {isAdminUser && (
           <SubMenu
             label="Report"
@@ -178,6 +207,18 @@ export default function SidebarMenu() {
               active={activePath === route.REPORT_CUSTOMER}
             >
               Customer Report
+            </MenuItem>
+            <MenuItem
+              component={<Link to={route.INVENTORY_SUMMARY} />}
+              active={activePath === route.INVENTORY_SUMMARY}
+            >
+              Inventory Summary
+            </MenuItem>
+            <MenuItem
+              component={<Link to={route.REPORT_INVENTORY} />}
+              active={activePath === route.REPORT_INVENTORY}
+            >
+              Inventory Report
             </MenuItem>
           </SubMenu>
         )}
@@ -226,15 +267,6 @@ export default function SidebarMenu() {
             active={activePath === route.USERS}
           >
             Users
-          </MenuItem>
-        ) : null}
-        {isAdminUser ? (
-          <MenuItem
-            component={<Link to={route.AUDIT_LOG} />}
-            icon={<FaHistory />}
-            active={activePath === route.AUDIT_LOG}
-          >
-            Audit Log
           </MenuItem>
         ) : null}
         {isAdminUser ? (

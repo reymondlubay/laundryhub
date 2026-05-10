@@ -4,13 +4,14 @@ export const API_ROUTES = {
   TRANSACTIONS: "/transactions",
   USERS: "/users",
   CUSTOMERS: "/customers",
+  INVENTORY_ITEMS: "/inventory-items",
+  INVENTORY_RECORDS: "/inventory-records",
+  STOCK_USAGE_RECORDS: "/stock-usage-records",
   BACKUP: "/backup",
   BACKUP_UPLOAD: "/backup/upload",
   BACKUPS: "/backups",
   RESTORE: "/restore",
   ADDONS_PRICING: "/addons-pricing",
-  AUDIT_LOGS: "/audit-logs",
-  AUDIT_LOG_SETTINGS: "/audit-logs/settings",
 } as const;
 
 export default API_ROUTES;

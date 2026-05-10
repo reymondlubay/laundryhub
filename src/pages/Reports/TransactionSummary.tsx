@@ -76,6 +76,7 @@ type TransactionStatus =
   | "unpaid"
   | "not-picked"
   | "withdrawn"
+  | "wrong-record"
   | "backdate-payment"
   | "backdate-pickup";
 
@@ -252,6 +253,8 @@ const matchesFilter = (
       return hasBackdatePickup(transaction);
     case "withdrawn":
       return getDeleteReason(transaction).toLowerCase() === "withdrawn";
+    case "wrong-record":
+      return getDeleteReason(transaction).toLowerCase() === "wrong record";
     default:
       return true;
   }
@@ -339,6 +342,13 @@ const TransactionSummary = () => {
         return (
           isDeleted &&
           getDeleteReason(transaction).toLowerCase() === "withdrawn"
+        );
+      }
+
+      if (statusFilter === "wrong-record") {
+        return (
+          isDeleted &&
+          getDeleteReason(transaction).toLowerCase() === "wrong record"
         );
       }
 
@@ -508,6 +518,7 @@ const TransactionSummary = () => {
                 <MenuItem value="backdate-payment">Backdate payment</MenuItem>
                 <MenuItem value="backdate-pickup">Backdate pickup</MenuItem>
                 <MenuItem value="withdrawn">Withdrawn</MenuItem>
+                <MenuItem value="wrong-record">Wrong Record</MenuItem>
               </Select>
             </FormControl>
           </Stack>

@@ -31,6 +31,8 @@ const Transaction = () => {
   const [selectedTransaction, setSelectedTransaction] =
     React.useState<Transaction | null>(null);
   const [showPendingOnly, setShowPendingOnly] = React.useState(false);
+  const [showReadyForPickupOnly, setShowReadyForPickupOnly] =
+    React.useState(false);
   const [jumpToFirstPageNonce, setJumpToFirstPageNonce] = React.useState(0);
   const [flashRowRequest, setFlashRowRequest] = React.useState<{
     transactionId: string;
@@ -62,14 +64,15 @@ const Transaction = () => {
   }, []);
   const {
     searchText,
-    selectedMonth,
+    dateFrom,
+    dateTo,
     transactions,
     loading,
     error,
     setSearchText,
-    setSelectedMonth,
+    setDateFrom,
+    setDateTo,
     search,
-    clearCustomerAndSearch,
     clearFilters,
     upsertTransaction,
     removeTransaction,
@@ -130,24 +133,51 @@ const Transaction = () => {
 
   const handleClearFilters = React.useCallback(() => {
     setShowPendingOnly(false);
+    setShowReadyForPickupOnly(false);
     clearFilters();
   }, [clearFilters]);
 
+  const handleSearch = React.useCallback(
+    (overrides?: Parameters<typeof search>[0]) => {
+      return search({
+        useDefaultDateRange: !showReadyForPickupOnly,
+        ...overrides,
+      });
+    },
+    [search, showReadyForPickupOnly],
+  );
+
+  const handleReadyForPickupChange = React.useCallback(
+    (checked: boolean) => {
+      setShowReadyForPickupOnly(checked);
+      void search({ useDefaultDateRange: !checked });
+    },
+    [search],
+  );
+
   const filteredTransactions = React.useMemo(() => {
-    if (!showPendingOnly) return transactions;
+    if (!showPendingOnly && !showReadyForPickupOnly) return transactions;
 
     return transactions.filter((transaction) => {
-      const tx = transaction as Transaction & { dateloaded?: string | null };
+      const tx = transaction as Transaction & {
+        dateloaded?: string | null;
+        datepickup?: string | null;
+      };
       const loadedDate = transaction.dateLoaded || tx.dateloaded || null;
-      return !loadedDate;
+      const pickupDate = transaction.datePickup || tx.datepickup || null;
+
+      if (showPendingOnly && loadedDate) return false;
+      if (showReadyForPickupOnly && (!loadedDate || pickupDate)) return false;
+
+      return true;
     });
-  }, [showPendingOnly, transactions]);
+  }, [showPendingOnly, showReadyForPickupOnly, transactions]);
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter") void search();
+      if (e.key === "Enter") void handleSearch();
     },
-    [search],
+    [handleSearch],
   );
 
   const autocompleteOptions = React.useMemo(() => {
@@ -170,8 +200,10 @@ const Transaction = () => {
   const suggestionListOpen = comboOpen && canShowSuggestionList;
 
   const handleClearCustomerSearch = () => {
+    const useDefaultDateRange = !showReadyForPickupOnly;
     setComboOpen(false);
-    void clearCustomerAndSearch();
+    setSearchText("");
+    void search({ searchText: "", useDefaultDateRange });
   };
 
   return (
@@ -202,6 +234,8 @@ const Transaction = () => {
               onChange={(_, value) => {
                 if (value && typeof value === "object" && "name" in value) {
                   setSearchText(value.name);
+                  setComboOpen(false);
+                  void handleSearch({ searchText: value.name });
                 }
               }}
               filterOptions={(options) => options}
@@ -239,21 +273,38 @@ const Transaction = () => {
           </Stack>
         </Grid>
 
-        {/* Month filter */}
+        {/* Date Range filter */}
         <Grid size={{ xs: 12, sm: "auto" }}>
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DatePicker
-              label="Filter by month"
-              views={["year", "month"]}
-              openTo="month"
-              value={selectedMonth}
-              onChange={(val) => setSelectedMonth(val)}
+              label="From Date"
+              value={dateFrom}
+              onChange={(val) => setDateFrom(val)}
               disabled={loading}
+              maxDate={dateTo || undefined}
               slotProps={{
                 textField: { size: "small" },
                 field: {
                   clearable: true,
-                  onClear: () => setSelectedMonth(null),
+                  onClear: () => setDateFrom(null),
+                },
+              }}
+            />
+          </LocalizationProvider>
+        </Grid>
+        <Grid size={{ xs: 12, sm: "auto" }}>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DatePicker
+              label="To Date"
+              value={dateTo}
+              onChange={(val) => setDateTo(val)}
+              disabled={loading}
+              minDate={dateFrom || undefined}
+              slotProps={{
+                textField: { size: "small" },
+                field: {
+                  clearable: true,
+                  onClear: () => setDateTo(null),
                 },
               }}
             />
@@ -265,7 +316,7 @@ const Transaction = () => {
           <Button
             variant="contained"
             size="small"
-            onClick={search}
+            onClick={() => void handleSearch()}
             disabled={loading}
             startIcon={<SearchIcon />}
           >
@@ -309,17 +360,32 @@ const Transaction = () => {
           mb: 1.5,
         }}
       >
-        <FormControlLabel
-          sx={{ m: 0 }}
-          control={
-            <Checkbox
-              size="small"
-              checked={showPendingOnly}
-              onChange={(event) => setShowPendingOnly(event.target.checked)}
-            />
-          }
-          label="Show pending"
-        />
+        <Stack direction="row" spacing={1} alignItems="center">
+          <FormControlLabel
+            sx={{ m: 0 }}
+            control={
+              <Checkbox
+                size="small"
+                checked={showPendingOnly}
+                onChange={(event) => setShowPendingOnly(event.target.checked)}
+              />
+            }
+            label="Show pending"
+          />
+          <FormControlLabel
+            sx={{ m: 0 }}
+            control={
+              <Checkbox
+                size="small"
+                checked={showReadyForPickupOnly}
+                onChange={(event) =>
+                  handleReadyForPickupChange(event.target.checked)
+                }
+              />
+            }
+            label="Show Ready for pickup"
+          />
+        </Stack>
         <Stack direction="row" spacing={2} alignItems="center">
           <Stack direction="row" spacing={0.75} alignItems="center">
             <Box

@@ -276,7 +276,7 @@ const Dashboard = () => {
         if (!aDate.isValid() && !bDate.isValid()) return 0;
         if (!aDate.isValid()) return 1;
         if (!bDate.isValid()) return -1;
-        return aDate.valueOf() - bDate.valueOf();
+        return bDate.valueOf() - aDate.valueOf();
       });
   }, [activeTransactions]);
 
@@ -330,7 +330,7 @@ const Dashboard = () => {
         if (!aDate.isValid() && !bDate.isValid()) return 0;
         if (!aDate.isValid()) return 1;
         if (!bDate.isValid()) return -1;
-        return aDate.valueOf() - bDate.valueOf();
+        return bDate.valueOf() - aDate.valueOf();
       });
   }, [activeTransactions]);
 
@@ -892,6 +892,16 @@ const Dashboard = () => {
                           Customer
                         </TableCell>
                         <TableCell
+                          sx={{
+                            bgcolor: tableHeadBg,
+                            color: tableHeadColor,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Loaded Date
+                        </TableCell>
+                        <TableCell
                           align="right"
                           sx={{
                             bgcolor: tableHeadBg,
@@ -908,7 +918,7 @@ const Dashboard = () => {
                       {loadedTodayTransactions.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={3}
+                            colSpan={4}
                             align="center"
                             sx={{ color: tableCellColor }}
                           >
@@ -920,6 +930,21 @@ const Dashboard = () => {
                           <TableRow key={`done-${transaction.id}`}>
                             <TableCell sx={{ color: tableCellColor }}>
                               {dayjs(
+                                getTransactionDate(transaction, "dateReceived"),
+                              ).isValid()
+                                ? dayjs(
+                                    getTransactionDate(
+                                      transaction,
+                                      "dateReceived",
+                                    ),
+                                  ).format("MM-DD-YY h:mm A")
+                                : "-"}
+                            </TableCell>
+                            <TableCell sx={{ color: tableCellColor }}>
+                              {toPascalCase(transaction.customer?.name || "-")}
+                            </TableCell>
+                            <TableCell sx={{ color: tableCellColor }}>
+                              {dayjs(
                                 getTransactionDate(transaction, "dateLoaded"),
                               ).isValid()
                                 ? dayjs(
@@ -929,9 +954,6 @@ const Dashboard = () => {
                                     ),
                                   ).format("MM-DD-YY h:mm A")
                                 : "-"}
-                            </TableCell>
-                            <TableCell sx={{ color: tableCellColor }}>
-                              {toPascalCase(transaction.customer?.name || "-")}
                             </TableCell>
                             <TableCell
                               align="right"

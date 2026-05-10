@@ -7,13 +7,20 @@ import transactionService, {
 
 export interface TransactionSearchState {
   searchText: string;
-  selectedMonth: Dayjs | null;
+  dateFrom: Dayjs | null;
+  dateTo: Dayjs | null;
   transactions: Transaction[];
   loading: boolean;
   error: string | null;
   setSearchText: (value: string) => void;
-  setSelectedMonth: (value: Dayjs | null) => void;
-  search: () => Promise<void>;
+  setDateFrom: (value: Dayjs | null) => void;
+  setDateTo: (value: Dayjs | null) => void;
+  search: (overrides?: {
+    searchText?: string;
+    dateFrom?: Dayjs | null;
+    dateTo?: Dayjs | null;
+    useDefaultDateRange?: boolean;
+  }) => Promise<void>;
   clearCustomerAndSearch: () => void;
   clearFilters: () => void;
   upsertTransaction: (next: Transaction) => void;
@@ -35,7 +42,8 @@ function defaultParams() {
 
 export function useTransactionSearch(): TransactionSearchState {
   const [searchText, setSearchText] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState<Dayjs | null>(null);
+  const [dateFrom, setDateFrom] = useState<Dayjs | null>(null);
+  const [dateTo, setDateTo] = useState<Dayjs | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,36 +97,56 @@ export function useTransactionSearch(): TransactionSearchState {
   }, []);
 
   // Explicit search triggered by the Search button (returns when the list fetch finishes).
-  const search = useCallback(async () => {
-    const hasText = searchText.trim().length > 0;
-    const hasMonth = !!selectedMonth;
+  const search = useCallback(
+    async (overrides?: {
+      searchText?: string;
+      dateFrom?: Dayjs | null;
+      dateTo?: Dayjs | null;
+      useDefaultDateRange?: boolean;
+    }) => {
+      const text =
+        overrides?.searchText !== undefined ? overrides.searchText : searchText;
+      const from =
+        overrides?.dateFrom !== undefined ? overrides.dateFrom : dateFrom;
+      const to = overrides?.dateTo !== undefined ? overrides.dateTo : dateTo;
+      const useDefaultDateRange = overrides?.useDefaultDateRange ?? true;
 
-    if (!hasText && !hasMonth) {
-      const defaults = defaultParams();
-      appliedParamsRef.current = defaults;
-      await fetchTransactions(defaults);
-      return;
-    }
+      const hasText = text.trim().length > 0;
+      const hasFrom = !!from;
+      const hasTo = !!to;
 
-    const params: TransactionQueryParams = {
-      customer: hasText ? searchText.trim() : undefined,
-      fromDate: hasMonth
-        ? selectedMonth!.startOf("month").format("YYYY-MM-DD")
-        : undefined,
-      toDate: hasMonth
-        ? selectedMonth!.endOf("month").format("YYYY-MM-DD")
-        : undefined,
-    };
+      if (!hasText && !hasFrom && !hasTo) {
+        if (!useDefaultDateRange) {
+          const params: TransactionQueryParams = {};
+          appliedParamsRef.current = params;
+          await fetchTransactions(params);
+          return;
+        }
 
-    appliedParamsRef.current = params;
-    await fetchTransactions(params);
-  }, [searchText, selectedMonth, fetchTransactions]);
+        const defaults = defaultParams();
+        appliedParamsRef.current = defaults;
+        await fetchTransactions(defaults);
+        return;
+      }
+
+      const params: TransactionQueryParams = {
+        customer: hasText ? text.trim() : undefined,
+        fromDate: hasFrom ? from!.format("YYYY-MM-DD") : undefined,
+        toDate: hasTo ? to!.format("YYYY-MM-DD") : undefined,
+      };
+
+      appliedParamsRef.current = params;
+      await fetchTransactions(params);
+    },
+    [searchText, dateFrom, dateTo, fetchTransactions],
+  );
 
   const clearCustomerAndSearch = useCallback(() => {
     setSearchText("");
 
-    const hasMonth = !!selectedMonth;
-    if (!hasMonth) {
+    const hasFrom = !!dateFrom;
+    const hasTo = !!dateTo;
+    if (!hasFrom && !hasTo) {
       const defaults = defaultParams();
       appliedParamsRef.current = defaults;
       fetchTransactions(defaults);
@@ -127,17 +155,18 @@ export function useTransactionSearch(): TransactionSearchState {
 
     const params: TransactionQueryParams = {
       customer: undefined,
-      fromDate: selectedMonth.startOf("month").format("YYYY-MM-DD"),
-      toDate: selectedMonth.endOf("month").format("YYYY-MM-DD"),
+      fromDate: hasFrom ? dateFrom!.format("YYYY-MM-DD") : undefined,
+      toDate: hasTo ? dateTo!.format("YYYY-MM-DD") : undefined,
     };
 
     appliedParamsRef.current = params;
     fetchTransactions(params);
-  }, [selectedMonth, fetchTransactions]);
+  }, [dateFrom, dateTo, fetchTransactions]);
 
   const clearFilters = useCallback(() => {
     setSearchText("");
-    setSelectedMonth(null);
+    setDateFrom(null);
+    setDateTo(null);
     const defaults = defaultParams();
     appliedParamsRef.current = defaults;
     fetchTransactions(defaults);
@@ -145,12 +174,14 @@ export function useTransactionSearch(): TransactionSearchState {
 
   return {
     searchText,
-    selectedMonth,
+    dateFrom,
+    dateTo,
     transactions,
     loading,
     error,
     setSearchText,
-    setSelectedMonth,
+    setDateFrom,
+    setDateTo,
     search,
     clearCustomerAndSearch,
     clearFilters,
