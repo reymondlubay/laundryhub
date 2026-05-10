@@ -26,7 +26,19 @@ const SettingsDatabasePage = lazy(() => import("./pages/Settings/Database"));
 const SettingsAddonsPricingPage = lazy(
   () => import("./pages/Settings/AddonsPricing"),
 );
-const AuditLogPage = lazy(() => import("./pages/AuditLog/AuditLog"));
+const InventoryItemsPage = lazy(
+  () => import("./pages/Inventory/InventoryItems"),
+);
+const ManageInventoryPage = lazy(
+  () => import("./pages/Inventory/ManageInventory"),
+);
+const StockUsagePage = lazy(() => import("./pages/Inventory/StockUsage"));
+const InventorySummaryPage = lazy(
+  () => import("./pages/Inventory/InventorySummary"),
+);
+const InventoryReportPage = lazy(
+  () => import("./pages/Reports/InventoryReport"),
+);
 
 function App() {
   return (
@@ -83,24 +95,60 @@ function App() {
             }
           />
           <Route
-            path={route.USERS}
+            path={route.INVENTORY_ITEMS}
             element={
               <RoleProtectedRoute>
                 <MainLayout>
                   <Suspense fallback={null}>
-                    <UsersPage />
+                    <InventoryItemsPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>
             }
           />
           <Route
-            path={route.AUDIT_LOG}
+            path={route.INVENTORY_MANAGE}
             element={
               <RoleProtectedRoute>
                 <MainLayout>
                   <Suspense fallback={null}>
-                    <AuditLogPage />
+                    <ManageInventoryPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.INVENTORY_STOCK_USAGE}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <StockUsagePage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.INVENTORY_SUMMARY}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <InventorySummaryPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.USERS}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <UsersPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>
@@ -137,6 +185,18 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <CustomerReportPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.REPORT_INVENTORY}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <InventoryReportPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>

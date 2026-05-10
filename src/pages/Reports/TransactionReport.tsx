@@ -262,6 +262,10 @@ const TransactionReport: React.FC = () => {
   const [backdatePickupRowsPerPage, setBackdatePickupRowsPerPage] =
     React.useState(50);
 
+  /** Cash count vs system (cash-only; excludes GCash). */
+  const [cashPanukliInput, setCashPanukliInput] = React.useState("");
+  const [cashOnHandInput, setCashOnHandInput] = React.useState("");
+
   // Reset pages when filters change
   React.useEffect(() => {
     setLoadPage(0);
@@ -418,6 +422,13 @@ const TransactionReport: React.FC = () => {
     });
   }, [addonsPricing, dateFrom, dateTo, paymentReportRows]);
 
+  const parseMoneyInput = React.useCallback((raw: string): number | null => {
+    const trimmed = raw.trim().replace(/,/g, "");
+    if (trimmed === "") return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }, []);
+
   const paymentSummary = React.useMemo(() => {
     const modeTotals: PaymentModeTotals = { cash: 0, gcash: 0 };
     let totalPayments = 0;
@@ -459,6 +470,36 @@ const TransactionReport: React.FC = () => {
       totalOver,
     };
   }, [addonsPricing, paymentRowsWithRangePayments]);
+
+  const cashReconciliation = React.useMemo(() => {
+    const systemCash = paymentSummary.totalPaymentCash;
+    const panukli = parseMoneyInput(cashPanukliInput);
+    const onHand = parseMoneyInput(cashOnHandInput);
+    if (panukli === null || onHand === null) {
+      return { short: 0, over: 0, countedCash: null as number | null };
+    }
+    const countedCash = onHand - panukli;
+    if (countedCash < systemCash) {
+      return {
+        short: systemCash - countedCash,
+        over: 0,
+        countedCash,
+      };
+    }
+    if (countedCash > systemCash) {
+      return {
+        short: 0,
+        over: countedCash - systemCash,
+        countedCash,
+      };
+    }
+    return { short: 0, over: 0, countedCash };
+  }, [
+    cashOnHandInput,
+    cashPanukliInput,
+    parseMoneyInput,
+    paymentSummary.totalPaymentCash,
+  ]);
 
   const backdatePaymentRows = React.useMemo(() => {
     const range = normalizeRange(dateFrom, dateTo);
@@ -961,6 +1002,40 @@ const TransactionReport: React.FC = () => {
               <Divider sx={{ my: 1 }} />
               <Typography sx={{ fontWeight: 700 }}>
                 Total over - {formatCurrency(paymentSummary.totalOver)}
+              </Typography>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Cash count vs system (excluding GCash)
+              </Typography>
+              <Grid container spacing={2} sx={{ mb: 1 }}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    label="Initials / Panukli"
+                    value={cashPanukliInput}
+                    onChange={(e) => setCashPanukliInput(e.target.value)}
+                    placeholder="0"
+                    size="small"
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    label="Total cash on hand"
+                    value={cashOnHandInput}
+                    onChange={(e) => setCashOnHandInput(e.target.value)}
+                    placeholder="0"
+                    size="small"
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+              </Grid>
+              <Typography sx={{ fontWeight: 700 }}>
+                Short - {formatCurrency(cashReconciliation.short)}
+              </Typography>
+              <Typography sx={{ fontWeight: 700 }}>
+                Over - {formatCurrency(cashReconciliation.over)}
               </Typography>
             </Box>
           </Paper>

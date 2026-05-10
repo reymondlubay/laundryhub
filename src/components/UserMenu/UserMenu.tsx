@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
 import authService from "../../services/authService";
-import { toPascalCase } from "../../utils/stringUtils";
+import { toPascalCase, toTitleCaseWords } from "../../utils/stringUtils";
 
 const UserMenu: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -40,15 +40,16 @@ const UserMenu: React.FC = () => {
       .slice(0, 2);
   };
 
-  const fullName = toPascalCase(
+  const fullName = toTitleCaseWords(
     [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim(),
   );
-  const displayName =
+  const rawDisplayName =
     fullName ||
     user?.name ||
     user?.userName ||
     (user as { username?: string } | null)?.username ||
     "User";
+  const displayName = toTitleCaseWords(String(rawDisplayName || "User").trim());
 
   return (
     <>
@@ -72,7 +73,7 @@ const UserMenu: React.FC = () => {
       >
         <Box sx={{ px: 2, py: 1.5 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-            {displayName}
+            {toPascalCase(displayName)}
           </Typography>
           <Typography variant="caption" sx={{ color: "text.secondary" }}>
             Role: {user?.role || "Unknown"}

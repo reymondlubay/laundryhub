@@ -15,6 +15,7 @@ import {
   TableHead,
   TablePagination,
   TableRow,
+  TableSortLabel,
   TextField,
   Typography,
 } from "@mui/material";
@@ -157,6 +158,25 @@ const CustomerReport: React.FC = () => {
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(20);
 
+  type SortableColumn =
+    | "customerName"
+    | "totalLoads"
+    | "totalPaid"
+    | "balance";
+  type SortOrder = "asc" | "desc";
+  const [sortColumn, setSortColumn] =
+    React.useState<SortableColumn>("customerName");
+  const [sortOrder, setSortOrder] = React.useState<SortOrder>("asc");
+
+  const handleRequestSort = (column: SortableColumn) => {
+    if (sortColumn === column) {
+      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortOrder(column === "customerName" ? "asc" : "desc");
+    }
+  };
+
   React.useEffect(() => {
     setPage(0);
   }, [selectedCustomer, monthFrom, monthTo]);
@@ -270,9 +290,7 @@ const CustomerReport: React.FC = () => {
       rowsByCustomer.set(txCustomerId, current);
     });
 
-    return Array.from(rowsByCustomer.values()).sort((a, b) =>
-      a.customerName.localeCompare(b.customerName),
-    );
+    return Array.from(rowsByCustomer.values());
   }, [
     customers,
     monthFrom,
@@ -283,8 +301,27 @@ const CustomerReport: React.FC = () => {
     addonsPricing,
   ]);
 
+  const sortedReportRows = React.useMemo<CustomerReportRow[]>(() => {
+    const rows = [...reportRows];
+    const direction = sortOrder === "asc" ? 1 : -1;
+
+    rows.sort((a, b) => {
+      if (sortColumn === "customerName") {
+        return direction * a.customerName.localeCompare(b.customerName);
+      }
+      const aValue = a[sortColumn];
+      const bValue = b[sortColumn];
+      if (aValue === bValue) {
+        return a.customerName.localeCompare(b.customerName);
+      }
+      return direction * (aValue - bValue);
+    });
+
+    return rows;
+  }, [reportRows, sortColumn, sortOrder]);
+
   const totals = React.useMemo(() => {
-    return reportRows.reduce(
+    return sortedReportRows.reduce(
       (acc, row) => {
         acc.totalCustomers += 1;
         acc.totalLoads += row.totalLoads;
@@ -294,7 +331,7 @@ const CustomerReport: React.FC = () => {
       },
       { totalCustomers: 0, totalLoads: 0, totalPaid: 0, totalBalance: 0 },
     );
-  }, [reportRows]);
+  }, [sortedReportRows]);
 
   return (
     <Box>
@@ -379,22 +416,63 @@ const CustomerReport: React.FC = () => {
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell>Customer</TableCell>
-                  <TableCell align="right">Total Loads</TableCell>
-                  <TableCell align="right">Total Paid</TableCell>
-                  <TableCell align="right">Balance</TableCell>
+                  <TableCell sortDirection={sortColumn === "customerName" ? sortOrder : false}>
+                    <TableSortLabel
+                      active={sortColumn === "customerName"}
+                      direction={sortColumn === "customerName" ? sortOrder : "asc"}
+                      onClick={() => handleRequestSort("customerName")}
+                    >
+                      Customer
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sortDirection={sortColumn === "totalLoads" ? sortOrder : false}
+                  >
+                    <TableSortLabel
+                      active={sortColumn === "totalLoads"}
+                      direction={sortColumn === "totalLoads" ? sortOrder : "asc"}
+                      onClick={() => handleRequestSort("totalLoads")}
+                    >
+                      Total Loads
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sortDirection={sortColumn === "totalPaid" ? sortOrder : false}
+                  >
+                    <TableSortLabel
+                      active={sortColumn === "totalPaid"}
+                      direction={sortColumn === "totalPaid" ? sortOrder : "asc"}
+                      onClick={() => handleRequestSort("totalPaid")}
+                    >
+                      Total Paid
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sortDirection={sortColumn === "balance" ? sortOrder : false}
+                  >
+                    <TableSortLabel
+                      active={sortColumn === "balance"}
+                      direction={sortColumn === "balance" ? sortOrder : "asc"}
+                      onClick={() => handleRequestSort("balance")}
+                    >
+                      Balance
+                    </TableSortLabel>
+                  </TableCell>
                 </TableRow>
               </TableHead>
 
               <TableBody>
-                {reportRows.length === 0 ? (
+                {sortedReportRows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} align="center">
                       No records found.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  reportRows
+                  sortedReportRows
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((row) => (
                       <TableRow key={row.customerId}>
@@ -418,7 +496,7 @@ const CustomerReport: React.FC = () => {
           <TablePagination
             rowsPerPageOptions={[20, 50, 100, 200]}
             component="div"
-            count={reportRows.length}
+            count={sortedReportRows.length}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={(_, newPage) => setPage(newPage)}

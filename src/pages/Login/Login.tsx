@@ -169,17 +169,7 @@ const Login: React.FC = () => {
             </form>
           )}
 
-          <Typography
-            variant="caption"
-            sx={{
-              display: "block",
-              textAlign: "center",
-              marginTop: 2,
-              color: "text.secondary",
-            }}
-          >
-            Demo: admin / admin123
-          </Typography>
+          {/* Demo credentials removed for production UX */}
         </Paper>
       </Box>
     </Container>
