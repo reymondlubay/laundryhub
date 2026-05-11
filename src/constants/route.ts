@@ -10,6 +10,7 @@ const route = {
   INVENTORY_SUMMARY: "/inventory/summary",
   REPORT_TRANSACTION: "/reports/transaction",
   REPORT_TRANSACTION_SUMMARY: "/reports/transaction-summary",
+  REPORT_TRANSACTION_GRAPH_SUMMARY: "/reports/transaction-graph-summary",
   REPORT_CUSTOMER: "/reports/customer",
   REPORT_INVENTORY: "/reports/inventory",
   USERS: "/users",
