@@ -9,6 +9,7 @@ export const API_ROUTES = {
   STOCK_USAGE_RECORDS: "/stock-usage-records",
   BACKUP: "/backup",
   BACKUP_UPLOAD: "/backup/upload",
+  BACKUP_FOLDER_PATHS: "/backup/folder-paths",
   BACKUPS: "/backups",
   RESTORE: "/restore",
   ADDONS_PRICING: "/addons-pricing",
