@@ -1,4 +1,5 @@
 import {
+  Box,
   Dialog,
   DialogContent,
   Grid,
@@ -406,6 +407,43 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     // Prevent mouse-wheel from stepping number inputs.
     (e.target as HTMLInputElement).blur();
   };
+
+  const kgTooltipContent = (
+    <Box sx={{ p: 0.5 }}>
+      <Typography
+        variant="caption"
+        sx={{
+          display: "block",
+          fontWeight: 700,
+          fontSize: 13,
+          mb: 0.5,
+          letterSpacing: 0.3,
+        }}
+      >
+        KG fraction guide
+      </Typography>
+      <Box sx={{ fontSize: 13, lineHeight: 1.6 }}>
+        <Box>1/4 = .25</Box>
+        <Box>1/2 = .50</Box>
+        <Box>3/4 = .75</Box>
+      </Box>
+    </Box>
+  );
+
+  const kgTooltipSlotProps = {
+    tooltip: {
+      sx: {
+        bgcolor: "rgba(33, 33, 33, 0.95)",
+        color: "#fff",
+        fontSize: 13,
+        maxWidth: 240,
+        px: 1.25,
+        py: 1,
+        boxShadow: 3,
+      },
+    },
+    arrow: { sx: { color: "rgba(33, 33, 33, 0.95)" } },
+  } as const;
 
   const handleCreateCustomer = async (
     setFieldValue: (
@@ -853,34 +891,45 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                   </Grid>
 
                                   <Grid size={{ xs: 4, sm: 3 }}>
-                                    <TextField
-                                      label="KG"
-                                      size="small"
-                                      type="number"
-                                      fullWidth
-                                      disabled={item.type === "Comforter"}
-                                      value={item.kg === 0 ? "" : item.kg}
-                                      onChange={(e) =>
-                                        setFieldValue(
-                                          `items[${index}].kg`,
-                                          sanitizeNumber(e.target.value),
-                                        )
-                                      }
-                                      error={kgTouched && !!kgError}
-                                      helperText={kgTouched ? kgError : ""}
-                                      sx={numberInputSx}
-                                      inputProps={{ onWheel: preventWheelStep }}
-                                      slotProps={{
-                                        input: {
-                                          // Targets the Input component
-                                          endAdornment: (
-                                            <InputAdornment position="start">
-                                              kg
-                                            </InputAdornment>
-                                          ),
-                                        },
-                                      }}
-                                    />
+                                    <Tooltip
+                                      title={kgTooltipContent}
+                                      placement="top"
+                                      arrow
+                                      disableHoverListener
+                                      disableTouchListener
+                                      slotProps={kgTooltipSlotProps}
+                                    >
+                                      <TextField
+                                        label="KG"
+                                        size="small"
+                                        type="number"
+                                        fullWidth
+                                        disabled={item.type === "Comforter"}
+                                        value={item.kg === 0 ? "" : item.kg}
+                                        onChange={(e) =>
+                                          setFieldValue(
+                                            `items[${index}].kg`,
+                                            sanitizeNumber(e.target.value),
+                                          )
+                                        }
+                                        error={kgTouched && !!kgError}
+                                        helperText={kgTouched ? kgError : ""}
+                                        sx={numberInputSx}
+                                        inputProps={{
+                                          onWheel: preventWheelStep,
+                                        }}
+                                        slotProps={{
+                                          input: {
+                                            // Targets the Input component
+                                            endAdornment: (
+                                              <InputAdornment position="start">
+                                                kg
+                                              </InputAdornment>
+                                            ),
+                                          },
+                                        }}
+                                      />
+                                    </Tooltip>
                                   </Grid>
 
                                   <Grid size={{ xs: 4, sm: 2 }}>
