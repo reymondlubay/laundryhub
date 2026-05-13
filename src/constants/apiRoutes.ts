@@ -7,6 +7,8 @@ export const API_ROUTES = {
   INVENTORY_ITEMS: "/inventory-items",
   INVENTORY_RECORDS: "/inventory-records",
   STOCK_USAGE_RECORDS: "/stock-usage-records",
+  EXPENSE_ITEMS: "/expense-items",
+  EXPENSE_RECORDS: "/expense-records",
   BACKUP: "/backup",
   BACKUP_UPLOAD: "/backup/upload",
   BACKUP_FOLDER_PATHS: "/backup/folder-paths",

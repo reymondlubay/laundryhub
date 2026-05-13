@@ -42,6 +42,10 @@ const InventorySummaryPage = lazy(
 const InventoryReportPage = lazy(
   () => import("./pages/Reports/InventoryReport"),
 );
+const ExpenseItemsPage = lazy(() => import("./pages/Expenses/ExpenseItems"));
+const RecordExpensePage = lazy(() => import("./pages/Expenses/RecordExpense"));
+const ExpensesReportPage = lazy(() => import("./pages/Reports/ExpensesReport"));
+const SalesReportPage = lazy(() => import("./pages/Reports/SalesReport"));
 
 function App() {
   return (
@@ -146,6 +150,30 @@ function App() {
             }
           />
           <Route
+            path={route.EXPENSES_ITEMS}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <ExpenseItemsPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.EXPENSES_RECORDS}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <RecordExpensePage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
             path={route.USERS}
             element={
               <RoleProtectedRoute>
@@ -212,6 +240,30 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <InventoryReportPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.REPORT_EXPENSES}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <ExpensesReportPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.REPORT_SALES}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <SalesReportPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>

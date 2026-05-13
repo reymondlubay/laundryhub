@@ -28,6 +28,9 @@ import inventoryRecordService, {
 import stockUsageService, {
   type StockUsageRecord,
 } from "../../services/stockUsageService";
+import expenseRecordService, {
+  type ExpenseRecord,
+} from "../../services/expenseRecordService";
 import { computeFifoUsageCosts } from "../../utils/inventoryFifo";
 
 type ReportRow = {
@@ -66,6 +69,7 @@ const InventoryReport: React.FC = () => {
     [],
   );
   const [usageRecords, setUsageRecords] = React.useState<StockUsageRecord[]>([]);
+  const [expenseRecords, setExpenseRecords] = React.useState<ExpenseRecord[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -78,14 +82,16 @@ const InventoryReport: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const [lookupItems, inv, usage] = await Promise.all([
+        const [lookupItems, inv, usage, expenses] = await Promise.all([
           inventoryItemService.getAllForLookup(),
           inventoryRecordService.getAll(),
           stockUsageService.getAll(),
+          expenseRecordService.getAll(),
         ]);
         setItems(lookupItems);
         setInventoryRecords(inv);
         setUsageRecords(usage);
+        setExpenseRecords(expenses);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to load inventory report.");
       } finally {
@@ -102,11 +108,26 @@ const InventoryReport: React.FC = () => {
     return map;
   }, [items]);
 
+  // Inventory-sourced expense records are functionally identical to stock usage
+  // for FIFO costing and internal/external reporting, so we merge them here.
+  const allConsumption = React.useMemo<StockUsageRecord[]>(() => {
+    const fromExpenses: StockUsageRecord[] = expenseRecords
+      .filter((r) => r.source === "inventory" && r.inventoryItemId)
+      .map((r) => ({
+        id: r.id,
+        itemId: r.inventoryItemId as string,
+        date: r.date,
+        pieces: Number(r.pieces) || 0,
+        isExternalUsage: Boolean(r.isExternalUsage),
+      }));
+    return [...usageRecords, ...fromExpenses];
+  }, [usageRecords, expenseRecords]);
+
   const reportRows = React.useMemo<ReportRow[]>(() => {
     const range = normalizeRange(dateFrom, dateTo);
 
     // FIFO needs usages up to `to` (and before-from to prime the lot consumption).
-    const usagesUpToTo = usageRecords.filter((u) =>
+    const usagesUpToTo = allConsumption.filter((u) =>
       isWithinRange(u.date, dayjs("1970-01-01"), range.to),
     );
 
@@ -115,7 +136,7 @@ const InventoryReport: React.FC = () => {
       stockUsageRecords: usagesUpToTo,
     });
 
-    const inRange = usageRecords.filter((u) =>
+    const inRange = allConsumption.filter((u) =>
       isWithinRange(u.date, range.from, range.to),
     );
 
@@ -145,12 +166,12 @@ const InventoryReport: React.FC = () => {
 
     rows.sort((a, b) => a.itemName.localeCompare(b.itemName));
     return rows;
-  }, [dateFrom, dateTo, inventoryRecords, itemById, selectedItemId, usageRecords]);
+  }, [dateFrom, dateTo, inventoryRecords, itemById, selectedItemId, allConsumption]);
 
   const externalReportRows = React.useMemo<ReportRow[]>(() => {
     const range = normalizeRange(dateFrom, dateTo);
 
-    const usagesUpToTo = usageRecords.filter((u) =>
+    const usagesUpToTo = allConsumption.filter((u) =>
       isWithinRange(u.date, dayjs("1970-01-01"), range.to),
     );
 
@@ -159,7 +180,7 @@ const InventoryReport: React.FC = () => {
       stockUsageRecords: usagesUpToTo,
     });
 
-    const inRange = usageRecords.filter((u) =>
+    const inRange = allConsumption.filter((u) =>
       isWithinRange(u.date, range.from, range.to),
     );
 
@@ -189,7 +210,7 @@ const InventoryReport: React.FC = () => {
 
     rows.sort((a, b) => a.itemName.localeCompare(b.itemName));
     return rows;
-  }, [dateFrom, dateTo, inventoryRecords, itemById, selectedItemId, usageRecords]);
+  }, [dateFrom, dateTo, inventoryRecords, itemById, selectedItemId, allConsumption]);
 
   const totals = React.useMemo(() => {
     return reportRows.reduce(

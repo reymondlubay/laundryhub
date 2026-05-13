@@ -1,0 +1,805 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Autocomplete,
+  Box,
+  Button,
+  Checkbox,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  FormControlLabel,
+  Grid,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TablePagination,
+  TableRow,
+  TextField,
+  Typography,
+} from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs, { type Dayjs } from "dayjs";
+import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog";
+import {
+  TableHeaderSkeleton,
+  TableSkeleton,
+} from "../../components/Skeletons/SkeletonComponents";
+import { API_ERRORS, UI_TEXT } from "../../constants/messages";
+import inventoryItemService, {
+  type InventoryItem,
+} from "../../services/inventoryItemService";
+import inventoryRecordService, {
+  type InventoryRecord,
+} from "../../services/inventoryRecordService";
+import stockUsageService, {
+  type StockUsageRecord,
+} from "../../services/stockUsageService";
+import expenseItemService, {
+  type ExpenseItem,
+} from "../../services/expenseItemService";
+import expenseRecordService, {
+  type CreateExpenseRecordPayload,
+  type ExpenseRecord,
+  type UpdateExpenseRecordPayload,
+} from "../../services/expenseRecordService";
+import { isAdmin } from "../../utils/roleAccess";
+
+type ExpenseOption = {
+  key: string;
+  type: "inventory" | "expense";
+  id: string;
+  name: string;
+  label: string;
+};
+
+type FormState = {
+  option: ExpenseOption | null;
+  date: Dayjs;
+  pieces: string;
+  amount: string;
+  isExternalUsage: boolean;
+  notes: string;
+};
+
+const emptyForm = (): FormState => ({
+  option: null,
+  date: dayjs(),
+  pieces: "",
+  amount: "",
+  isExternalUsage: false,
+  notes: "",
+});
+
+type SourceFilter = "all" | "inventory" | "expense";
+type UsageTypeFilter = "all" | "internal" | "external";
+
+const phpFormatter = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+});
+
+const RecordExpensePage: React.FC = () => {
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [expenseItems, setExpenseItems] = useState<ExpenseItem[]>([]);
+  const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>(
+    [],
+  );
+  const [stockUsageRecords, setStockUsageRecords] = useState<StockUsageRecord[]>(
+    [],
+  );
+  const [records, setRecords] = useState<ExpenseRecord[]>([]);
+
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<ExpenseRecord | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm);
+
+  const [filterSource, setFilterSource] = useState<SourceFilter>("all");
+  const [filterUsageType, setFilterUsageType] = useState<UsageTypeFilter>("all");
+
+  const isCurrentUserAdmin = useMemo(() => isAdmin(), []);
+
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
+
+  const inventoryItemById = useMemo(() => {
+    const map = new Map<string, InventoryItem>();
+    inventoryItems.forEach((i) => map.set(i.id, i));
+    return map;
+  }, [inventoryItems]);
+
+  const expenseItemById = useMemo(() => {
+    const map = new Map<string, ExpenseItem>();
+    expenseItems.forEach((i) => map.set(i.id, i));
+    return map;
+  }, [expenseItems]);
+
+  const latestPriceByItemId = useMemo(() => {
+    const map = new Map<string, number>();
+    const seenByItem = new Map<
+      string,
+      { dateOfPrice: number; createdAt: number; pricePerPiece: number }
+    >();
+    inventoryRecords.forEach((rec) => {
+      const dop = dayjs(rec.dateOfPrice || rec.date || 0).valueOf() || 0;
+      const ca = dayjs(rec.createdAt || rec.date || 0).valueOf() || 0;
+      const prev = seenByItem.get(rec.itemId);
+      if (
+        !prev ||
+        dop > prev.dateOfPrice ||
+        (dop === prev.dateOfPrice && ca > prev.createdAt)
+      ) {
+        seenByItem.set(rec.itemId, {
+          dateOfPrice: dop,
+          createdAt: ca,
+          pricePerPiece: Number(rec.pricePerPiece) || 0,
+        });
+      }
+    });
+    seenByItem.forEach((v, k) => map.set(k, v.pricePerPiece));
+    return map;
+  }, [inventoryRecords]);
+
+  const visibleExpenseItems = useMemo(() => {
+    if (isCurrentUserAdmin) return expenseItems;
+    return expenseItems.filter((it) => !it.isAdminOnly);
+  }, [expenseItems, isCurrentUserAdmin]);
+
+  const combinedOptions = useMemo<ExpenseOption[]>(() => {
+    const invOptions: ExpenseOption[] = inventoryItems.map((it) => ({
+      key: `inventory:${it.id}`,
+      type: "inventory",
+      id: it.id,
+      name: it.name || "",
+      label: `[Inventory] ${it.name || ""}`,
+    }));
+    const expOptions: ExpenseOption[] = visibleExpenseItems.map((it) => ({
+      key: `expense:${it.id}`,
+      type: "expense",
+      id: it.id,
+      name: it.name || "",
+      label: `[Expense] ${it.name || ""}`,
+    }));
+    return [...invOptions, ...expOptions].sort((a, b) =>
+      a.label.localeCompare(b.label),
+    );
+  }, [inventoryItems, visibleExpenseItems]);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [invItems, expItems, invRecs, usageRecs, expRecs] =
+        await Promise.all([
+          inventoryItemService.getAllForLookup(),
+          expenseItemService.getAllForLookup(),
+          inventoryRecordService.getAll(),
+          stockUsageService.getAll(),
+          expenseRecordService.getAll(),
+        ]);
+      setInventoryItems(invItems);
+      setExpenseItems(expItems);
+      setInventoryRecords(invRecs);
+      setStockUsageRecords(usageRecs);
+      setRecords(expRecs);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : API_ERRORS.SAVE_FAILED);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const unsubInv = inventoryItemService.subscribeToLookup((next) =>
+      setInventoryItems(next),
+    );
+    const unsubExp = expenseItemService.subscribeToLookup((next) =>
+      setExpenseItems(next),
+    );
+    return () => {
+      unsubInv();
+      unsubExp();
+    };
+  }, [load]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [records.length]);
+
+  const selectedAvailablePieces = useMemo<number | null>(() => {
+    if (form.option?.type !== "inventory") return null;
+    const itemId = form.option.id;
+    const purchased = inventoryRecords.reduce(
+      (sum, row) =>
+        row.itemId === itemId ? sum + (Number(row.pieces) || 0) : sum,
+      0,
+    );
+    const legacyUsed = stockUsageRecords.reduce(
+      (sum, row) =>
+        row.itemId === itemId ? sum + (Number(row.pieces) || 0) : sum,
+      0,
+    );
+    const expensed = records.reduce((sum, row) => {
+      if (row.source !== "inventory") return sum;
+      if (row.inventoryItemId !== itemId) return sum;
+      // When editing, don't count the row currently being edited.
+      if (editing && row.id === editing.id) return sum;
+      return sum + (Number(row.pieces) || 0);
+    }, 0);
+    return Math.max(0, purchased - legacyUsed - expensed);
+  }, [editing, form.option, inventoryRecords, records, stockUsageRecords]);
+
+  const computedAmountPreview = useMemo<number | null>(() => {
+    if (form.option?.type !== "inventory") return null;
+    const pieces = Number(form.pieces);
+    if (!Number.isFinite(pieces) || pieces <= 0) return null;
+    const price = latestPriceByItemId.get(form.option.id);
+    if (price == null) return null;
+    return Number((pieces * price).toFixed(2));
+  }, [form.option, form.pieces, latestPriceByItemId]);
+
+  const filteredRecords = useMemo(() => {
+    const bySource =
+      filterSource === "all"
+        ? records
+        : records.filter((r) => r.source === filterSource);
+    if (filterUsageType === "internal") {
+      return bySource.filter((r) => !r.isExternalUsage);
+    }
+    if (filterUsageType === "external") {
+      return bySource.filter((r) => Boolean(r.isExternalUsage));
+    }
+    return bySource;
+  }, [filterSource, filterUsageType, records]);
+
+  const paged = useMemo(() => {
+    return filteredRecords.slice(
+      page * rowsPerPage,
+      page * rowsPerPage + rowsPerPage,
+    );
+  }, [filteredRecords, page, rowsPerPage]);
+
+  const renderExpenseName = (record: ExpenseRecord): string => {
+    if (record.source === "inventory" && record.inventoryItemId) {
+      const item = inventoryItemById.get(record.inventoryItemId);
+      return `[Inventory] ${item?.name || "-"}`;
+    }
+    if (record.source === "expense" && record.expenseItemId) {
+      const item = expenseItemById.get(record.expenseItemId);
+      return `[Expense] ${item?.name || "-"}`;
+    }
+    return "-";
+  };
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm());
+    setDialogError(null);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (record: ExpenseRecord) => {
+    let option: ExpenseOption | null = null;
+    if (record.source === "inventory" && record.inventoryItemId) {
+      const item = inventoryItemById.get(record.inventoryItemId);
+      option = item
+        ? {
+            key: `inventory:${item.id}`,
+            type: "inventory",
+            id: item.id,
+            name: item.name || "",
+            label: `[Inventory] ${item.name || ""}`,
+          }
+        : null;
+    } else if (record.source === "expense" && record.expenseItemId) {
+      const item = expenseItemById.get(record.expenseItemId);
+      option = item
+        ? {
+            key: `expense:${item.id}`,
+            type: "expense",
+            id: item.id,
+            name: item.name || "",
+            label: `[Expense] ${item.name || ""}`,
+          }
+        : null;
+    }
+    setEditing(record);
+    setForm({
+      option,
+      date: dayjs(record.date || new Date()),
+      pieces: record.pieces == null ? "" : String(record.pieces),
+      amount: record.amount == null ? "" : String(record.amount),
+      isExternalUsage: Boolean(record.isExternalUsage),
+      notes: record.notes || "",
+    });
+    setDialogError(null);
+    setDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+    setEditing(null);
+    setForm(emptyForm());
+    setDialogError(null);
+  };
+
+  const validateForm = (): string | null => {
+    if (!form.option) return "Expense Name is required.";
+    if (!form.date || !form.date.isValid()) return "Date is required.";
+
+    if (form.option.type === "inventory") {
+      const pieces = Number(form.pieces);
+      if (!Number.isFinite(pieces) || pieces <= 0) {
+        return "Pieces must be 1 or more.";
+      }
+      if (
+        typeof selectedAvailablePieces === "number" &&
+        pieces > selectedAvailablePieces
+      ) {
+        return `Pieces should not be greater than the available stocks (${selectedAvailablePieces}).`;
+      }
+    } else {
+      const amount = Number(form.amount);
+      if (!Number.isFinite(amount) || amount < 0) {
+        return "Amount must be 0 or more.";
+      }
+    }
+    return null;
+  };
+
+  const handleSubmit = async () => {
+    const validationError = validateForm();
+    if (validationError) {
+      setDialogError(validationError);
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setDialogError(null);
+      setError(null);
+
+      if (editing) {
+        const payload: UpdateExpenseRecordPayload =
+          form.option!.type === "inventory"
+            ? {
+                source: "inventory",
+                inventoryItemId: form.option!.id,
+                expenseItemId: null,
+                date: form.date.toISOString(),
+                pieces: Number(form.pieces),
+                amount: null,
+                isExternalUsage: Boolean(form.isExternalUsage),
+                notes: form.notes.trim() || null,
+              }
+            : {
+                source: "expense",
+                inventoryItemId: null,
+                expenseItemId: form.option!.id,
+                date: form.date.toISOString(),
+                pieces: null,
+                amount: Number(form.amount),
+                isExternalUsage: Boolean(form.isExternalUsage),
+                notes: form.notes.trim() || null,
+              };
+        await expenseRecordService.update(editing.id, payload);
+      } else {
+        const payload: CreateExpenseRecordPayload =
+          form.option!.type === "inventory"
+            ? {
+                source: "inventory",
+                inventoryItemId: form.option!.id,
+                date: form.date.toISOString(),
+                pieces: Number(form.pieces),
+                isExternalUsage: Boolean(form.isExternalUsage),
+                notes: form.notes.trim() || undefined,
+              }
+            : {
+                source: "expense",
+                expenseItemId: form.option!.id,
+                date: form.date.toISOString(),
+                amount: Number(form.amount),
+                isExternalUsage: Boolean(form.isExternalUsage),
+                notes: form.notes.trim() || undefined,
+              };
+        await expenseRecordService.create(payload);
+      }
+
+      closeDialog();
+      await load();
+    } catch (err: unknown) {
+      setDialogError(err instanceof Error ? err.message : API_ERRORS.SAVE_FAILED);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteId) return;
+    try {
+      setError(null);
+      await expenseRecordService.delete(deleteId);
+      setDeleteId(null);
+      await load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : API_ERRORS.SAVE_FAILED);
+      setDeleteId(null);
+    }
+  };
+
+  const sourceType = form.option?.type ?? null;
+  const isInventory = sourceType === "inventory";
+  const isExpense = sourceType === "expense";
+
+  return (
+    <Box>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        gap={2}
+        flexWrap="wrap"
+        sx={{ mb: 2 }}
+      >
+        <Typography variant="h6">Record Expense</Typography>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel id="expense-source-filter-label">Source</InputLabel>
+            <Select
+              labelId="expense-source-filter-label"
+              label="Source"
+              value={filterSource}
+              onChange={(e) => setFilterSource(e.target.value as SourceFilter)}
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="inventory">Inventory</MenuItem>
+              <MenuItem value="expense">Expense</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel id="expense-type-filter-label">Type</InputLabel>
+            <Select
+              labelId="expense-type-filter-label"
+              label="Type"
+              value={filterUsageType}
+              onChange={(e) =>
+                setFilterUsageType(e.target.value as UsageTypeFilter)
+              }
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="internal">Internal</MenuItem>
+              <MenuItem value="external">External</MenuItem>
+            </Select>
+          </FormControl>
+          <Button variant="contained" onClick={openCreate} disabled={loading}>
+            Record Expense
+          </Button>
+        </Stack>
+      </Stack>
+
+      {error ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      ) : null}
+
+      <Paper>
+        {loading ? (
+          <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+            <Table size="small" stickyHeader>
+              <TableHeaderSkeleton columns={7} />
+              <TableSkeleton columns={7} rows={8} />
+            </Table>
+          </TableContainer>
+        ) : (
+          <>
+            <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Expense Name</TableCell>
+                    <TableCell>Date</TableCell>
+                    <TableCell align="right">Pieces</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                    <TableCell align="center">Not internal usage</TableCell>
+                    <TableCell>Notes</TableCell>
+                    <TableCell align="right">Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {paged.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center">
+                        No expense records.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paged.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{renderExpenseName(record)}</TableCell>
+                        <TableCell>
+                          {dayjs(record.date).isValid()
+                            ? dayjs(record.date).format("MM-DD-YY h:mm A")
+                            : "-"}
+                        </TableCell>
+                        <TableCell align="right">
+                          {record.source === "inventory" && record.pieces != null
+                            ? record.pieces
+                            : "-"}
+                        </TableCell>
+                        <TableCell align="right">
+                          {record.amount != null
+                            ? phpFormatter.format(Number(record.amount))
+                            : "-"}
+                        </TableCell>
+                        <TableCell align="center">
+                          {record.isExternalUsage ? "Yes" : "No"}
+                        </TableCell>
+                        <TableCell>{record.notes || "-"}</TableCell>
+                        <TableCell align="right">
+                          <IconButton
+                            color="success"
+                            onClick={() => openEdit(record)}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            color="error"
+                            onClick={() => setDeleteId(record.id)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <TablePagination
+              rowsPerPageOptions={[25, 50, 100, 200]}
+              component="div"
+              count={filteredRecords.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={(_, newPage) => setPage(newPage)}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(parseInt(event.target.value, 10));
+                setPage(0);
+              }}
+            />
+          </>
+        )}
+      </Paper>
+
+      <ConfirmDialog
+        open={Boolean(deleteId)}
+        title="Confirm Delete"
+        message="Are you sure you want to delete this expense record?"
+        confirmText={UI_TEXT.DELETE}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDeleteConfirm}
+      />
+
+      <Dialog
+        open={dialogOpen}
+        onClose={closeDialog}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ component: "form", autoComplete: "off" }}
+      >
+        <DialogTitle
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1.5,
+            minWidth: 0,
+            flexWrap: "wrap",
+          }}
+        >
+          {editing ? "Edit Expense Record" : "Add Expense Record"}
+          {isInventory && typeof selectedAvailablePieces === "number" ? (
+            <Chip
+              label={`Available: ${selectedAvailablePieces}`}
+              sx={(theme) => ({
+                height: 34,
+                px: 0.75,
+                borderRadius: 0,
+                fontWeight: 700,
+                fontSize: "0.9rem",
+                letterSpacing: 0.05,
+                borderWidth: 1,
+                borderStyle: "solid",
+                borderColor:
+                  theme.palette.mode === "dark"
+                    ? "rgba(255,255,255,0.35)"
+                    : theme.palette.primary.main,
+                bgcolor:
+                  theme.palette.mode === "dark"
+                    ? "#000"
+                    : "rgba(232, 238, 245, 0.95)",
+                color:
+                  theme.palette.mode === "dark"
+                    ? "rgba(255,255,255,0.95)"
+                    : theme.palette.text.primary,
+                "& .MuiChip-label": {
+                  px: 1,
+                  py: 0,
+                },
+              })}
+            />
+          ) : null}
+        </DialogTitle>
+        <DialogContent>
+          {dialogError ? (
+            <Alert severity="error" sx={{ mb: 1 }}>
+              {dialogError}
+            </Alert>
+          ) : null}
+
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <Grid container spacing={2} sx={{ mt: 0.5 }}>
+              <Grid size={12}>
+                <Autocomplete
+                  options={combinedOptions}
+                  value={form.option}
+                  onChange={(_, value) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      option: value,
+                      pieces: "",
+                      amount: "",
+                    }))
+                  }
+                  isOptionEqualToValue={(option, value) =>
+                    option.key === value.key
+                  }
+                  getOptionLabel={(option) => option.label || ""}
+                  groupBy={(option) =>
+                    option.type === "inventory" ? "Inventory" : "Expense"
+                  }
+                  renderInput={(params) => (
+                    <TextField {...params} label="Expense Name" size="small" />
+                  )}
+                />
+              </Grid>
+
+              <Grid size={12}>
+                <DateTimePicker
+                  label="Date"
+                  value={form.date}
+                  onChange={(value) =>
+                    setForm((prev) => ({ ...prev, date: value || dayjs() }))
+                  }
+                  disabled={!form.option}
+                  slotProps={{
+                    textField: { fullWidth: true, size: "small" },
+                  }}
+                />
+              </Grid>
+
+              <Grid size={12}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Pieces"
+                  value={isInventory ? form.pieces : ""}
+                  disabled={!isInventory}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, pieces: e.target.value }))
+                  }
+                  inputProps={{
+                    min: 1,
+                    ...(typeof selectedAvailablePieces === "number"
+                      ? { max: selectedAvailablePieces }
+                      : {}),
+                  }}
+                  error={
+                    isInventory &&
+                    typeof selectedAvailablePieces === "number" &&
+                    Number(form.pieces || 0) > selectedAvailablePieces
+                  }
+                  helperText={
+                    isInventory &&
+                    typeof selectedAvailablePieces === "number" &&
+                    Number(form.pieces || 0) > selectedAvailablePieces
+                      ? `Cannot exceed available stocks (${selectedAvailablePieces}).`
+                      : isInventory && computedAmountPreview != null
+                        ? `Amount preview: ${phpFormatter.format(
+                            computedAmountPreview,
+                          )} (auto-calculated on save)`
+                        : isInventory
+                          ? "Amount is auto-calculated from latest inventory price on save."
+                          : ""
+                  }
+                />
+              </Grid>
+
+              <Grid size={12}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Amount"
+                  value={isExpense ? form.amount : ""}
+                  disabled={!isExpense}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, amount: e.target.value }))
+                  }
+                  inputProps={{ min: 0, step: "0.01" }}
+                />
+              </Grid>
+
+              <Grid size={12}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Notes"
+                  multiline
+                  rows={2}
+                  value={form.notes}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, notes: e.target.value }))
+                  }
+                />
+              </Grid>
+
+              <Grid size={12}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={form.isExternalUsage}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          isExternalUsage: e.target.checked,
+                        }))
+                      }
+                    />
+                  }
+                  label="Is not internal usage"
+                />
+              </Grid>
+            </Grid>
+          </LocalizationProvider>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDialog} disabled={submitting}>
+            {UI_TEXT.CANCEL}
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            disabled={submitting}
+          >
+            {submitting ? UI_TEXT.SAVING : UI_TEXT.SAVE}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default RecordExpensePage;

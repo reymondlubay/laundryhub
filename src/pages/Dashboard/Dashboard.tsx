@@ -42,6 +42,8 @@ type DashboardCard = {
   key: string;
   title: string;
   value: number;
+  secondaryValue?: number;
+  secondaryLabel?: string;
   icon: React.ReactNode;
   iconBg: string;
   iconColor: string;
@@ -343,6 +345,15 @@ const Dashboard = () => {
     [pickupTodayTransactions],
   );
 
+  const readyForPickupTotalLoads = React.useMemo(
+    () =>
+      readyForPickupTransactions.reduce(
+        (sum, transaction) => sum + getTransactionLoads(transaction),
+        0,
+      ),
+    [readyForPickupTransactions],
+  );
+
   const cards: DashboardCard[] = [
     {
       key: "todays-transaction",
@@ -396,6 +407,8 @@ const Dashboard = () => {
       key: "ready-for-pickup",
       title: "Ready for Pickup",
       value: metrics.readyForPickupCount,
+      secondaryValue: readyForPickupTotalLoads,
+      secondaryLabel: "Transactions | Loads",
       icon: <CheckCircleOutlineIcon />,
       iconBg: "#e8f7f1",
       iconColor: "#1d9a72",
@@ -600,7 +613,40 @@ const Dashboard = () => {
                       }}
                     >
                       <AnimatedCount value={card.value} />
+                      {typeof card.secondaryValue === "number" ? (
+                        <>
+                          <Box
+                            component="span"
+                            sx={{
+                              mx: { xs: 0.6, sm: 0.85 },
+                              color: titleColor,
+                              fontWeight: 500,
+                            }}
+                          >
+                            |
+                          </Box>
+                          <AnimatedCount value={card.secondaryValue} />
+                        </>
+                      ) : null}
                     </Typography>
+                    {card.secondaryLabel ? (
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          display: "block",
+                          color: titleColor,
+                          fontWeight: 500,
+                          mt: 0.35,
+                          lineHeight: 1.1,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          fontSize: { xs: "0.65rem", sm: "0.7rem" },
+                        }}
+                      >
+                        {card.secondaryLabel}
+                      </Typography>
+                    ) : null}
                   </Box>
                 </Paper>
               </Grid>
@@ -1011,7 +1057,8 @@ const Dashboard = () => {
                       textAlign: "right",
                     }}
                   >
-                    Total: {readyForPickupTransactions.length}
+                    Transactions: {readyForPickupTransactions.length} | Loads:{" "}
+                    {readyForPickupTotalLoads}
                   </Typography>
                 </Stack>
                 <TableContainer sx={{ maxHeight: "35vh" }}>
