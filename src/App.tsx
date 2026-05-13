@@ -21,6 +21,9 @@ const TransactionReportPage = lazy(
 const TransactionSummaryPage = lazy(
   () => import("./pages/Reports/TransactionSummary"),
 );
+const TransactionGraphSummaryPage = lazy(
+  () => import("./pages/Reports/TransactionGraphSummary"),
+);
 const CustomerReportPage = lazy(() => import("./pages/Reports/CustomerReport"));
 const SettingsDatabasePage = lazy(() => import("./pages/Settings/Database"));
 const SettingsAddonsPricingPage = lazy(
@@ -173,6 +176,18 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <TransactionSummaryPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.REPORT_TRANSACTION_GRAPH_SUMMARY}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <TransactionGraphSummaryPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>

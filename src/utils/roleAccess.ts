@@ -19,6 +19,7 @@ const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
     "/inventory/summary",
     "/reports/transaction",
     "/reports/transaction-summary",
+    "/reports/transaction-graph-summary",
     "/reports/customer",
     "/reports/inventory",
     "/users",
@@ -29,11 +30,7 @@ const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
     "/dashboard",
     "/transaction",
     "/customer",
-    "/inventory",
-    "/inventory/items",
-    "/inventory/manage",
-    "/inventory/stock-usage",
-    "/inventory/summary",
+    "/settings/database",
   ],
 };
 

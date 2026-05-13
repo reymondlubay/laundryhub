@@ -1,3 +1,4 @@
+import { isAxiosError } from "axios";
 import axiosClient from "./axiosClient";
 import API_ROUTES from "../constants/apiRoutes";
 
@@ -11,6 +12,21 @@ export type BackupItem = {
   status: BackupStatus;
   error_message?: string | null;
   created_at: string;
+};
+
+export type BackupFolderPathItem = {
+  id: string;
+  folder_path: string;
+  created_at: string;
+};
+
+const normalizeFolderPath = (raw: unknown): BackupFolderPathItem => {
+  const item = raw as Record<string, unknown>;
+  return {
+    id: String(item.id ?? ""),
+    folder_path: String(item.folder_path ?? item.folderPath ?? ""),
+    created_at: String(item.created_at ?? item.createdAt ?? ""),
+  };
 };
 
 const normalizeBackup = (raw: unknown): BackupItem => {
@@ -27,10 +43,62 @@ const normalizeBackup = (raw: unknown): BackupItem => {
 };
 
 const backupService = {
-  createBackup: async (folderPath?: string): Promise<void> => {
-    await axiosClient.post(API_ROUTES.BACKUP, {
-      folderPath: folderPath?.trim() || undefined,
+  createBackup: async (
+    folderPath?: string,
+  ): Promise<{
+    skippedFolders?: { path: string; reason: string }[];
+  }> => {
+    try {
+      const { data } = await axiosClient.post(API_ROUTES.BACKUP, {
+        folderPath: folderPath?.trim() || undefined,
+      });
+      const skipped = Array.isArray(data.backup?.skippedFolders)
+        ? (data.backup.skippedFolders as { path: string; reason: string }[])
+        : undefined;
+      return { skippedFolders: skipped };
+    } catch (err: unknown) {
+      if (isAxiosError(err)) {
+        const body = err.response?.data as { message?: string } | undefined;
+        if (body?.message) {
+          throw new Error(body.message);
+        }
+      }
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+  },
+
+  getBackupFolderPaths: async (): Promise<BackupFolderPathItem[]> => {
+    const { data } = await axiosClient.get(API_ROUTES.BACKUP_FOLDER_PATHS);
+    const list = Array.isArray(data.folderPaths)
+      ? data.folderPaths
+      : Array.isArray(data.data)
+        ? data.data
+        : [];
+    return list.map(normalizeFolderPath);
+  },
+
+  addBackupFolderPath: async (
+    folderPath: string,
+  ): Promise<BackupFolderPathItem> => {
+    const { data } = await axiosClient.post(API_ROUTES.BACKUP_FOLDER_PATHS, {
+      folderPath,
     });
+    return normalizeFolderPath(data.folderPath ?? data.data);
+  },
+
+  updateBackupFolderPath: async (
+    id: string,
+    folderPath: string,
+  ): Promise<BackupFolderPathItem> => {
+    const { data } = await axiosClient.put(
+      `${API_ROUTES.BACKUP_FOLDER_PATHS}/${id}`,
+      { folderPath },
+    );
+    return normalizeFolderPath(data.folderPath ?? data.data);
+  },
+
+  deleteBackupFolderPath: async (id: string): Promise<void> => {
+    await axiosClient.delete(`${API_ROUTES.BACKUP_FOLDER_PATHS}/${id}`);
   },
 
   getBackups: async (): Promise<BackupItem[]> => {
