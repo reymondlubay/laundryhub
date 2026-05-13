@@ -149,35 +149,37 @@ export default function SidebarMenu() {
           Customer
         </MenuItem>
 
-        <SubMenu
-          label="Inventory"
-          icon={<FaWarehouse />}
-          defaultOpen={activePath.startsWith("/inventory")}
-          rootStyles={{
-            color: activePath.startsWith("/inventory")
-              ? primary.main
-              : text.primary,
-          }}
-        >
-          <MenuItem
-            component={<Link to={route.INVENTORY_ITEMS} />}
-            active={activePath === route.INVENTORY_ITEMS}
+        {isAdminUser && (
+          <SubMenu
+            label="Inventory"
+            icon={<FaWarehouse />}
+            defaultOpen={activePath.startsWith("/inventory")}
+            rootStyles={{
+              color: activePath.startsWith("/inventory")
+                ? primary.main
+                : text.primary,
+            }}
           >
-            Inventory Items
-          </MenuItem>
-          <MenuItem
-            component={<Link to={route.INVENTORY_MANAGE} />}
-            active={activePath === route.INVENTORY_MANAGE}
-          >
-            Manage Inventory
-          </MenuItem>
-          <MenuItem
-            component={<Link to={route.INVENTORY_STOCK_USAGE} />}
-            active={activePath === route.INVENTORY_STOCK_USAGE}
-          >
-            Record Stock Usage
-          </MenuItem>
-        </SubMenu>
+            <MenuItem
+              component={<Link to={route.INVENTORY_ITEMS} />}
+              active={activePath === route.INVENTORY_ITEMS}
+            >
+              Inventory Items
+            </MenuItem>
+            <MenuItem
+              component={<Link to={route.INVENTORY_MANAGE} />}
+              active={activePath === route.INVENTORY_MANAGE}
+            >
+              Manage Inventory
+            </MenuItem>
+            <MenuItem
+              component={<Link to={route.INVENTORY_STOCK_USAGE} />}
+              active={activePath === route.INVENTORY_STOCK_USAGE}
+            >
+              Record Stock Usage
+            </MenuItem>
+          </SubMenu>
+        )}
 
         {isAdminUser && (
           <SubMenu
@@ -275,31 +277,31 @@ export default function SidebarMenu() {
             Users
           </MenuItem>
         ) : null}
-        {isAdminUser ? (
-          <SubMenu
-            label="Settings"
-            icon={<FaWarehouse />}
-            defaultOpen={activePath.startsWith("/settings")}
-            rootStyles={{
-              color: activePath.startsWith("/settings")
-                ? primary.main
-                : text.primary,
-            }}
+        <SubMenu
+          label="Settings"
+          icon={<FaWarehouse />}
+          defaultOpen={activePath.startsWith("/settings")}
+          rootStyles={{
+            color: activePath.startsWith("/settings")
+              ? primary.main
+              : text.primary,
+          }}
+        >
+          <MenuItem
+            component={<Link to={route.SETTINGS} />}
+            active={activePath === route.SETTINGS}
           >
-            <MenuItem
-              component={<Link to={route.SETTINGS} />}
-              active={activePath === route.SETTINGS}
-            >
-              Database
-            </MenuItem>
+            Database
+          </MenuItem>
+          {isAdminUser && (
             <MenuItem
               component={<Link to={route.SETTINGS_ADDONS_PRICING} />}
               active={activePath === route.SETTINGS_ADDONS_PRICING}
             >
               Adons Pricing
             </MenuItem>
-          </SubMenu>
-        ) : null}
+          )}
+        </SubMenu>
       </Menu>
     </Sidebar>
   );

@@ -30,11 +30,7 @@ const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
     "/dashboard",
     "/transaction",
     "/customer",
-    "/inventory",
-    "/inventory/items",
-    "/inventory/manage",
-    "/inventory/stock-usage",
-    "/inventory/summary",
+    "/settings/database",
   ],
 };
 

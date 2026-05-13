@@ -56,6 +56,9 @@ const DatabaseSettings: React.FC = () => {
   const [backupFolderPath, setBackupFolderPath] = React.useState("");
   const [uploadFile, setUploadFile] = React.useState<File | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(
+    null,
+  );
 
   const [restoreId, setRestoreId] = React.useState<string | null>(null);
   const [restoreLoading, setRestoreLoading] = React.useState(false);
@@ -133,6 +136,7 @@ const DatabaseSettings: React.FC = () => {
     try {
       setCreating(true);
       setError(null);
+      setSuccessMessage(null);
       setSkippedFoldersWarning(null);
       const useSavedFoldersOnly = folderPaths.length > 0;
       const { skippedFolders } = await backupService.createBackup(
@@ -141,7 +145,13 @@ const DatabaseSettings: React.FC = () => {
       if (skippedFolders?.length) {
         setSkippedFoldersWarning(skippedFolders);
       }
-      await fetchBackups();
+      if (isAdmin) {
+        await fetchBackups();
+      } else {
+        setSuccessMessage(
+          "Backup started successfully. Please contact an administrator if you need to manage backups.",
+        );
+      }
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Failed to start backup.";
@@ -286,9 +296,50 @@ const DatabaseSettings: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <Alert severity="error">
-        You are not authorized to access database backup settings.
-      </Alert>
+      <Box>
+        <Typography
+          variant="h6"
+          sx={{ color: headingColor, fontWeight: 700, mb: 2 }}
+        >
+          Settings - Database Backup
+        </Typography>
+
+        <Paper
+          sx={{
+            p: 3,
+            bgcolor: surfaceColor,
+            border: `1px solid ${borderColor}`,
+          }}
+        >
+          <Stack spacing={2}>
+            <Typography variant="body2" sx={{ color: cellColor }}>
+              Click the button below to create a backup of the database. Only
+              an administrator can view, restore, upload, or delete backups.
+            </Typography>
+
+            {error ? <Alert severity="error">{error}</Alert> : null}
+
+            {successMessage ? (
+              <Alert
+                severity="success"
+                onClose={() => setSuccessMessage(null)}
+              >
+                {successMessage}
+              </Alert>
+            ) : null}
+
+            <Box>
+              <Button
+                variant="contained"
+                onClick={handleCreateBackup}
+                disabled={creating}
+              >
+                {creating ? "Starting..." : "Create Backup"}
+              </Button>
+            </Box>
+          </Stack>
+        </Paper>
+      </Box>
     );
   }
 
