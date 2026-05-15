@@ -415,6 +415,8 @@ const TransactionGraphSummary: React.FC = () => {
 
     const index = new Map(months.map((m, i) => [m.monthKey, i]));
     const daysByMonth = new Map<string, Set<string>>();
+    const txCountByKey = new Map<string, number>();
+
     for (const t of transactions) {
       const dateRaw = getTransactionDate(t);
       if (!dateRaw) continue;
@@ -423,6 +425,7 @@ const TransactionGraphSummary: React.FC = () => {
       const key = d.format("YYYY-MM");
       const idx = index.get(key);
       if (idx === undefined) continue;
+      txCountByKey.set(key, (txCountByKey.get(key) ?? 0) + 1);
       months[idx].loads += getTotalLoads(t);
       months[idx].amount += getTransactionAmount(t);
 
@@ -433,10 +436,12 @@ const TransactionGraphSummary: React.FC = () => {
     }
 
     // Attach transaction-day counts (for consistent averages vs Daily table)
-    return months.map((m) => {
-      const txDays = daysByMonth.get(m.monthKey)?.size ?? 0;
-      return { ...m, txDays } as MonthlyRow & { txDays: number };
-    });
+    return months
+      .map((m) => {
+        const txDays = daysByMonth.get(m.monthKey)?.size ?? 0;
+        return { ...m, txDays } as MonthlyRow & { txDays: number };
+      })
+      .filter((m) => (txCountByKey.get(m.monthKey) ?? 0) > 0);
   }, [transactions]);
 
   const dailyChartPoints = React.useMemo<BarChartPoint[]>(
@@ -609,8 +614,15 @@ const TransactionGraphSummary: React.FC = () => {
 
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" sx={{ mb: 1.5, fontWeight: 700 }}>
-              Monthly Summary (last {MONTHS_WINDOW} months)
+              Monthly Summary (up to {MONTHS_WINDOW} months, with transactions
+              only)
             </Typography>
+            {monthlyRows.length === 0 ? (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                No months in this range have any laundry transactions yet.
+              </Alert>
+            ) : (
+              <>
             <TableContainer sx={{ mb: 2 }}>
               <Table size="small">
                 <TableHead>
@@ -657,6 +669,8 @@ const TransactionGraphSummary: React.FC = () => {
               points={monthlyChartPoints}
               height={300}
             />
+              </>
+            )}
           </Paper>
         </Stack>
       )}

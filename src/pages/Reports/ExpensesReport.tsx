@@ -11,6 +11,7 @@ import {
   MenuItem,
   Paper,
   Select,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -50,6 +51,18 @@ type ReportRow = {
 };
 
 type UsageTypeFilter = "all" | "internal" | "external";
+
+type ConsolidatedRow = {
+  expenseName: string;
+  totalPieces: number;
+  totalAmount: number;
+};
+
+const formatDateTime = (value?: string | null): string => {
+  if (!value) return "-";
+  const d = dayjs(value);
+  return d.isValid() ? d.format("MM-DD-YY h:mm A") : "-";
+};
 
 const currency = new Intl.NumberFormat("en-PH", {
   style: "currency",
@@ -213,6 +226,35 @@ const ExpensesReport: React.FC = () => {
     return reportRows.reduce((sum, row) => sum + (row.amount || 0), 0);
   }, [reportRows]);
 
+  const consolidatedRows = React.useMemo<ConsolidatedRow[]>(() => {
+    const map = new Map<string, { pieces: number; amount: number }>();
+    for (const row of reportRows) {
+      const key = row.expenseName;
+      const prev = map.get(key) ?? { pieces: 0, amount: 0 };
+      map.set(key, {
+        pieces: prev.pieces + (row.pieces ?? 0),
+        amount: prev.amount + row.amount,
+      });
+    }
+    return Array.from(map.entries())
+      .map(([expenseName, agg]) => ({
+        expenseName,
+        totalPieces: agg.pieces,
+        totalAmount: agg.amount,
+      }))
+      .sort((a, b) => a.expenseName.localeCompare(b.expenseName));
+  }, [reportRows]);
+
+  const consolidatedTotals = React.useMemo(() => {
+    return consolidatedRows.reduce(
+      (acc, row) => ({
+        pieces: acc.pieces + row.totalPieces,
+        amount: acc.amount + row.totalAmount,
+      }),
+      { pieces: 0, amount: 0 },
+    );
+  }, [consolidatedRows]);
+
   return (
     <Box>
       <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
@@ -291,60 +333,115 @@ const ExpensesReport: React.FC = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <Paper sx={{ p: 2 }}>
-          <TableContainer sx={{ maxHeight: 600 }}>
-            <Table size="small" stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Expense Name</TableCell>
-                  <TableCell>Source</TableCell>
-                  <TableCell align="right">Pieces</TableCell>
-                  <TableCell align="right">Amount</TableCell>
-                  <TableCell>Notes</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {reportRows.length === 0 ? (
+        <Stack spacing={3}>
+          <Paper sx={{ p: 2 }}>
+            <TableContainer sx={{ maxHeight: 600 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={5} align="center">
-                      No records found.
-                    </TableCell>
+                    <TableCell>Expense Name</TableCell>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Source</TableCell>
+                    <TableCell align="right">Pieces</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                    <TableCell>Notes</TableCell>
                   </TableRow>
-                ) : (
-                  reportRows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>{row.expenseName}</TableCell>
-                      <TableCell>
-                        {row.source === "inventory" ? "Inventory" : "Expense"}
+                </TableHead>
+                <TableBody>
+                  {reportRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center">
+                        No records found.
                       </TableCell>
-                      <TableCell align="right">
-                        {row.pieces == null ? "" : row.pieces}
-                      </TableCell>
-                      <TableCell align="right">
-                        {currency.format(row.amount)}
-                      </TableCell>
-                      <TableCell>{row.notes || "-"}</TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                  ) : (
+                    reportRows.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell>{row.expenseName}</TableCell>
+                        <TableCell>{formatDateTime(row.date)}</TableCell>
+                        <TableCell>
+                          {row.source === "inventory" ? "Inventory" : "Expense"}
+                        </TableCell>
+                        <TableCell align="right">
+                          {row.pieces == null ? "" : row.pieces}
+                        </TableCell>
+                        <TableCell align="right">
+                          {currency.format(row.amount)}
+                        </TableCell>
+                        <TableCell>{row.notes || "-"}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
-          <Box
-            sx={{
-              mt: 2,
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 3,
-              flexWrap: "wrap",
-            }}
-          >
-            <Typography sx={{ fontWeight: 700 }}>
-              Total Amount: {currency.format(totalAmount)}
+            <Box
+              sx={{
+                mt: 2,
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 3,
+                flexWrap: "wrap",
+              }}
+            >
+              <Typography sx={{ fontWeight: 700 }}>
+                Total Amount: {currency.format(totalAmount)}
+              </Typography>
+            </Box>
+          </Paper>
+
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
+              Consolidated Expenses
             </Typography>
-          </Box>
-        </Paper>
+            <TableContainer sx={{ maxHeight: 400 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Expense name</TableCell>
+                    <TableCell align="right">Pieces</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {consolidatedRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center">
+                        No records to consolidate.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    <>
+                      {consolidatedRows.map((row) => (
+                        <TableRow key={row.expenseName}>
+                          <TableCell>{row.expenseName}</TableCell>
+                          <TableCell align="right">
+                            {row.totalPieces === 0 ? "" : row.totalPieces}
+                          </TableCell>
+                          <TableCell align="right">
+                            {currency.format(row.totalAmount)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>
+                          {consolidatedTotals.pieces === 0
+                            ? ""
+                            : consolidatedTotals.pieces}
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>
+                          {currency.format(consolidatedTotals.amount)}
+                        </TableCell>
+                      </TableRow>
+                    </>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Stack>
       )}
     </Box>
   );

@@ -261,6 +261,12 @@ export default function SidebarMenu() {
             >
               Sales Report
             </MenuItem>
+            <MenuItem
+              component={<Link to={route.REPORT_SALES_EXPENSE_GRAPH} />}
+              active={activePath === route.REPORT_SALES_EXPENSE_GRAPH}
+            >
+              Sales & Expense Graph
+            </MenuItem>
           </SubMenu>
         )}
       </Menu>
@@ -332,6 +338,14 @@ export default function SidebarMenu() {
               active={activePath === route.SETTINGS_ADDONS_PRICING}
             >
               Adons Pricing
+            </MenuItem>
+          )}
+          {isAdminUser && (
+            <MenuItem
+              component={<Link to={route.SETTINGS_FIXED_MONTHLY_EXPENSES} />}
+              active={activePath === route.SETTINGS_FIXED_MONTHLY_EXPENSES}
+            >
+              Fixed monthly expenses
             </MenuItem>
           )}
         </SubMenu>

@@ -36,6 +36,10 @@ import expenseItemService, {
 import expenseRecordService, {
   type ExpenseRecord,
 } from "../../services/expenseRecordService";
+import fixedMonthlyExpenseService, {
+  getActiveFixedMonthlyTotal,
+  type FixedMonthlyExpense,
+} from "../../services/fixedMonthlyExpenseService";
 import { toPascalCase } from "../../utils/stringUtils";
 import { getAddonsTotal, getStoredSnapshots } from "../../utils/pricing";
 
@@ -130,6 +134,9 @@ const SalesReport: React.FC = () => {
   const [expenseRecords, setExpenseRecords] = React.useState<ExpenseRecord[]>(
     [],
   );
+  const [fixedMonthlyExpenses, setFixedMonthlyExpenses] = React.useState<
+    FixedMonthlyExpense[]
+  >([]);
 
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -151,13 +158,14 @@ const SalesReport: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const [txData, pricingData, invItems, expItems, expRecords] =
+        const [txData, pricingData, invItems, expItems, expRecords, fixedItems] =
           await Promise.all([
             transactionService.getAll(),
             addonsPricingService.get(),
             inventoryItemService.getAllForLookup(),
             expenseItemService.getAllForLookup(),
             expenseRecordService.getAll(),
+            fixedMonthlyExpenseService.getAll(),
           ]);
         setAddonsPricing(pricingData);
         setTransactions(
@@ -168,6 +176,7 @@ const SalesReport: React.FC = () => {
         setInventoryItems(invItems);
         setExpenseItems(expItems);
         setExpenseRecords(expRecords);
+        setFixedMonthlyExpenses(fixedItems);
       } catch (err: unknown) {
         setError(
           err instanceof Error ? err.message : "Failed to load sales report.",
@@ -280,18 +289,22 @@ const SalesReport: React.FC = () => {
 
   const totals = React.useMemo(() => {
     const totalSales = salesRows.reduce((s, r) => s + r.price, 0);
-    const totalExpenses = expenseRows.reduce((s, r) => s + r.amount, 0);
+    const recordedInternalExpenses = expenseRows.reduce((s, r) => s + r.amount, 0);
+    const fixedMonthlyTotal = getActiveFixedMonthlyTotal(fixedMonthlyExpenses);
+    const totalExpenses = recordedInternalExpenses + fixedMonthlyTotal;
     const totalUnpaid = salesRows.reduce((s, r) => s + r.balance, 0);
     const netSales = totalSales - totalExpenses;
 
     return {
       totalSales,
+      recordedInternalExpenses,
+      fixedMonthlyTotal,
       totalExpenses,
       netSales,
       totalPaid: totalPaidInMonth,
       totalUnpaid,
     };
-  }, [expenseRows, salesRows, totalPaidInMonth]);
+  }, [expenseRows, fixedMonthlyExpenses, salesRows, totalPaidInMonth]);
 
   const monthText = selectedMonth.isValid()
     ? selectedMonth.format("MMMM YYYY")
@@ -398,6 +411,10 @@ const SalesReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Internal Expenses ({monthText})
             </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+              Table lists recorded expenses only. Active fixed monthly items from
+              Settings are included in Summary totals below.
+            </Typography>
             <TableContainer sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
@@ -460,6 +477,14 @@ const SalesReport: React.FC = () => {
               Total Sales (Gross) - {formatCurrency(totals.totalSales)}
             </Typography>
             <Typography>
+              Internal expenses (recorded) -{" "}
+              {formatCurrency(totals.recordedInternalExpenses)}
+            </Typography>
+            <Typography>
+              Fixed monthly expenses (active) -{" "}
+              {formatCurrency(totals.fixedMonthlyTotal)}
+            </Typography>
+            <Typography sx={{ fontWeight: 600 }}>
               Total Internal Expenses - {formatCurrency(totals.totalExpenses)}
             </Typography>
             <Typography sx={{ fontWeight: 700, mt: 0.5 }}>

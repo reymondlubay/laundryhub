@@ -29,6 +29,9 @@ const SettingsDatabasePage = lazy(() => import("./pages/Settings/Database"));
 const SettingsAddonsPricingPage = lazy(
   () => import("./pages/Settings/AddonsPricing"),
 );
+const SettingsFixedMonthlyExpensesPage = lazy(
+  () => import("./pages/Settings/FixedMonthlyExpenses"),
+);
 const InventoryItemsPage = lazy(
   () => import("./pages/Inventory/InventoryItems"),
 );
@@ -46,6 +49,9 @@ const ExpenseItemsPage = lazy(() => import("./pages/Expenses/ExpenseItems"));
 const RecordExpensePage = lazy(() => import("./pages/Expenses/RecordExpense"));
 const ExpensesReportPage = lazy(() => import("./pages/Reports/ExpensesReport"));
 const SalesReportPage = lazy(() => import("./pages/Reports/SalesReport"));
+const SalesExpenseGraphReportPage = lazy(
+  () => import("./pages/Reports/SalesExpenseGraphReport"),
+);
 
 function App() {
   return (
@@ -270,6 +276,18 @@ function App() {
             }
           />
           <Route
+            path={route.REPORT_SALES_EXPENSE_GRAPH}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <SalesExpenseGraphReportPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
             path={route.SETTINGS}
             element={
               <RoleProtectedRoute>
@@ -288,6 +306,18 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <SettingsAddonsPricingPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.SETTINGS_FIXED_MONTHLY_EXPENSES}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <SettingsFixedMonthlyExpensesPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>
