@@ -1,10 +1,13 @@
-import React from "react";
+import React, { startTransition } from "react";
 import {
   Alert,
   Box,
+  FormControlLabel,
   Grid,
   Paper,
+  Snackbar,
   Stack,
+  Switch,
   Tooltip,
   Table,
   TableBody,
@@ -38,10 +41,15 @@ import transactionService, {
 import { toPascalCase } from "../../utils/stringUtils";
 import { getTransactionNoteDetailLines } from "../../utils/transactionNoteDetails";
 
+const DASHBOARD_AUTO_REFRESH_KEY = "laundryhub.dashboard.autoRefresh";
+const DASHBOARD_REFRESH_INTERVAL_MS = 30_000;
+
 type DashboardCard = {
   key: string;
   title: string;
   value: number;
+  secondaryValue?: number;
+  secondaryLabel?: string;
   icon: React.ReactNode;
   iconBg: string;
   iconColor: string;
@@ -50,6 +58,9 @@ type DashboardCard = {
 const formatCount = (value: number): string => {
   return Math.round(value).toLocaleString("en-US");
 };
+
+const splitPipedLabels = (label: string): string[] =>
+  label.split("|").map((s) => s.trim()).filter((s) => s.length > 0);
 
 const isSameDay = (value?: string | null): boolean => {
   if (!value) return false;
@@ -108,35 +119,37 @@ const getTransactionLoads = (transaction: Transaction): number => {
 };
 
 const AnimatedCount: React.FC<{ value: number }> = ({ value }) => {
-  const [displayValue, setDisplayValue] = React.useState(0);
-  const previousValueRef = React.useRef(0);
+  const endValue = Math.max(0, Math.round(Number(value) || 0));
+  const [displayValue, setDisplayValue] = React.useState(endValue);
+  const displayRef = React.useRef(endValue);
 
   React.useEffect(() => {
-    const startValue = previousValueRef.current;
-    const endValue = Math.max(0, value);
-    const duration = 700;
-    const startAt = Date.now();
+    const startValue = displayRef.current;
+    if (startValue === endValue) return;
 
-    const tick = () => {
-      const elapsed = Date.now() - startAt;
-      const progress = Math.min(elapsed / duration, 1);
+    let cancelled = false;
+    const durationMs = 520;
+    const t0 = performance.now();
+
+    const tick = (now: number) => {
+      if (cancelled) return;
+      const elapsed = now - t0;
+      const progress = Math.min(elapsed / durationMs, 1);
       const eased = 1 - (1 - progress) * (1 - progress);
-      const nextValue = Math.round(
-        startValue + (endValue - startValue) * eased,
-      );
-
-      setDisplayValue(nextValue);
-
+      const next = Math.round(startValue + (endValue - startValue) * eased);
+      displayRef.current = next;
+      setDisplayValue(next);
       if (progress < 1) {
         window.requestAnimationFrame(tick);
-      } else {
-        previousValueRef.current = endValue;
       }
     };
 
-    const animationFrame = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(animationFrame);
-  }, [value]);
+    const id = window.requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(id);
+    };
+  }, [endValue]);
 
   return <>{formatCount(displayValue)}</>;
 };
@@ -146,32 +159,88 @@ const Dashboard = () => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
+  const [lastUpdatedAt, setLastUpdatedAt] = React.useState<Date | null>(null);
+  const [refreshError, setRefreshError] = React.useState<string | null>(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = React.useState(() => {
+    try {
+      return window.localStorage.getItem(DASHBOARD_AUTO_REFRESH_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
 
-  React.useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
+  const fetchSeqRef = React.useRef(0);
+
+  const loadTransactions = React.useCallback(async (options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    const seq = ++fetchSeqRef.current;
+
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
+
+    try {
+      const transactionData = await transactionService.getAll();
+      if (fetchSeqRef.current !== seq) return;
+
+      const nextTransactions = transactionData.filter(
+        (t) =>
+          !t.isDeleted &&
+          !(t as Transaction & { isdeleted?: boolean }).isdeleted,
+      );
+
+      const apply = () => {
+        setTransactions(nextTransactions);
+        setLastUpdatedAt(new Date());
+        setRefreshError(null);
         setError(null);
+      };
 
-        const transactionData = await transactionService.getAll();
-
-        setTransactions(
-          transactionData.filter(
-            (t) =>
-              !t.isDeleted &&
-              !(t as Transaction & { isdeleted?: boolean }).isdeleted,
-          ),
-        );
-      } catch (err: unknown) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load dashboard data.",
-        );
-      } finally {
+      if (silent) {
+        startTransition(apply);
+      } else {
+        apply();
+      }
+    } catch (err: unknown) {
+      if (fetchSeqRef.current !== seq) return;
+      const message =
+        err instanceof Error ? err.message : "Failed to load dashboard data.";
+      if (silent) {
+        setRefreshError(message);
+      } else {
+        setError(message);
+      }
+    } finally {
+      if (fetchSeqRef.current === seq && !silent) {
         setLoading(false);
       }
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadTransactions({ silent: false });
+  }, [loadTransactions]);
+
+  React.useEffect(() => {
+    if (!autoRefreshEnabled || loading) return;
+
+    const tick = () => {
+      if (document.hidden) return;
+      void loadTransactions({ silent: true });
     };
 
-    void loadData();
+    const id = window.setInterval(tick, DASHBOARD_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [autoRefreshEnabled, loadTransactions, loading]);
+
+  const persistAutoRefresh = React.useCallback((enabled: boolean) => {
+    setAutoRefreshEnabled(enabled);
+    try {
+      window.localStorage.setItem(DASHBOARD_AUTO_REFRESH_KEY, enabled ? "1" : "0");
+    } catch {
+      /* ignore quota / private mode */
+    }
   }, []);
 
   const activeTransactions = React.useMemo(() => {
@@ -343,6 +412,15 @@ const Dashboard = () => {
     [pickupTodayTransactions],
   );
 
+  const readyForPickupTotalLoads = React.useMemo(
+    () =>
+      readyForPickupTransactions.reduce(
+        (sum, transaction) => sum + getTransactionLoads(transaction),
+        0,
+      ),
+    [readyForPickupTransactions],
+  );
+
   const cards: DashboardCard[] = [
     {
       key: "todays-transaction",
@@ -396,6 +474,8 @@ const Dashboard = () => {
       key: "ready-for-pickup",
       title: "Ready for Pickup",
       value: metrics.readyForPickupCount,
+      secondaryValue: readyForPickupTotalLoads,
+      secondaryLabel: "Transactions | Loads",
       icon: <CheckCircleOutlineIcon />,
       iconBg: "#e8f7f1",
       iconColor: "#1d9a72",
@@ -413,17 +493,77 @@ const Dashboard = () => {
 
   return (
     <Box sx={{ width: "100%" }}>
-      <Typography
-        variant="h5"
-        sx={{
-          mb: 2,
-          fontWeight: 700,
-          color: headingColor,
-          fontSize: { xs: "1.25rem", sm: "1.5rem" },
-        }}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        alignItems={{ xs: "stretch", sm: "center" }}
+        justifyContent="space-between"
+        sx={{ mb: 2 }}
       >
-        Dashboard
-      </Typography>
+        <Typography
+          variant="h5"
+          sx={{
+            fontWeight: 700,
+            color: headingColor,
+            fontSize: { xs: "1.25rem", sm: "1.5rem" },
+          }}
+        >
+          Dashboard
+        </Typography>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          alignItems={{ xs: "flex-start", sm: "center" }}
+        >
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={autoRefreshEnabled}
+                onChange={(_, checked) => persistAutoRefresh(checked)}
+                disabled={loading}
+                inputProps={{ "aria-label": "Auto refresh dashboard data" }}
+              />
+            }
+            label={
+              <Typography variant="body2" sx={{ color: titleColor }}>
+                Auto refresh (30s)
+              </Typography>
+            }
+            sx={{ mr: 0 }}
+          />
+          {lastUpdatedAt ? (
+            <Typography
+              variant="caption"
+              sx={{
+                color: titleColor,
+                opacity: 0.9,
+                fontVariantNumeric: "tabular-nums",
+                minWidth: "12.5rem",
+                textAlign: { xs: "left", sm: "right" },
+              }}
+            >
+              Last updated: {dayjs(lastUpdatedAt).format("h:mm:ss A")}
+            </Typography>
+          ) : null}
+        </Stack>
+      </Stack>
+
+      <Snackbar
+        open={Boolean(refreshError)}
+        autoHideDuration={6000}
+        onClose={() => setRefreshError(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setRefreshError(null)}
+          severity="warning"
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {refreshError}
+        </Alert>
+      </Snackbar>
 
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -541,9 +681,39 @@ const Dashboard = () => {
         </>
       ) : (
         <>
-          <Grid container spacing={2}>
-            {cards.map((card) => (
-              <Grid key={card.key} size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Grid container spacing={2} alignItems="stretch">
+            {cards.map((card) => {
+              const pairedLabels = card.secondaryLabel
+                ? splitPipedLabels(card.secondaryLabel)
+                : [];
+              const secondaryVal = card.secondaryValue;
+              const usePairedMetricLayout =
+                typeof secondaryVal === "number" &&
+                pairedLabels.length === 2;
+
+              const valueTypographySx = {
+                fontWeight: 700,
+                color: valueColor,
+                lineHeight: 1,
+                letterSpacing: 0.3,
+                fontSize: { xs: "1.6rem", sm: "2rem" },
+              } as const;
+
+              const metricCaptionSx = {
+                display: "block",
+                color: titleColor,
+                fontWeight: 500,
+                mt: 0.35,
+                lineHeight: 1.1,
+                fontSize: { xs: "0.65rem", sm: "0.7rem" },
+              } as const;
+
+              return (
+              <Grid
+                key={card.key}
+                size={{ xs: 12, sm: 6, lg: 3 }}
+                sx={{ display: "flex", flexDirection: "column" }}
+              >
                 <Paper
                   elevation={0}
                   sx={{
@@ -553,7 +723,9 @@ const Dashboard = () => {
                     border: `1px solid ${borderColor}`,
                     display: "flex",
                     alignItems: "center",
-                    minHeight: 84,
+                    flex: 1,
+                    width: "100%",
+                    minHeight: { xs: 118, sm: 124 },
                     gap: { xs: 1.25, sm: 1.5 },
                   }}
                 >
@@ -589,6 +761,60 @@ const Dashboard = () => {
                     >
                       {card.title}
                     </Typography>
+                    {usePairedMetricLayout ? (
+                      <Box
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr auto 1fr",
+                          alignItems: "stretch",
+                          width: "100%",
+                          mt: 0.15,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            minWidth: 0,
+                            textAlign: "center",
+                            pr: { xs: 1, sm: 1.25 },
+                          }}
+                        >
+                          <Typography variant="h4" sx={valueTypographySx}>
+                            <AnimatedCount value={card.value} />
+                          </Typography>
+                          <Typography variant="caption" sx={metricCaptionSx}>
+                            {pairedLabels[0]}
+                          </Typography>
+                        </Box>
+                        <Box
+                          aria-hidden
+                          sx={{
+                            width: 1,
+                            flexShrink: 0,
+                            alignSelf: "stretch",
+                            bgcolor: borderColor,
+                            opacity: 0.7,
+                            borderRadius: 0.5,
+                            my: 0.35,
+                            justifySelf: "center",
+                          }}
+                        />
+                        <Box
+                          sx={{
+                            minWidth: 0,
+                            textAlign: "center",
+                            pl: { xs: 1, sm: 1.25 },
+                          }}
+                        >
+                          <Typography variant="h4" sx={valueTypographySx}>
+                            <AnimatedCount value={secondaryVal} />
+                          </Typography>
+                          <Typography variant="caption" sx={metricCaptionSx}>
+                            {pairedLabels[1]}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <>
                     <Typography
                       variant="h4"
                       sx={{
@@ -600,11 +826,47 @@ const Dashboard = () => {
                       }}
                     >
                       <AnimatedCount value={card.value} />
+                      {typeof card.secondaryValue === "number" ? (
+                        <>
+                          <Box
+                            component="span"
+                            sx={{
+                              mx: { xs: 0.6, sm: 0.85 },
+                              color: titleColor,
+                              fontWeight: 500,
+                            }}
+                          >
+                            |
+                          </Box>
+                          <AnimatedCount value={card.secondaryValue} />
+                        </>
+                      ) : null}
                     </Typography>
+                    {card.secondaryLabel && !usePairedMetricLayout ? (
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          display: "block",
+                          color: titleColor,
+                          fontWeight: 500,
+                          mt: 0.35,
+                          lineHeight: 1.1,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          fontSize: { xs: "0.65rem", sm: "0.7rem" },
+                        }}
+                      >
+                        {card.secondaryLabel}
+                      </Typography>
+                    ) : null}
+                      </>
+                    )}
                   </Box>
                 </Paper>
               </Grid>
-            ))}
+              );
+            })}
           </Grid>
 
           <Grid container spacing={2} sx={{ mt: 2 }}>
@@ -1011,7 +1273,8 @@ const Dashboard = () => {
                       textAlign: "right",
                     }}
                   >
-                    Total: {readyForPickupTransactions.length}
+                    Transactions: {readyForPickupTransactions.length} | Loads:{" "}
+                    {readyForPickupTotalLoads}
                   </Typography>
                 </Stack>
                 <TableContainer sx={{ maxHeight: "35vh" }}>

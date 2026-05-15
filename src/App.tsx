@@ -29,6 +29,9 @@ const SettingsDatabasePage = lazy(() => import("./pages/Settings/Database"));
 const SettingsAddonsPricingPage = lazy(
   () => import("./pages/Settings/AddonsPricing"),
 );
+const SettingsFixedMonthlyExpensesPage = lazy(
+  () => import("./pages/Settings/FixedMonthlyExpenses"),
+);
 const InventoryItemsPage = lazy(
   () => import("./pages/Inventory/InventoryItems"),
 );
@@ -41,6 +44,13 @@ const InventorySummaryPage = lazy(
 );
 const InventoryReportPage = lazy(
   () => import("./pages/Reports/InventoryReport"),
+);
+const ExpenseItemsPage = lazy(() => import("./pages/Expenses/ExpenseItems"));
+const RecordExpensePage = lazy(() => import("./pages/Expenses/RecordExpense"));
+const ExpensesReportPage = lazy(() => import("./pages/Reports/ExpensesReport"));
+const SalesReportPage = lazy(() => import("./pages/Reports/SalesReport"));
+const SalesExpenseGraphReportPage = lazy(
+  () => import("./pages/Reports/SalesExpenseGraphReport"),
 );
 
 function App() {
@@ -146,6 +156,30 @@ function App() {
             }
           />
           <Route
+            path={route.EXPENSES_ITEMS}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <ExpenseItemsPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.EXPENSES_RECORDS}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <RecordExpensePage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
             path={route.USERS}
             element={
               <RoleProtectedRoute>
@@ -218,6 +252,42 @@ function App() {
             }
           />
           <Route
+            path={route.REPORT_EXPENSES}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <ExpensesReportPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.REPORT_SALES}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <SalesReportPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.REPORT_SALES_EXPENSE_GRAPH}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <SalesExpenseGraphReportPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
             path={route.SETTINGS}
             element={
               <RoleProtectedRoute>
@@ -236,6 +306,18 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <SettingsAddonsPricingPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.SETTINGS_FIXED_MONTHLY_EXPENSES}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <SettingsFixedMonthlyExpensesPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>

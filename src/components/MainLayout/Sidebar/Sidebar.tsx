@@ -2,6 +2,7 @@ import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
 import {
   FaChartBar,
   FaFileAlt,
+  FaMoneyBillWave,
   FaShoppingCart,
   FaWarehouse,
   FaUsers,
@@ -172,14 +173,34 @@ export default function SidebarMenu() {
             >
               Manage Inventory
             </MenuItem>
-            <MenuItem
-              component={<Link to={route.INVENTORY_STOCK_USAGE} />}
-              active={activePath === route.INVENTORY_STOCK_USAGE}
-            >
-              Record Stock Usage
-            </MenuItem>
           </SubMenu>
         )}
+
+        <SubMenu
+          label="Expenses"
+          icon={<FaMoneyBillWave />}
+          defaultOpen={activePath.startsWith("/expenses")}
+          rootStyles={{
+            color: activePath.startsWith("/expenses")
+              ? primary.main
+              : text.primary,
+          }}
+        >
+          {isAdminUser && (
+            <MenuItem
+              component={<Link to={route.EXPENSES_ITEMS} />}
+              active={activePath === route.EXPENSES_ITEMS}
+            >
+              Expense Items
+            </MenuItem>
+          )}
+          <MenuItem
+            component={<Link to={route.EXPENSES_RECORDS} />}
+            active={activePath === route.EXPENSES_RECORDS}
+          >
+            Record Expense
+          </MenuItem>
+        </SubMenu>
 
         {isAdminUser && (
           <SubMenu
@@ -227,6 +248,24 @@ export default function SidebarMenu() {
               active={activePath === route.REPORT_INVENTORY}
             >
               Inventory Report
+            </MenuItem>
+            <MenuItem
+              component={<Link to={route.REPORT_EXPENSES} />}
+              active={activePath === route.REPORT_EXPENSES}
+            >
+              Expenses Report
+            </MenuItem>
+            <MenuItem
+              component={<Link to={route.REPORT_SALES} />}
+              active={activePath === route.REPORT_SALES}
+            >
+              Sales Report
+            </MenuItem>
+            <MenuItem
+              component={<Link to={route.REPORT_SALES_EXPENSE_GRAPH} />}
+              active={activePath === route.REPORT_SALES_EXPENSE_GRAPH}
+            >
+              Sales & Expense Graph
             </MenuItem>
           </SubMenu>
         )}
@@ -299,6 +338,14 @@ export default function SidebarMenu() {
               active={activePath === route.SETTINGS_ADDONS_PRICING}
             >
               Adons Pricing
+            </MenuItem>
+          )}
+          {isAdminUser && (
+            <MenuItem
+              component={<Link to={route.SETTINGS_FIXED_MONTHLY_EXPENSES} />}
+              active={activePath === route.SETTINGS_FIXED_MONTHLY_EXPENSES}
+            >
+              Fixed monthly expenses
             </MenuItem>
           )}
         </SubMenu>

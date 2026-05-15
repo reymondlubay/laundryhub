@@ -8,14 +8,20 @@ const route = {
   INVENTORY_MANAGE: "/inventory/manage",
   INVENTORY_STOCK_USAGE: "/inventory/stock-usage",
   INVENTORY_SUMMARY: "/inventory/summary",
+  EXPENSES_ITEMS: "/expenses/items",
+  EXPENSES_RECORDS: "/expenses/records",
   REPORT_TRANSACTION: "/reports/transaction",
   REPORT_TRANSACTION_SUMMARY: "/reports/transaction-summary",
   REPORT_TRANSACTION_GRAPH_SUMMARY: "/reports/transaction-graph-summary",
   REPORT_CUSTOMER: "/reports/customer",
   REPORT_INVENTORY: "/reports/inventory",
+  REPORT_EXPENSES: "/reports/expenses",
+  REPORT_SALES: "/reports/sales",
+  REPORT_SALES_EXPENSE_GRAPH: "/reports/sales-expense-graph",
   USERS: "/users",
   SETTINGS: "/settings/database",
   SETTINGS_ADDONS_PRICING: "/settings/addons-pricing",
+  SETTINGS_FIXED_MONTHLY_EXPENSES: "/settings/fixed-monthly-expenses",
 };
 
 export default route;
