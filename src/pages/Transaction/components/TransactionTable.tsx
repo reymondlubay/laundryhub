@@ -32,6 +32,7 @@ import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { type Dayjs } from "dayjs";
 import { toApiDateTimeString } from "../../../utils/dateTimeApi";
+import { ignoreBackdropClose } from "../../../utils/muiDialogClose";
 
 import { AgGridReact } from "ag-grid-react";
 import { colorSchemeDark, colorSchemeLightWarm } from "ag-grid-community";
@@ -1721,7 +1722,7 @@ function TransactionTableInner({
 
       <Dialog
         open={markModalOpen}
-        onClose={handleCloseMarkModal}
+        onClose={ignoreBackdropClose(handleCloseMarkModal)}
         maxWidth="sm"
         fullWidth
         slotProps={{

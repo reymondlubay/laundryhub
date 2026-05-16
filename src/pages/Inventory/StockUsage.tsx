@@ -52,6 +52,7 @@ import stockUsageService, {
   type UpdateStockUsagePayload,
 } from "../../services/stockUsageService";
 import { computeFifoUsageCosts } from "../../utils/inventoryFifo";
+import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
 type FormState = {
   item: InventoryItem | null;
@@ -400,7 +401,7 @@ const StockUsagePage: React.FC = () => {
 
       <Dialog
         open={dialogOpen}
-        onClose={closeDialog}
+        onClose={ignoreBackdropClose(closeDialog)}
         fullWidth
         maxWidth="sm"
         PaperProps={{ component: "form", autoComplete: "off" }}

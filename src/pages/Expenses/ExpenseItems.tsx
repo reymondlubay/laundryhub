@@ -38,6 +38,7 @@ import expenseItemService, {
   type ExpenseItem,
   type UpdateExpenseItemPayload,
 } from "../../services/expenseItemService";
+import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
 type ExpenseItemFormState = {
   name: string;
@@ -291,7 +292,7 @@ const ExpenseItemsPage: React.FC = () => {
 
       <Dialog
         open={dialogOpen}
-        onClose={closeDialog}
+        onClose={ignoreBackdropClose(closeDialog)}
         fullWidth
         maxWidth="sm"
         PaperProps={{ component: "form", autoComplete: "off" }}
