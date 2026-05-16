@@ -120,8 +120,8 @@ const getTransactionLoads = (transaction: Transaction): number => {
 
 const AnimatedCount: React.FC<{ value: number }> = ({ value }) => {
   const endValue = Math.max(0, Math.round(Number(value) || 0));
-  const [displayValue, setDisplayValue] = React.useState(endValue);
-  const displayRef = React.useRef(endValue);
+  const [displayValue, setDisplayValue] = React.useState(0);
+  const displayRef = React.useRef(0);
 
   React.useEffect(() => {
     const startValue = displayRef.current;
@@ -141,6 +141,9 @@ const AnimatedCount: React.FC<{ value: number }> = ({ value }) => {
       setDisplayValue(next);
       if (progress < 1) {
         window.requestAnimationFrame(tick);
+      } else {
+        displayRef.current = endValue;
+        setDisplayValue(endValue);
       }
     };
 
