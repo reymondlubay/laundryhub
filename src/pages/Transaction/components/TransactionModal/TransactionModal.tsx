@@ -61,6 +61,7 @@ import {
   toBackendPaymentMode,
 } from "../../../../constants/payment";
 import { toTitleCaseWords } from "../../../../utils/stringUtils";
+import { ignoreBackdropClose } from "../../../../utils/muiDialogClose";
 
 type TransactionModalProps = {
   isOpen: boolean;
@@ -495,6 +496,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       maxWidth="lg"
       fullWidth
       fullScreen={isMobile}
+      onClose={ignoreBackdropClose(handleClose)}
       slotProps={{
         paper: {
           sx: {
@@ -1272,9 +1274,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 open={addCustomerOpen}
                 disableEscapeKeyDown
                 onClose={(_, reason) => {
-                  if (reason === "backdropClick" || reason === "escapeKeyDown") {
-                    return;
-                  }
+                  if (reason === "backdropClick") return;
                   if (!addingCustomer) {
                     setAddCustomerOpen(false);
                     resetNewCustomerForm();

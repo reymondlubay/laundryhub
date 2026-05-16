@@ -38,6 +38,7 @@ import fixedMonthlyExpenseService, {
   type FixedMonthlyExpense,
   type UpdateFixedMonthlyExpensePayload,
 } from "../../services/fixedMonthlyExpenseService";
+import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
 const formatCurrency = (value: number): string =>
   `₱${value.toLocaleString("en-US", {
@@ -335,7 +336,7 @@ const FixedMonthlyExpensesPage: React.FC = () => {
         )}
       </Paper>
 
-      <Dialog open={dialogOpen} onClose={closeDialog} fullWidth maxWidth="sm">
+      <Dialog open={dialogOpen} onClose={ignoreBackdropClose(closeDialog)} fullWidth maxWidth="sm">
         <DialogTitle>{editing ? "Edit fixed expense" : "Add fixed expense"}</DialogTitle>
         <DialogContent>
           {dialogError ? (

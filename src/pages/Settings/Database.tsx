@@ -32,6 +32,7 @@ import {
   TableSkeleton,
   TableHeaderSkeleton,
 } from "../../components/Skeletons/SkeletonComponents";
+import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
 const formatSize = (bytes: number): string => {
   if (!bytes || bytes < 1) return "0 B";
@@ -763,7 +764,7 @@ const DatabaseSettings: React.FC = () => {
 
       <Dialog
         open={Boolean(restoreId)}
-        onClose={() => setRestoreId(null)}
+        onClose={ignoreBackdropClose(() => setRestoreId(null))}
         maxWidth="xs"
         fullWidth
         PaperProps={{ sx: { bgcolor: paperDialogBg, color: cellColor } }}
@@ -791,10 +792,10 @@ const DatabaseSettings: React.FC = () => {
 
       <Dialog
         open={Boolean(deleteId)}
-        onClose={() => {
+        onClose={ignoreBackdropClose(() => {
           setDeleteId(null);
           setDeleteConfirmText("");
-        }}
+        })}
         maxWidth="xs"
         fullWidth
         PaperProps={{ sx: { bgcolor: paperDialogBg, color: cellColor } }}
@@ -840,11 +841,11 @@ const DatabaseSettings: React.FC = () => {
 
       <Dialog
         open={Boolean(pathEditId)}
-        onClose={() => {
+        onClose={ignoreBackdropClose(() => {
           if (pathEditLoading) return;
           setPathEditId(null);
           setPathEditValue("");
-        }}
+        })}
         maxWidth="sm"
         fullWidth
         PaperProps={{ sx: { bgcolor: paperDialogBg, color: cellColor } }}
@@ -886,7 +887,9 @@ const DatabaseSettings: React.FC = () => {
 
       <Dialog
         open={Boolean(pathDeleteId)}
-        onClose={() => !pathDeleteLoading && setPathDeleteId(null)}
+        onClose={ignoreBackdropClose(
+          () => !pathDeleteLoading && setPathDeleteId(null),
+        )}
         maxWidth="xs"
         fullWidth
         PaperProps={{ sx: { bgcolor: paperDialogBg, color: cellColor } }}

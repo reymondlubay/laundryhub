@@ -34,6 +34,7 @@ import {
 } from "../../constants/payment";
 import { UI_TEXT } from "../../constants/messages";
 import { toPascalCase } from "../../utils/stringUtils";
+import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
 type PaymentModalProps = {
   isOpen: boolean;
@@ -150,6 +151,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       open={isOpen}
       maxWidth="sm"
       fullWidth
+      onClose={ignoreBackdropClose(handleClose)}
       slotProps={{
         paper: {
           sx: {
