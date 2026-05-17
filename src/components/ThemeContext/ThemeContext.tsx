@@ -38,11 +38,16 @@ const DARK = {
 
 const fontStack = '"Montserrat", "Helvetica Neue", Arial, sans-serif';
 
+const readInitialDarkMode = (): boolean => {
+  const storedTheme = localStorage.getItem("darkMode");
+  if (storedTheme === null) {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  return storedTheme === "true";
+};
+
 export const CustomThemeProvider = ({ children }: { children: ReactNode }) => {
-  const [darkMode, setDarkMode] = useState<boolean>(() => {
-    const storedTheme = localStorage.getItem("darkMode");
-    return storedTheme === "true";
-  });
+  const [darkMode, setDarkMode] = useState<boolean>(readInitialDarkMode);
 
   const toggleTheme = () => {
     setDarkMode((prev) => {
@@ -53,14 +58,14 @@ export const CustomThemeProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    const storedTheme = localStorage.getItem("darkMode");
-    if (storedTheme === null) {
-      const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)",
-      ).matches;
-      setDarkMode(prefersDark);
-      localStorage.setItem("darkMode", String(prefersDark));
-    }
+    if (localStorage.getItem("darkMode") !== null) return;
+
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = (event: MediaQueryListEvent) => {
+      setDarkMode(event.matches);
+    };
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
   }, []);
 
   const theme = useMemo(
