@@ -6,6 +6,7 @@ export interface InventoryItem {
   id: string;
   name: string;
   notes?: string;
+  defaultPieces?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -13,19 +14,31 @@ export interface InventoryItem {
 export interface CreateInventoryItemPayload {
   name: string;
   notes?: string;
+  defaultPieces?: number | null;
 }
 
 export interface UpdateInventoryItemPayload {
   name?: string;
   notes?: string;
+  defaultPieces?: number | null;
 }
 
 const normalize = (raw: unknown): InventoryItem => {
   const item = raw as Record<string, unknown>;
+  const dp =
+    item.defaultPieces ?? item.defaultpieces ?? item.default_pieces;
+  let defaultPieces: number | null | undefined;
+  if (dp === undefined) defaultPieces = undefined;
+  else if (dp === null || dp === "") defaultPieces = null;
+  else {
+    const n = Number(dp);
+    defaultPieces = Number.isFinite(n) ? n : null;
+  }
   return {
     id: String(item.id ?? ""),
     name: String(item.name ?? ""),
     notes: String(item.notes ?? ""),
+    ...(defaultPieces !== undefined ? { defaultPieces } : {}),
     createdAt: String(item.createdAt ?? item.createdat ?? ""),
     updatedAt: String(item.updatedAt ?? item.updatedat ?? ""),
   };

@@ -41,6 +41,7 @@ import {
 } from "../../constants/messages";
 import { toPascalCase } from "../../utils/stringUtils";
 import { USER_ROLE_ADMIN, USER_ROLE_EMPLOYEE } from "../../constants/roles";
+import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 import {
   USER_STATUS_ACTIVE,
   USER_STATUS_INACTIVE,
@@ -376,7 +377,7 @@ const Users: React.FC = () => {
 
       <Dialog
         open={dialogOpen}
-        onClose={closeDialog}
+        onClose={ignoreBackdropClose(closeDialog)}
         fullWidth
         maxWidth="sm"
         PaperProps={{ component: "form", autoComplete: "off" }}

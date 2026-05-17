@@ -13,6 +13,7 @@ import {
   Box,
 } from "@mui/material";
 import { UI_TEXT } from "../../constants/messages";
+import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
 export type DeleteReason = "Wrong Record" | "Withdrawn";
 
@@ -46,7 +47,7 @@ const TransactionDeleteDialog: React.FC<TransactionDeleteDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={ignoreBackdropClose(handleClose)} maxWidth="sm" fullWidth>
       <DialogTitle>Confirm Delete</DialogTitle>
       <DialogContent>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>

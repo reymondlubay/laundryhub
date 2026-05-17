@@ -37,6 +37,7 @@ import customerService, {
   type UpdateCustomerPayload,
 } from "../../services/customerService";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog.tsx";
+import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 import {
   TableSkeleton,
   TableHeaderSkeleton,
@@ -339,7 +340,7 @@ const CustomerPage: React.FC = () => {
 
       <Dialog
         open={dialogOpen}
-        onClose={closeDialog}
+        onClose={ignoreBackdropClose(closeDialog)}
         fullWidth
         maxWidth="sm"
         PaperProps={{ component: "form", autoComplete: "off" }}

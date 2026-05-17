@@ -32,6 +32,7 @@ export interface CreateExpenseItemExpensePayload {
   expenseItemId: string;
   date: string;
   amount: number;
+  pieces?: number | null;
   isExternalUsage?: boolean;
   notes?: string;
 }
@@ -63,6 +64,19 @@ const toOptionalNumber = (value: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+/** API may return ISO strings or Date instances (serialized differently by layers). */
+const toParseableInstant = (value: unknown): string => {
+  if (value == null || value === "") return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return new Date(value).toISOString();
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+  return String(value);
+};
+
 const normalize = (raw: unknown): ExpenseRecord => {
   const item = raw as Record<string, unknown>;
   const source =
@@ -74,7 +88,7 @@ const normalize = (raw: unknown): ExpenseRecord => {
       item.inventoryItemId ?? item.inventoryitemid,
     ),
     expenseItemId: toOptionalString(item.expenseItemId ?? item.expenseitemid),
-    date: String(item.date ?? ""),
+    date: toParseableInstant(item.date ?? item.Date),
     pieces: toOptionalNumber(item.pieces),
     amount: toOptionalNumber(item.amount),
     isExternalUsage: Boolean(
@@ -86,8 +100,10 @@ const normalize = (raw: unknown): ExpenseRecord => {
         : String(item.notes) === ""
           ? null
           : String(item.notes),
-    createdAt: String(item.createdAt ?? item.createdat ?? ""),
-    updatedAt: String(item.updatedAt ?? item.updatedat ?? ""),
+    createdAt: toParseableInstant(
+      item.createdAt ?? item.createdat ?? item.CreatedAt,
+    ),
+    updatedAt: toParseableInstant(item.updatedAt ?? item.updatedat),
   };
 };
 

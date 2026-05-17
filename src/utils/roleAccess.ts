@@ -15,7 +15,6 @@ const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
     "/inventory",
     "/inventory/items",
     "/inventory/manage",
-    "/inventory/stock-usage",
     "/inventory/summary",
     "/expenses",
     "/expenses/items",
@@ -32,6 +31,7 @@ const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
     "/settings/database",
     "/settings/addons-pricing",
     "/settings/fixed-monthly-expenses",
+    "/settings/activity-log",
   ],
   [USER_ROLE_EMPLOYEE]: [
     "/dashboard",

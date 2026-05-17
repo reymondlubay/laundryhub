@@ -46,9 +46,6 @@ import inventoryItemService, {
 import inventoryRecordService, {
   type InventoryRecord,
 } from "../../services/inventoryRecordService";
-import stockUsageService, {
-  type StockUsageRecord,
-} from "../../services/stockUsageService";
 import expenseItemService, {
   type ExpenseItem,
 } from "../../services/expenseItemService";
@@ -58,6 +55,7 @@ import expenseRecordService, {
   type UpdateExpenseRecordPayload,
 } from "../../services/expenseRecordService";
 import { isAdmin } from "../../utils/roleAccess";
+import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
 type ExpenseOption = {
   key: string;
@@ -97,9 +95,6 @@ const RecordExpensePage: React.FC = () => {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [expenseItems, setExpenseItems] = useState<ExpenseItem[]>([]);
   const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>(
-    [],
-  );
-  const [stockUsageRecords, setStockUsageRecords] = useState<StockUsageRecord[]>(
     [],
   );
   const [records, setRecords] = useState<ExpenseRecord[]>([]);
@@ -189,18 +184,15 @@ const RecordExpensePage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [invItems, expItems, invRecs, usageRecs, expRecs] =
-        await Promise.all([
-          inventoryItemService.getAllForLookup(),
-          expenseItemService.getAllForLookup(),
-          inventoryRecordService.getAll(),
-          stockUsageService.getAll(),
-          expenseRecordService.getAll(),
-        ]);
+      const [invItems, expItems, invRecs, expRecs] = await Promise.all([
+        inventoryItemService.getAllForLookup(),
+        expenseItemService.getAllForLookup(),
+        inventoryRecordService.getAll(),
+        expenseRecordService.getAll(),
+      ]);
       setInventoryItems(invItems);
       setExpenseItems(expItems);
       setInventoryRecords(invRecs);
-      setStockUsageRecords(usageRecs);
       setRecords(expRecs);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : API_ERRORS.SAVE_FAILED);
@@ -235,11 +227,6 @@ const RecordExpensePage: React.FC = () => {
         row.itemId === itemId ? sum + (Number(row.pieces) || 0) : sum,
       0,
     );
-    const legacyUsed = stockUsageRecords.reduce(
-      (sum, row) =>
-        row.itemId === itemId ? sum + (Number(row.pieces) || 0) : sum,
-      0,
-    );
     const expensed = records.reduce((sum, row) => {
       if (row.source !== "inventory") return sum;
       if (row.inventoryItemId !== itemId) return sum;
@@ -247,8 +234,8 @@ const RecordExpensePage: React.FC = () => {
       if (editing && row.id === editing.id) return sum;
       return sum + (Number(row.pieces) || 0);
     }, 0);
-    return Math.max(0, purchased - legacyUsed - expensed);
-  }, [editing, form.option, inventoryRecords, records, stockUsageRecords]);
+    return Math.max(0, purchased - expensed);
+  }, [editing, form.option, inventoryRecords, records]);
 
   const computedAmountPreview = useMemo<number | null>(() => {
     if (form.option?.type !== "inventory") return null;
@@ -361,8 +348,14 @@ const RecordExpensePage: React.FC = () => {
       }
     } else {
       const amount = Number(form.amount);
-      if (!Number.isFinite(amount) || amount < 0) {
-        return "Amount must be 0 or more.";
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return "Amount must be greater than 0.";
+      }
+      if (form.pieces.trim()) {
+        const p = Math.floor(Number(form.pieces));
+        if (!Number.isFinite(p) || p < 1) {
+          return "Pieces must be 1 or more when provided.";
+        }
       }
     }
     return null;
@@ -398,7 +391,9 @@ const RecordExpensePage: React.FC = () => {
                 inventoryItemId: null,
                 expenseItemId: form.option!.id,
                 date: form.date.toISOString(),
-                pieces: null,
+                pieces: form.pieces.trim()
+                  ? Math.max(1, Math.floor(Number(form.pieces)))
+                  : null,
                 amount: Number(form.amount),
                 isExternalUsage: Boolean(form.isExternalUsage),
                 notes: form.notes.trim() || null,
@@ -420,6 +415,11 @@ const RecordExpensePage: React.FC = () => {
                 expenseItemId: form.option!.id,
                 date: form.date.toISOString(),
                 amount: Number(form.amount),
+                ...(form.pieces.trim()
+                  ? {
+                      pieces: Math.max(1, Math.floor(Number(form.pieces))),
+                    }
+                  : {}),
                 isExternalUsage: Boolean(form.isExternalUsage),
                 notes: form.notes.trim() || undefined,
               };
@@ -544,14 +544,16 @@ const RecordExpensePage: React.FC = () => {
                             : "-"}
                         </TableCell>
                         <TableCell align="right">
-                          {record.source === "inventory" && record.pieces != null
-                            ? record.pieces
-                            : "-"}
+                          {record.pieces != null ? record.pieces : "-"}
                         </TableCell>
                         <TableCell align="right">
-                          {record.amount != null
-                            ? phpFormatter.format(Number(record.amount))
-                            : "-"}
+                          {record.amount == null
+                            ? "-"
+                            : record.source === "expense"
+                              ? phpFormatter.format(Number(record.amount))
+                              : isCurrentUserAdmin
+                                ? phpFormatter.format(Number(record.amount))
+                                : "-"}
                         </TableCell>
                         <TableCell align="center">
                           {record.isExternalUsage ? "Yes" : "No"}
@@ -605,7 +607,7 @@ const RecordExpensePage: React.FC = () => {
 
       <Dialog
         open={dialogOpen}
-        onClose={closeDialog}
+        onClose={ignoreBackdropClose(closeDialog)}
         fullWidth
         maxWidth="sm"
         PaperProps={{ component: "form", autoComplete: "off" }}
@@ -666,14 +668,26 @@ const RecordExpensePage: React.FC = () => {
                 <Autocomplete
                   options={combinedOptions}
                   value={form.option}
-                  onChange={(_, value) =>
+                  onChange={(_, value) => {
+                    let pieces = "";
+                    if (value?.type === "inventory") {
+                      const item = inventoryItemById.get(value.id);
+                      const dp = item?.defaultPieces;
+                      if (
+                        dp != null &&
+                        Number.isFinite(Number(dp)) &&
+                        Number(dp) >= 1
+                      ) {
+                        pieces = String(Math.floor(Number(dp)));
+                      }
+                    }
                     setForm((prev) => ({
                       ...prev,
                       option: value,
-                      pieces: "",
+                      pieces,
                       amount: "",
-                    }))
-                  }
+                    }));
+                  }}
                   isOptionEqualToValue={(option, value) =>
                     option.key === value.key
                   }
@@ -691,12 +705,14 @@ const RecordExpensePage: React.FC = () => {
                 <DateTimePicker
                   label="Date"
                   value={form.date}
+                  maxDateTime={dayjs()}
                   onChange={(value) =>
                     setForm((prev) => ({ ...prev, date: value || dayjs() }))
                   }
                   disabled={!form.option}
                   slotProps={{
                     textField: { fullWidth: true, size: "small" },
+                    actionBar: { actions: ["today", "cancel", "accept"] },
                   }}
                 />
               </Grid>
@@ -705,15 +721,21 @@ const RecordExpensePage: React.FC = () => {
                 <TextField
                   fullWidth
                   size="small"
-                  label="Pieces"
-                  value={isInventory ? form.pieces : ""}
-                  disabled={!isInventory}
+                  label={
+                    isExpense
+                      ? "Pieces (optional)"
+                      : isInventory
+                        ? "Pieces"
+                        : "Pieces"
+                  }
+                  value={form.option ? form.pieces : ""}
+                  disabled={!form.option}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, pieces: e.target.value }))
                   }
                   inputProps={{
                     min: 1,
-                    ...(typeof selectedAvailablePieces === "number"
+                    ...(typeof selectedAvailablePieces === "number" && isInventory
                       ? { max: selectedAvailablePieces }
                       : {}),
                   }}
@@ -727,11 +749,15 @@ const RecordExpensePage: React.FC = () => {
                     typeof selectedAvailablePieces === "number" &&
                     Number(form.pieces || 0) > selectedAvailablePieces
                       ? `Cannot exceed available stocks (${selectedAvailablePieces}).`
-                      : isInventory && computedAmountPreview != null
+                      : isInventory &&
+                          computedAmountPreview != null &&
+                          isCurrentUserAdmin
                         ? `Amount preview: ${phpFormatter.format(
                             computedAmountPreview,
                           )} (auto-calculated on save)`
-                        : isInventory
+                        : isInventory &&
+                            isCurrentUserAdmin &&
+                            computedAmountPreview == null
                           ? "Amount is auto-calculated from latest inventory price on save."
                           : ""
                   }
@@ -748,7 +774,7 @@ const RecordExpensePage: React.FC = () => {
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, amount: e.target.value }))
                   }
-                  inputProps={{ min: 0, step: "0.01" }}
+                  inputProps={{ min: 0.01, step: "0.01" }}
                 />
               </Grid>
 

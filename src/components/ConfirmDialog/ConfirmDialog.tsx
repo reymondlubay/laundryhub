@@ -8,6 +8,7 @@ import {
   Typography,
 } from "@mui/material";
 import { UI_TEXT } from "../../constants/messages";
+import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -29,7 +30,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
 }) => {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={ignoreBackdropClose(onClose)} maxWidth="xs" fullWidth>
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         {typeof message === "string" ? (

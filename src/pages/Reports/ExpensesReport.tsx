@@ -48,6 +48,7 @@ type ReportRow = {
   amount: number;
   notes: string;
   date: string;
+  createdAt: string;
 };
 
 type UsageTypeFilter = "all" | "internal" | "external";
@@ -85,6 +86,46 @@ const isWithinRange = (dateValue: string | undefined, from: Dayjs, to: Dayjs) =>
   const date = dayjs(dateValue);
   if (!date.isValid()) return false;
   return sameOrAfter(date, from) && sameOrBefore(date, to);
+};
+
+/**
+ * Backdated = expense calendar day is strictly before the day the row was created.
+ * Time-of-day on the expense timestamp is ignored for this rule.
+ */
+const isBackdatedByPastDateOnly = (
+  expenseDateRaw: string,
+  createdAtRaw: string,
+): boolean => {
+  const expenseAt = dayjs(expenseDateRaw);
+  const recordedAt = dayjs(createdAtRaw);
+  if (!expenseAt.isValid() || !recordedAt.isValid()) return false;
+  return expenseAt.startOf("day").isBefore(recordedAt.startOf("day"));
+};
+
+const recordToReportRow = (
+  r: ExpenseRecord,
+  inventoryItemById: Map<string, InventoryItem>,
+  expenseItemById: Map<string, ExpenseItem>,
+): ReportRow => {
+  let expenseName = "-";
+  if (r.source === "inventory" && r.inventoryItemId) {
+    const item = inventoryItemById.get(r.inventoryItemId);
+    expenseName = `[Inventory] ${item?.name || "Unknown Item"}`;
+  } else if (r.source === "expense" && r.expenseItemId) {
+    const item = expenseItemById.get(r.expenseItemId);
+    expenseName = `[Expense] ${item?.name || "Unknown Item"}`;
+  }
+
+  return {
+    id: r.id,
+    expenseName,
+    source: r.source,
+    pieces: r.pieces == null ? null : Number(r.pieces),
+    amount: r.amount == null ? 0 : Number(r.amount),
+    notes: r.notes || "",
+    date: r.date ?? "",
+    createdAt: r.createdAt ?? "",
+  };
 };
 
 const ExpensesReport: React.FC = () => {
@@ -182,27 +223,9 @@ const ExpensesReport: React.FC = () => {
         })
       : byType;
 
-    const rows: ReportRow[] = byItem.map((r) => {
-      let expenseName = "-";
-      if (r.source === "inventory" && r.inventoryItemId) {
-        const item = inventoryItemById.get(r.inventoryItemId);
-        expenseName = `[Inventory] ${item?.name || "Unknown Item"}`;
-      } else if (r.source === "expense" && r.expenseItemId) {
-        const item = expenseItemById.get(r.expenseItemId);
-        expenseName = `[Expense] ${item?.name || "Unknown Item"}`;
-      }
-
-      return {
-        id: r.id,
-        expenseName,
-        source: r.source,
-        pieces:
-          r.source === "inventory" && r.pieces != null ? Number(r.pieces) : null,
-        amount: r.amount == null ? 0 : Number(r.amount),
-        notes: r.notes || "",
-        date: typeof r.date === "string" ? r.date : "",
-      };
-    });
+    const rows: ReportRow[] = byItem.map((r) =>
+      recordToReportRow(r, inventoryItemById, expenseItemById),
+    );
 
     rows.sort((a, b) => {
       const ta = dayjs(a.date).isValid() ? dayjs(a.date).valueOf() : 0;
@@ -244,6 +267,47 @@ const ExpensesReport: React.FC = () => {
       }))
       .sort((a, b) => a.expenseName.localeCompare(b.expenseName));
   }, [reportRows]);
+
+  const backdatedRows = React.useMemo(() => {
+    const range = normalizeRange(dateFrom, dateTo);
+
+    const createdInRange = records.filter((r) =>
+      isWithinRange(r.createdAt ?? "", range.from, range.to),
+    );
+
+    const scoped = selectedOption
+      ? createdInRange.filter((r) => {
+          if (selectedOption.type === "inventory") {
+            return (
+              r.source === "inventory" && r.inventoryItemId === selectedOption.id
+            );
+          }
+          return (
+            r.source === "expense" && r.expenseItemId === selectedOption.id
+          );
+        })
+      : createdInRange;
+
+    const rows = scoped
+      .map((r) => recordToReportRow(r, inventoryItemById, expenseItemById))
+      .filter((row) => isBackdatedByPastDateOnly(row.date, row.createdAt));
+
+    rows.sort((a, b) => {
+      const ta = dayjs(a.date).isValid() ? dayjs(a.date).valueOf() : 0;
+      const tb = dayjs(b.date).isValid() ? dayjs(b.date).valueOf() : 0;
+      if (ta !== tb) return tb - ta;
+      return a.expenseName.localeCompare(b.expenseName);
+    });
+
+    return rows;
+  }, [
+    records,
+    dateFrom,
+    dateTo,
+    selectedOption,
+    inventoryItemById,
+    expenseItemById,
+  ]);
 
   const consolidatedTotals = React.useMemo(() => {
     return consolidatedRows.reduce(
@@ -436,6 +500,61 @@ const ExpensesReport: React.FC = () => {
                         </TableCell>
                       </TableRow>
                     </>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
+              Backdated entries
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Entries where the expense date (calendar day only) is before the calendar
+              day the record was created. Here, Date From / To filters by when the row
+              was recorded (creation time); the tables above filter by expense date
+              instead. Item Filter still applies. Type (internal/external) does not
+              filter this list.
+            </Typography>
+            <TableContainer sx={{ maxHeight: 400 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Expense Name</TableCell>
+                    <TableCell>Expense date</TableCell>
+                    <TableCell>Recorded at</TableCell>
+                    <TableCell>Source</TableCell>
+                    <TableCell align="right">Pieces</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                    <TableCell>Notes</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {backdatedRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center">
+                        No backdated entries match the filters.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    backdatedRows.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell>{row.expenseName}</TableCell>
+                        <TableCell>{formatDateTime(row.date)}</TableCell>
+                        <TableCell>{formatDateTime(row.createdAt)}</TableCell>
+                        <TableCell>
+                          {row.source === "inventory" ? "Inventory" : "Expense"}
+                        </TableCell>
+                        <TableCell align="right">
+                          {row.pieces == null ? "" : row.pieces}
+                        </TableCell>
+                        <TableCell align="right">
+                          {currency.format(row.amount)}
+                        </TableCell>
+                        <TableCell>{row.notes || "-"}</TableCell>
+                      </TableRow>
+                    ))
                   )}
                 </TableBody>
               </Table>

@@ -6,7 +6,6 @@ const route = {
   TRANSACTION: "/transaction",
   INVENTORY_ITEMS: "/inventory/items",
   INVENTORY_MANAGE: "/inventory/manage",
-  INVENTORY_STOCK_USAGE: "/inventory/stock-usage",
   INVENTORY_SUMMARY: "/inventory/summary",
   EXPENSES_ITEMS: "/expenses/items",
   EXPENSES_RECORDS: "/expenses/records",
@@ -22,6 +21,7 @@ const route = {
   SETTINGS: "/settings/database",
   SETTINGS_ADDONS_PRICING: "/settings/addons-pricing",
   SETTINGS_FIXED_MONTHLY_EXPENSES: "/settings/fixed-monthly-expenses",
+  SETTINGS_ACTIVITY_LOG: "/settings/activity-log",
 };
 
 export default route;

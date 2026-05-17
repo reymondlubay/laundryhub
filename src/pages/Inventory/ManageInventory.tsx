@@ -41,6 +41,7 @@ import inventoryRecordService, {
   type InventoryRecord,
   type UpdateInventoryRecordPayload,
 } from "../../services/inventoryRecordService";
+import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
 type FormState = {
   item: InventoryItem | null;
@@ -335,7 +336,7 @@ const ManageInventoryPage: React.FC = () => {
 
       <Dialog
         open={dialogOpen}
-        onClose={closeDialog}
+        onClose={ignoreBackdropClose(closeDialog)}
         fullWidth
         maxWidth="sm"
         PaperProps={{ component: "form", autoComplete: "off" }}

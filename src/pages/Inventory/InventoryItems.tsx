@@ -35,15 +35,18 @@ import inventoryItemService, {
   type InventoryItem,
   type UpdateInventoryItemPayload,
 } from "../../services/inventoryItemService";
+import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
 type InventoryItemFormState = {
   name: string;
   notes: string;
+  defaultPieces: string;
 };
 
 const emptyForm: InventoryItemFormState = {
   name: "",
   notes: "",
+  defaultPieces: "",
 };
 
 const InventoryItemsPage: React.FC = () => {
@@ -98,6 +101,10 @@ const InventoryItemsPage: React.FC = () => {
     setForm({
       name: item.name || "",
       notes: item.notes || "",
+      defaultPieces:
+        item.defaultPieces != null && Number(item.defaultPieces) >= 1
+          ? String(Math.floor(Number(item.defaultPieces)))
+          : "",
     });
     setDialogError(null);
     setDialogOpen(true);
@@ -112,6 +119,12 @@ const InventoryItemsPage: React.FC = () => {
 
   const validateForm = (): string | null => {
     if (!form.name.trim()) return "Item Name is required.";
+    if (form.defaultPieces.trim()) {
+      const n = Math.floor(Number(form.defaultPieces));
+      if (!Number.isFinite(n) || n < 1) {
+        return "Default pieces must be 1 or more when set.";
+      }
+    }
     return null;
   };
 
@@ -131,12 +144,28 @@ const InventoryItemsPage: React.FC = () => {
         const payload: UpdateInventoryItemPayload = {
           name: toTitleCaseWords(form.name.trim()),
           notes: form.notes.trim() || undefined,
+          ...(form.defaultPieces.trim() === ""
+            ? { defaultPieces: null }
+            : {
+                defaultPieces: Math.max(
+                  1,
+                  Math.floor(Number(form.defaultPieces)),
+                ),
+              }),
         };
         await inventoryItemService.update(editing.id, payload);
       } else {
         const payload: CreateInventoryItemPayload = {
           name: toTitleCaseWords(form.name.trim()),
           notes: form.notes.trim() || undefined,
+          ...(form.defaultPieces.trim() !== ""
+            ? {
+                defaultPieces: Math.max(
+                  1,
+                  Math.floor(Number(form.defaultPieces)),
+                ),
+              }
+            : {}),
         };
         await inventoryItemService.create(payload);
       }
@@ -186,10 +215,10 @@ const InventoryItemsPage: React.FC = () => {
 
       <Paper>
         {loading ? (
-          <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+            <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
             <Table size="small" stickyHeader>
-              <TableHeaderSkeleton columns={3} />
-              <TableSkeleton columns={3} rows={8} />
+              <TableHeaderSkeleton columns={4} />
+              <TableSkeleton columns={4} rows={8} />
             </Table>
           </TableContainer>
         ) : (
@@ -199,6 +228,7 @@ const InventoryItemsPage: React.FC = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell>Item Name</TableCell>
+                    <TableCell align="right">Default pieces</TableCell>
                     <TableCell>Notes</TableCell>
                     <TableCell align="right">Action</TableCell>
                   </TableRow>
@@ -206,7 +236,7 @@ const InventoryItemsPage: React.FC = () => {
                 <TableBody>
                   {pagedItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} align="center">
+                      <TableCell colSpan={4} align="center">
                         No inventory items.
                       </TableCell>
                     </TableRow>
@@ -214,6 +244,12 @@ const InventoryItemsPage: React.FC = () => {
                     pagedItems.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell>{item.name || "-"}</TableCell>
+                        <TableCell align="right">
+                          {item.defaultPieces != null &&
+                          Number.isFinite(Number(item.defaultPieces))
+                            ? String(Math.floor(Number(item.defaultPieces)))
+                            : "-"}
+                        </TableCell>
                         <TableCell>{item.notes || "-"}</TableCell>
                         <TableCell align="right">
                           <IconButton
@@ -263,7 +299,7 @@ const InventoryItemsPage: React.FC = () => {
 
       <Dialog
         open={dialogOpen}
-        onClose={closeDialog}
+        onClose={ignoreBackdropClose(closeDialog)}
         fullWidth
         maxWidth="sm"
         PaperProps={{ component: "form", autoComplete: "off" }}
@@ -287,6 +323,22 @@ const InventoryItemsPage: React.FC = () => {
                 onChange={(e) =>
                   setForm((prev) => ({ ...prev, name: e.target.value }))
                 }
+              />
+            </Grid>
+            <Grid size={12}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Default pieces (optional)"
+                value={form.defaultPieces}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    defaultPieces: e.target.value,
+                  }))
+                }
+                inputProps={{ min: 1, inputMode: "numeric" }}
+                helperText="Prefills Record Expense when this inventory item is selected."
               />
             </Grid>
             <Grid size={12}>
