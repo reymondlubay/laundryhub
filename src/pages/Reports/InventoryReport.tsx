@@ -25,13 +25,13 @@ import inventoryItemService, {
 import inventoryRecordService, {
   type InventoryRecord,
 } from "../../services/inventoryRecordService";
-import stockUsageService, {
-  type StockUsageRecord,
-} from "../../services/stockUsageService";
 import expenseRecordService, {
   type ExpenseRecord,
 } from "../../services/expenseRecordService";
-import { computeFifoUsageCosts } from "../../utils/inventoryFifo";
+import {
+  computeFifoUsageCosts,
+  inventoryConsumptionFromExpenses,
+} from "../../utils/inventoryFifo";
 
 type ReportRow = {
   itemId: string;
@@ -68,7 +68,6 @@ const InventoryReport: React.FC = () => {
   const [inventoryRecords, setInventoryRecords] = React.useState<InventoryRecord[]>(
     [],
   );
-  const [usageRecords, setUsageRecords] = React.useState<StockUsageRecord[]>([]);
   const [expenseRecords, setExpenseRecords] = React.useState<ExpenseRecord[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -82,15 +81,13 @@ const InventoryReport: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const [lookupItems, inv, usage, expenses] = await Promise.all([
+        const [lookupItems, inv, expenses] = await Promise.all([
           inventoryItemService.getAllForLookup(),
           inventoryRecordService.getAll(),
-          stockUsageService.getAll(),
           expenseRecordService.getAll(),
         ]);
         setItems(lookupItems);
         setInventoryRecords(inv);
-        setUsageRecords(usage);
         setExpenseRecords(expenses);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to load inventory report.");
@@ -108,32 +105,21 @@ const InventoryReport: React.FC = () => {
     return map;
   }, [items]);
 
-  // Inventory-sourced expense records are functionally identical to stock usage
-  // for FIFO costing and internal/external reporting, so we merge them here.
-  const allConsumption = React.useMemo<StockUsageRecord[]>(() => {
-    const fromExpenses: StockUsageRecord[] = expenseRecords
-      .filter((r) => r.source === "inventory" && r.inventoryItemId)
-      .map((r) => ({
-        id: r.id,
-        itemId: r.inventoryItemId as string,
-        date: r.date,
-        pieces: Number(r.pieces) || 0,
-        isExternalUsage: Boolean(r.isExternalUsage),
-      }));
-    return [...usageRecords, ...fromExpenses];
-  }, [usageRecords, expenseRecords]);
+  const allConsumption = React.useMemo(
+    () => inventoryConsumptionFromExpenses(expenseRecords),
+    [expenseRecords],
+  );
 
   const reportRows = React.useMemo<ReportRow[]>(() => {
     const range = normalizeRange(dateFrom, dateTo);
 
-    // FIFO needs usages up to `to` (and before-from to prime the lot consumption).
     const usagesUpToTo = allConsumption.filter((u) =>
       isWithinRange(u.date, dayjs("1970-01-01"), range.to),
     );
 
     const { usageCostsById } = computeFifoUsageCosts({
       inventoryRecords,
-      stockUsageRecords: usagesUpToTo,
+      consumptionRecords: usagesUpToTo,
     });
 
     const inRange = allConsumption.filter((u) =>
@@ -177,7 +163,7 @@ const InventoryReport: React.FC = () => {
 
     const { usageCostsById } = computeFifoUsageCosts({
       inventoryRecords,
-      stockUsageRecords: usagesUpToTo,
+      consumptionRecords: usagesUpToTo,
     });
 
     const inRange = allConsumption.filter((u) =>
@@ -386,4 +372,3 @@ const InventoryReport: React.FC = () => {
 };
 
 export default InventoryReport;
-
