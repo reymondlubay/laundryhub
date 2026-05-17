@@ -46,9 +46,6 @@ import inventoryItemService, {
 import inventoryRecordService, {
   type InventoryRecord,
 } from "../../services/inventoryRecordService";
-import stockUsageService, {
-  type StockUsageRecord,
-} from "../../services/stockUsageService";
 import expenseItemService, {
   type ExpenseItem,
 } from "../../services/expenseItemService";
@@ -98,9 +95,6 @@ const RecordExpensePage: React.FC = () => {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [expenseItems, setExpenseItems] = useState<ExpenseItem[]>([]);
   const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>(
-    [],
-  );
-  const [stockUsageRecords, setStockUsageRecords] = useState<StockUsageRecord[]>(
     [],
   );
   const [records, setRecords] = useState<ExpenseRecord[]>([]);
@@ -190,18 +184,15 @@ const RecordExpensePage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [invItems, expItems, invRecs, usageRecs, expRecs] =
-        await Promise.all([
-          inventoryItemService.getAllForLookup(),
-          expenseItemService.getAllForLookup(),
-          inventoryRecordService.getAll(),
-          stockUsageService.getAll(),
-          expenseRecordService.getAll(),
-        ]);
+      const [invItems, expItems, invRecs, expRecs] = await Promise.all([
+        inventoryItemService.getAllForLookup(),
+        expenseItemService.getAllForLookup(),
+        inventoryRecordService.getAll(),
+        expenseRecordService.getAll(),
+      ]);
       setInventoryItems(invItems);
       setExpenseItems(expItems);
       setInventoryRecords(invRecs);
-      setStockUsageRecords(usageRecs);
       setRecords(expRecs);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : API_ERRORS.SAVE_FAILED);
@@ -236,11 +227,6 @@ const RecordExpensePage: React.FC = () => {
         row.itemId === itemId ? sum + (Number(row.pieces) || 0) : sum,
       0,
     );
-    const legacyUsed = stockUsageRecords.reduce(
-      (sum, row) =>
-        row.itemId === itemId ? sum + (Number(row.pieces) || 0) : sum,
-      0,
-    );
     const expensed = records.reduce((sum, row) => {
       if (row.source !== "inventory") return sum;
       if (row.inventoryItemId !== itemId) return sum;
@@ -248,8 +234,8 @@ const RecordExpensePage: React.FC = () => {
       if (editing && row.id === editing.id) return sum;
       return sum + (Number(row.pieces) || 0);
     }, 0);
-    return Math.max(0, purchased - legacyUsed - expensed);
-  }, [editing, form.option, inventoryRecords, records, stockUsageRecords]);
+    return Math.max(0, purchased - expensed);
+  }, [editing, form.option, inventoryRecords, records]);
 
   const computedAmountPreview = useMemo<number | null>(() => {
     if (form.option?.type !== "inventory") return null;

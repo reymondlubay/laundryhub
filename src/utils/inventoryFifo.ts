@@ -1,6 +1,13 @@
 import dayjs from "dayjs";
 import type { InventoryRecord } from "../services/inventoryRecordService";
-import type { StockUsageRecord } from "../services/stockUsageService";
+
+export type InventoryConsumptionRecord = {
+  id: string;
+  itemId: string;
+  date: string;
+  pieces: number;
+  isExternalUsage: boolean;
+};
 
 export type FifoLot = {
   inventoryRecordId: string;
@@ -26,12 +33,12 @@ const toTime = (value?: string | null): number => {
 /**
  * FIFO costing:
  * - Inventory lots are ordered by `dateOfPrice` ascending (then by record `date`).
- * - Stock usage is ordered by `date` ascending.
- * Each usage consumes the oldest remaining lots first.
+ * - Consumption records are ordered by `date` ascending.
+ * Each consumption consumes the oldest remaining lots first.
  */
 export function computeFifoUsageCosts(params: {
   inventoryRecords: InventoryRecord[];
-  stockUsageRecords: StockUsageRecord[];
+  consumptionRecords: InventoryConsumptionRecord[];
 }): {
   usageCostsById: Map<string, UsageCostResult>;
   remainingLotsByItemId: Map<string, FifoLot[]>;
@@ -52,7 +59,6 @@ export function computeFifoUsageCosts(params: {
     lotsByItemId.set(itemId, arr);
   });
 
-  // sort lots FIFO
   lotsByItemId.forEach((arr) => {
     arr.sort((a, b) => {
       const byPriceDate = toTime(a.dateOfPrice) - toTime(b.dateOfPrice);
@@ -61,7 +67,7 @@ export function computeFifoUsageCosts(params: {
     });
   });
 
-  const usages = [...params.stockUsageRecords].sort((a, b) => {
+  const usages = [...params.consumptionRecords].sort((a, b) => {
     const byDate = toTime(a.date) - toTime(b.date);
     if (byDate !== 0) return byDate;
     return a.id.localeCompare(b.id);
@@ -94,7 +100,6 @@ export function computeFifoUsageCosts(params: {
     });
   });
 
-  // return deep-ish copies of remaining lots (so callers can't mutate internal)
   const remainingLotsByItemId = new Map<string, FifoLot[]>();
   lotsByItemId.forEach((arr, itemId) => {
     remainingLotsByItemId.set(
@@ -106,3 +111,23 @@ export function computeFifoUsageCosts(params: {
   return { usageCostsById, remainingLotsByItemId };
 }
 
+export function inventoryConsumptionFromExpenses(
+  expenseRecords: Array<{
+    id: string;
+    source: string;
+    inventoryItemId?: string | null;
+    date: string;
+    pieces?: number | null;
+    isExternalUsage?: boolean | null;
+  }>,
+): InventoryConsumptionRecord[] {
+  return expenseRecords
+    .filter((r) => r.source === "inventory" && r.inventoryItemId)
+    .map((r) => ({
+      id: r.id,
+      itemId: r.inventoryItemId as string,
+      date: r.date,
+      pieces: Number(r.pieces) || 0,
+      isExternalUsage: Boolean(r.isExternalUsage),
+    }));
+}

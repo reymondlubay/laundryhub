@@ -348,6 +348,14 @@ export default function SidebarMenu() {
               Fixed monthly expenses
             </MenuItem>
           )}
+          {isAdminUser && (
+            <MenuItem
+              component={<Link to={route.SETTINGS_ACTIVITY_LOG} />}
+              active={activePath === route.SETTINGS_ACTIVITY_LOG}
+            >
+              Activity log
+            </MenuItem>
+          )}
         </SubMenu>
       </Menu>
     </Sidebar>

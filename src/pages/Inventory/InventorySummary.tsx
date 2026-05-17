@@ -19,13 +19,13 @@ import inventoryItemService, {
 import inventoryRecordService, {
   type InventoryRecord,
 } from "../../services/inventoryRecordService";
-import stockUsageService, {
-  type StockUsageRecord,
-} from "../../services/stockUsageService";
 import expenseRecordService, {
   type ExpenseRecord,
 } from "../../services/expenseRecordService";
-import { computeFifoUsageCosts } from "../../utils/inventoryFifo";
+import {
+  computeFifoUsageCosts,
+  inventoryConsumptionFromExpenses,
+} from "../../utils/inventoryFifo";
 
 type SummaryRow = {
   itemId: string;
@@ -42,7 +42,6 @@ const currency = new Intl.NumberFormat("en-PH", {
 const InventorySummaryPage: React.FC = () => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [records, setRecords] = useState<InventoryRecord[]>([]);
-  const [usages, setUsages] = useState<StockUsageRecord[]>([]);
   const [expenseRecords, setExpenseRecords] = useState<ExpenseRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,15 +50,13 @@ const InventorySummaryPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [lookupItems, data, usageData, expenseData] = await Promise.all([
+      const [lookupItems, data, expenseData] = await Promise.all([
         inventoryItemService.getAllForLookup(),
         inventoryRecordService.getAll(),
-        stockUsageService.getAll(),
         expenseRecordService.getAll(),
       ]);
       setItems(lookupItems);
       setRecords(data);
-      setUsages(usageData);
       setExpenseRecords(expenseData);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : API_ERRORS.SAVE_FAILED);
@@ -82,23 +79,15 @@ const InventorySummaryPage: React.FC = () => {
     return map;
   }, [items]);
 
-  const allConsumption = useMemo<StockUsageRecord[]>(() => {
-    const fromExpenses: StockUsageRecord[] = expenseRecords
-      .filter((r) => r.source === "inventory" && r.inventoryItemId)
-      .map((r) => ({
-        id: r.id,
-        itemId: r.inventoryItemId as string,
-        date: r.date,
-        pieces: Number(r.pieces) || 0,
-        isExternalUsage: Boolean(r.isExternalUsage),
-      }));
-    return [...usages, ...fromExpenses];
-  }, [usages, expenseRecords]);
+  const allConsumption = useMemo(
+    () => inventoryConsumptionFromExpenses(expenseRecords),
+    [expenseRecords],
+  );
 
   const summary = useMemo<SummaryRow[]>(() => {
     const { remainingLotsByItemId } = computeFifoUsageCosts({
       inventoryRecords: records,
-      stockUsageRecords: allConsumption,
+      consumptionRecords: allConsumption,
     });
 
     const rows: SummaryRow[] = [];
@@ -199,4 +188,3 @@ const InventorySummaryPage: React.FC = () => {
 };
 
 export default InventorySummaryPage;
-

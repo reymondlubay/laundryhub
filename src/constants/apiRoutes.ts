@@ -6,7 +6,6 @@ export const API_ROUTES = {
   CUSTOMERS: "/customers",
   INVENTORY_ITEMS: "/inventory-items",
   INVENTORY_RECORDS: "/inventory-records",
-  STOCK_USAGE_RECORDS: "/stock-usage-records",
   EXPENSE_ITEMS: "/expense-items",
   EXPENSE_RECORDS: "/expense-records",
   FIXED_MONTHLY_EXPENSES: "/fixed-monthly-expenses",
@@ -16,6 +15,9 @@ export const API_ROUTES = {
   BACKUPS: "/backups",
   RESTORE: "/restore",
   ADDONS_PRICING: "/addons-pricing",
+  ACTIVITY_LOGS: "/activity-logs",
+  ACTIVITY_LOG_SETTINGS: "/activity-logs/settings",
+  ACTIVITY_LOG_CLEANUP: "/activity-logs/cleanup",
 } as const;
 
 export default API_ROUTES;
