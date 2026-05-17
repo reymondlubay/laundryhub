@@ -117,6 +117,20 @@ const TX_ACTION_ICON_BUTTON_SX = {
   "& .MuiSvgIcon-root": { fontSize: 20 },
 } as const;
 
+const TX_TABLE_STATUS_ICON_SIZE = 22;
+
+const TX_TABLE_TOOLTIP_SLOT_PROPS = {
+  tooltip: {
+    sx: {
+      fontSize: "0.95rem",
+      lineHeight: 1.45,
+      maxWidth: 380,
+      py: 0.75,
+      px: 1.25,
+    },
+  },
+} as const;
+
 const TX_CUSTOMER_TEXT_WRAP_SX = {
   overflowWrap: "anywhere" as const,
   wordBreak: "break-word" as const,
@@ -1048,10 +1062,25 @@ function TransactionTableInner({
             </Box>
             {params.data?.isFirstRow && params.data?.estimatedPickup ? (
               <Tooltip
-                title={dayjs(params.data.estimatedPickup).format(
-                  "MM-DD-YY h:mm A",
-                )}
+                title={
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 0.25,
+                      fontSize: "0.95rem",
+                    }}
+                  >
+                    <span>Scheduled Pick Up</span>
+                    <span>
+                      {dayjs(params.data.estimatedPickup).format(
+                        "MMMM D, YYYY hh:mm A",
+                      )}
+                    </span>
+                  </Box>
+                }
                 arrow
+                slotProps={TX_TABLE_TOOLTIP_SLOT_PROPS}
               >
                 <Box
                   component="span"
@@ -1064,7 +1093,7 @@ function TransactionTableInner({
                     flexShrink: 0,
                   }}
                 >
-                  <AccessTimeIcon sx={{ fontSize: 15 }} />
+                  <AccessTimeIcon sx={{ fontSize: TX_TABLE_STATUS_ICON_SIZE }} />
                 </Box>
               </Tooltip>
             ) : null}
@@ -1081,6 +1110,7 @@ function TransactionTableInner({
                             display: "flex",
                             flexDirection: "column",
                             gap: 0.25,
+                            fontSize: "0.95rem",
                           }}
                         >
                           {details.map((line) => (
@@ -1089,6 +1119,7 @@ function TransactionTableInner({
                         </Box>
                       }
                       arrow
+                      slotProps={TX_TABLE_TOOLTIP_SLOT_PROPS}
                     >
                       <Box
                         component="span"
@@ -1102,7 +1133,9 @@ function TransactionTableInner({
                           flexShrink: 0,
                         }}
                       >
-                        <InfoOutlinedIcon sx={{ fontSize: 15 }} />
+                        <InfoOutlinedIcon
+                          sx={{ fontSize: TX_TABLE_STATUS_ICON_SIZE }}
+                        />
                       </Box>
                     </Tooltip>
                   );
@@ -1237,7 +1270,14 @@ function TransactionTableInner({
           const overAmount = Math.max(totalPaid - totalPrice, 0);
 
           const tooltipTitle = (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 0.25,
+                fontSize: "0.95rem",
+              }}
+            >
               {params.data.paymentHistory.map((paymentLine, index) => (
                 <span key={`${params.data?.transactionId}-payment-${index}`}>
                   {paymentLine}
@@ -1268,20 +1308,24 @@ function TransactionTableInner({
               }}
             >
               {hasBalance ? (
-                <Tooltip title={tooltipTitle} arrow>
+                <Tooltip
+                  title={tooltipTitle}
+                  arrow
+                  slotProps={TX_TABLE_TOOLTIP_SLOT_PROPS}
+                >
                   <Box
                     component="span"
                     sx={{
                       display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      height: 20,
+                      height: TX_TABLE_STATUS_ICON_SIZE + 4,
                     }}
                   >
                     <WarningAmberIcon
                       sx={{
                         color: "#f44336",
-                        fontSize: 16,
+                        fontSize: TX_TABLE_STATUS_ICON_SIZE,
                         display: "block",
                       }}
                     />
@@ -1289,20 +1333,24 @@ function TransactionTableInner({
                 </Tooltip>
               ) : null}
               {hasPaidOrOver ? (
-                <Tooltip title={tooltipTitle} arrow>
+                <Tooltip
+                  title={tooltipTitle}
+                  arrow
+                  slotProps={TX_TABLE_TOOLTIP_SLOT_PROPS}
+                >
                   <Box
                     component="span"
                     sx={{
                       display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      height: 20,
+                      height: TX_TABLE_STATUS_ICON_SIZE + 4,
                     }}
                   >
                     <HistoryIcon
                       sx={{
                         color: "#4caf50",
-                        fontSize: 16,
+                        fontSize: TX_TABLE_STATUS_ICON_SIZE,
                         display: "block",
                       }}
                     />
@@ -1390,7 +1438,14 @@ function TransactionTableInner({
           if (details.length === 0) return "-";
 
           const tooltipTitle = (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 0.25,
+                fontSize: "0.95rem",
+              }}
+            >
               {details.map((line) => (
                 <span key={line}>{line}</span>
               ))}
@@ -1398,7 +1453,11 @@ function TransactionTableInner({
           );
 
           return (
-            <Tooltip title={tooltipTitle} arrow>
+            <Tooltip
+              title={tooltipTitle}
+              arrow
+              slotProps={TX_TABLE_TOOLTIP_SLOT_PROPS}
+            >
               <Stack
                 direction="row"
                 spacing={0.5}
@@ -1409,7 +1468,9 @@ function TransactionTableInner({
                   width: "fit-content",
                 }}
               >
-                <InfoOutlinedIcon sx={{ fontSize: 16, color: "#f44336" }} />
+                <InfoOutlinedIcon
+                  sx={{ fontSize: TX_TABLE_STATUS_ICON_SIZE, color: "#f44336" }}
+                />
                 <span style={{ color: "#f44336", fontWeight: 600 }}>
                   {UI_TEXT.READ_NOTES}
                 </span>

@@ -119,6 +119,21 @@ const backupService = {
     await axiosClient.delete(`${API_ROUTES.BACKUP}/${id}`);
   },
 
+  downloadBackup: async (id: string, filename: string): Promise<void> => {
+    const response = await axiosClient.get(`${API_ROUTES.BACKUP}/${id}/download`, {
+      responseType: "blob",
+    });
+    const blob = response.data as Blob;
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename || "backup.sql";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
   uploadBackup: async (file: File, folderPath?: string): Promise<void> => {
     const formData = new FormData();
     formData.append("file", file);

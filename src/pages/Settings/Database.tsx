@@ -68,6 +68,8 @@ const DatabaseSettings: React.FC = () => {
   const [deleteConfirmText, setDeleteConfirmText] = React.useState("");
   const [deleteLoading, setDeleteLoading] = React.useState(false);
 
+  const [downloadId, setDownloadId] = React.useState<string | null>(null);
+
   const [folderPaths, setFolderPaths] = React.useState<BackupFolderPathItem[]>(
     [],
   );
@@ -273,6 +275,20 @@ const DatabaseSettings: React.FC = () => {
       setError(message);
     } finally {
       setRestoreLoading(false);
+    }
+  };
+
+  const handleDownloadBackup = async (backup: BackupItem) => {
+    try {
+      setDownloadId(backup.id);
+      setError(null);
+      await backupService.downloadBackup(backup.id, backup.filename);
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Failed to download backup.",
+      );
+    } finally {
+      setDownloadId(null);
     }
   };
 
@@ -725,12 +741,30 @@ const DatabaseSettings: React.FC = () => {
                             <Button
                               size="small"
                               variant="outlined"
+                              disabled={
+                                isPending ||
+                                backup.status !== "Success" ||
+                                hasPendingOperation ||
+                                restoreLoading ||
+                                deleteLoading ||
+                                Boolean(downloadId)
+                              }
+                              onClick={() => void handleDownloadBackup(backup)}
+                            >
+                              {downloadId === backup.id
+                                ? "Downloading..."
+                                : "Download"}
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
                               color="warning"
                               disabled={
                                 isPending ||
                                 hasPendingOperation ||
                                 restoreLoading ||
-                                deleteLoading
+                                deleteLoading ||
+                                Boolean(downloadId)
                               }
                               onClick={() => setRestoreId(backup.id)}
                             >

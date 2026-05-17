@@ -31,7 +31,11 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import {
+  DatePicker,
+  DateTimePicker,
+  LocalizationProvider,
+} from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { type Dayjs } from "dayjs";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog";
@@ -91,6 +95,27 @@ const phpFormatter = new Intl.NumberFormat("en-PH", {
   currency: "PHP",
 });
 
+const normalizeRange = (from: Dayjs, to: Dayjs): { from: Dayjs; to: Dayjs } => {
+  if (from.isAfter(to)) return { from: to, to: from };
+  return { from, to };
+};
+
+const isWithinDateRange = (
+  dateValue: string | undefined,
+  from: Dayjs,
+  to: Dayjs,
+): boolean => {
+  if (!dateValue) return false;
+  const date = dayjs(dateValue);
+  if (!date.isValid()) return false;
+  const range = normalizeRange(from, to);
+  return (
+    (date.isSame(range.from.startOf("day")) ||
+      date.isAfter(range.from.startOf("day"))) &&
+    (date.isSame(range.to.endOf("day")) || date.isBefore(range.to.endOf("day")))
+  );
+};
+
 const RecordExpensePage: React.FC = () => {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [expenseItems, setExpenseItems] = useState<ExpenseItem[]>([]);
@@ -111,6 +136,11 @@ const RecordExpensePage: React.FC = () => {
 
   const [filterSource, setFilterSource] = useState<SourceFilter>("all");
   const [filterUsageType, setFilterUsageType] = useState<UsageTypeFilter>("all");
+  const [filterNameOption, setFilterNameOption] = useState<ExpenseOption | null>(
+    null,
+  );
+  const [filterDateFrom, setFilterDateFrom] = useState<Dayjs>(() => dayjs());
+  const [filterDateTo, setFilterDateTo] = useState<Dayjs>(() => dayjs());
 
   const isCurrentUserAdmin = useMemo(() => isAdmin(), []);
 
@@ -217,7 +247,14 @@ const RecordExpensePage: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [records.length]);
+  }, [
+    records.length,
+    filterSource,
+    filterUsageType,
+    filterNameOption,
+    filterDateFrom,
+    filterDateTo,
+  ]);
 
   const selectedAvailablePieces = useMemo<number | null>(() => {
     if (form.option?.type !== "inventory") return null;
@@ -251,14 +288,32 @@ const RecordExpensePage: React.FC = () => {
       filterSource === "all"
         ? records
         : records.filter((r) => r.source === filterSource);
-    if (filterUsageType === "internal") {
-      return bySource.filter((r) => !r.isExternalUsage);
-    }
-    if (filterUsageType === "external") {
-      return bySource.filter((r) => Boolean(r.isExternalUsage));
-    }
-    return bySource;
-  }, [filterSource, filterUsageType, records]);
+    const byUsage =
+      filterUsageType === "internal"
+        ? bySource.filter((r) => !r.isExternalUsage)
+        : filterUsageType === "external"
+          ? bySource.filter((r) => Boolean(r.isExternalUsage))
+          : bySource;
+    const byDate = byUsage.filter((r) =>
+      isWithinDateRange(r.date, filterDateFrom, filterDateTo),
+    );
+    if (!filterNameOption) return byDate;
+    return byDate.filter((r) => {
+      if (filterNameOption.type === "inventory") {
+        return (
+          r.source === "inventory" && r.inventoryItemId === filterNameOption.id
+        );
+      }
+      return r.source === "expense" && r.expenseItemId === filterNameOption.id;
+    });
+  }, [
+    filterSource,
+    filterUsageType,
+    filterNameOption,
+    filterDateFrom,
+    filterDateTo,
+    records,
+  ]);
 
   const paged = useMemo(() => {
     return filteredRecords.slice(
@@ -463,40 +518,83 @@ const RecordExpensePage: React.FC = () => {
         sx={{ mb: 2 }}
       >
         <Typography variant="h6">Record Expense</Typography>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <FormControl size="small" sx={{ minWidth: 160 }}>
-            <InputLabel id="expense-source-filter-label">Source</InputLabel>
-            <Select
-              labelId="expense-source-filter-label"
-              label="Source"
-              value={filterSource}
-              onChange={(e) => setFilterSource(e.target.value as SourceFilter)}
-            >
-              <MenuItem value="all">All</MenuItem>
-              <MenuItem value="inventory">Inventory</MenuItem>
-              <MenuItem value="expense">Expense</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 160 }}>
-            <InputLabel id="expense-type-filter-label">Type</InputLabel>
-            <Select
-              labelId="expense-type-filter-label"
-              label="Type"
-              value={filterUsageType}
-              onChange={(e) =>
-                setFilterUsageType(e.target.value as UsageTypeFilter)
-              }
-            >
-              <MenuItem value="all">All</MenuItem>
-              <MenuItem value="internal">Internal</MenuItem>
-              <MenuItem value="external">External</MenuItem>
-            </Select>
-          </FormControl>
-          <Button variant="contained" onClick={openCreate} disabled={loading}>
-            Record Expense
-          </Button>
-        </Stack>
+        <Button variant="contained" onClick={openCreate} disabled={loading}>
+          Record Expense
+        </Button>
       </Stack>
+
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Autocomplete
+                size="small"
+                fullWidth
+                options={combinedOptions}
+                value={filterNameOption}
+                onChange={(_, value) => setFilterNameOption(value)}
+                isOptionEqualToValue={(option, value) =>
+                  option.key === value.key
+                }
+                getOptionLabel={(option) => option.label}
+                renderInput={(params) => (
+                  <TextField {...params} label="Expense Name" fullWidth />
+                )}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <DatePicker
+                label="Date From"
+                value={filterDateFrom}
+                onChange={(value) => setFilterDateFrom(value || dayjs())}
+                slotProps={{ textField: { size: "small", fullWidth: true } }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <DatePicker
+                label="Date To"
+                value={filterDateTo}
+                onChange={(value) => setFilterDateTo(value || dayjs())}
+                slotProps={{ textField: { size: "small", fullWidth: true } }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <FormControl size="small" fullWidth>
+                <InputLabel id="expense-source-filter-label">Source</InputLabel>
+                <Select
+                  labelId="expense-source-filter-label"
+                  label="Source"
+                  value={filterSource}
+                  onChange={(e) =>
+                    setFilterSource(e.target.value as SourceFilter)
+                  }
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="inventory">Inventory</MenuItem>
+                  <MenuItem value="expense">Expense</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <FormControl size="small" fullWidth>
+                <InputLabel id="expense-type-filter-label">Type</InputLabel>
+                <Select
+                  labelId="expense-type-filter-label"
+                  label="Type"
+                  value={filterUsageType}
+                  onChange={(e) =>
+                    setFilterUsageType(e.target.value as UsageTypeFilter)
+                  }
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="internal">Internal</MenuItem>
+                  <MenuItem value="external">External</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </LocalizationProvider>
+      </Paper>
 
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -506,7 +604,7 @@ const RecordExpensePage: React.FC = () => {
 
       <Paper>
         {loading ? (
-          <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+          <TableContainer sx={{ maxHeight: "calc(100vh - 340px)" }}>
             <Table size="small" stickyHeader>
               <TableHeaderSkeleton columns={7} />
               <TableSkeleton columns={7} rows={8} />
@@ -514,7 +612,7 @@ const RecordExpensePage: React.FC = () => {
           </TableContainer>
         ) : (
           <>
-            <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+            <TableContainer sx={{ maxHeight: "calc(100vh - 340px)" }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
