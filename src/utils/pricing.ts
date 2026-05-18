@@ -52,11 +52,206 @@ export const getStoredSnapshots = (payload: {
     payload.addonsSubtotal ?? payload.addonssubtotal,
   );
 
+  const hasGrandTotal =
+    payload.grandTotal !== undefined || payload.grandtotal !== undefined;
+  const hasLoadSubtotal =
+    payload.loadSubtotal !== undefined || payload.loadsubtotal !== undefined;
+  const hasAddonsSubtotal =
+    payload.addonsSubtotal !== undefined ||
+    payload.addonssubtotal !== undefined;
+
+  const hasPersistedSnapshots =
+    grandTotal > 0 || loadSubtotal > 0 || addonsSubtotal > 0;
+
   return {
     grandTotal,
     loadSubtotal,
     addonsSubtotal,
-    hasGrandTotal:
-      payload.grandTotal !== undefined || payload.grandtotal !== undefined,
+    hasGrandTotal,
+    hasLoadSubtotal,
+    hasAddonsSubtotal,
+    hasPersistedSnapshots,
   };
+};
+
+/**
+ * Reconstruct per-addon unit prices from a frozen addonsSubtotal when possible.
+ * Used so old transactions do not pick up today's global addon prices.
+ */
+export const inferAddonPricingFromSnapshots = (
+  transaction: Record<string, unknown>,
+  fallback: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): AddonsPricing | null => {
+  const addonsSubtotal = toNumber(
+    transaction.addonsSubtotal ?? transaction.addonssubtotal,
+  );
+  if (addonsSubtotal <= 0) return null;
+
+  const whitePrice = toNumber(transaction.whitePrice ?? transaction.whiteprice);
+  const fabconQty = toNumber(transaction.fabconQty ?? transaction.fabconqty);
+  const detergentQty = toNumber(
+    transaction.detergentQty ?? transaction.detergentqty,
+  );
+  const colorSafeQty = toNumber(
+    transaction.colorSafeQty ?? transaction.colorsafeqty,
+  );
+
+  const addonRemainder = Math.max(0, addonsSubtotal - whitePrice);
+  const pricedQty = [
+    { qty: fabconQty, key: "fabcon" as const },
+    { qty: detergentQty, key: "detergent" as const },
+    { qty: colorSafeQty, key: "colorSafe" as const },
+  ].filter((entry) => entry.qty > 0);
+
+  if (pricedQty.length === 0) {
+    return { ...fallback };
+  }
+
+  if (pricedQty.length === 1) {
+    const unit = addonRemainder / pricedQty[0].qty;
+    return {
+      fabconPrice: pricedQty[0].key === "fabcon" ? unit : 0,
+      detergentPrice: pricedQty[0].key === "detergent" ? unit : 0,
+      colorSafePrice: pricedQty[0].key === "colorSafe" ? unit : 0,
+    };
+  }
+
+  const stored: AddonsPricing = {
+    fabconPrice: toNumber(
+      transaction.fabconUnitPrice ?? transaction.fabconunitprice,
+    ),
+    detergentPrice: toNumber(
+      transaction.detergentUnitPrice ?? transaction.detergentunitprice,
+    ),
+    colorSafePrice: toNumber(
+      transaction.colorSafeUnitPrice ?? transaction.colorsafeunitprice,
+    ),
+  };
+
+  const fromStored =
+    fabconQty * stored.fabconPrice +
+    detergentQty * stored.detergentPrice +
+    colorSafeQty * stored.colorSafePrice;
+
+  if (fromStored > 0 && Math.abs(fromStored - addonRemainder) < 0.02) {
+    return stored;
+  }
+
+  if (fromStored > 0) {
+    const scale = addonRemainder / fromStored;
+    return {
+      fabconPrice: stored.fabconPrice * scale,
+      detergentPrice: stored.detergentPrice * scale,
+      colorSafePrice: stored.colorSafePrice * scale,
+    };
+  }
+
+  const perUnit = addonRemainder / pricedQty.reduce((sum, e) => sum + e.qty, 0);
+  return {
+    fabconPrice: fabconQty > 0 ? perUnit : 0,
+    detergentPrice: detergentQty > 0 ? perUnit : 0,
+    colorSafePrice: colorSafeQty > 0 ? perUnit : 0,
+  };
+};
+
+export const getTransactionAddonPricing = (
+  transaction: Record<string, unknown>,
+  currentPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): AddonsPricing => {
+  const inferred = inferAddonPricingFromSnapshots(transaction, currentPricing);
+  if (inferred) {
+    return inferred;
+  }
+
+  const hasStored =
+    transaction.fabconUnitPrice != null ||
+    transaction.fabconunitprice != null ||
+    transaction.detergentUnitPrice != null ||
+    transaction.detergentunitprice != null ||
+    transaction.colorSafeUnitPrice != null ||
+    transaction.colorsafeunitprice != null;
+
+  if (!hasStored) {
+    return currentPricing;
+  }
+
+  return {
+    fabconPrice: toNumber(
+      transaction.fabconUnitPrice ??
+        transaction.fabconunitprice ??
+        currentPricing.fabconPrice,
+    ),
+    detergentPrice: toNumber(
+      transaction.detergentUnitPrice ??
+        transaction.detergentunitprice ??
+        currentPricing.detergentPrice,
+    ),
+    colorSafePrice: toNumber(
+      transaction.colorSafeUnitPrice ??
+        transaction.colorsafeunitprice ??
+        currentPricing.colorSafePrice,
+    ),
+  };
+};
+
+/** Prefer frozen snapshot totals; only recalculate when no persisted snapshot exists. */
+export const getTransactionGrandTotal = (
+  transaction: {
+    whitePrice?: number | string | null;
+    whiteprice?: number | string | null;
+    fabconQty?: number | string | null;
+    fabconqty?: number | string | null;
+    detergentQty?: number | string | null;
+    detergentqty?: number | string | null;
+    colorSafeQty?: number | string | null;
+    colorsafeqty?: number | string | null;
+    grandTotal?: number | string | null;
+    grandtotal?: number | string | null;
+    loadSubtotal?: number | string | null;
+    loadsubtotal?: number | string | null;
+    addonsSubtotal?: number | string | null;
+    addonssubtotal?: number | string | null;
+    loadDetails?: Array<{ price?: number | string | null }>;
+  },
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): number => {
+  const stored = getStoredSnapshots(transaction);
+  const loads = Array.isArray(transaction.loadDetails)
+    ? transaction.loadDetails
+    : [];
+  const loadFromLines = getLoadTotal(loads);
+
+  if (stored.grandTotal > 0) {
+    return stored.grandTotal;
+  }
+
+  if (stored.addonsSubtotal > 0 || stored.loadSubtotal > 0) {
+    const loadPart =
+      stored.loadSubtotal > 0 ? stored.loadSubtotal : loadFromLines;
+    return loadPart + stored.addonsSubtotal;
+  }
+
+  const loadTotal = loadFromLines;
+  const effectivePricing = getTransactionAddonPricing(
+    transaction as Record<string, unknown>,
+    addonsPricing,
+  );
+  return loadTotal + getAddonsTotal(transaction, effectivePricing);
+};
+
+/** Grand total stored on the row (for edit UI), ignoring live addon settings. */
+export const getFrozenTransactionGrandTotal = (
+  transaction: Record<string, unknown>,
+): number | null => {
+  const stored = getStoredSnapshots(transaction);
+  if (stored.grandTotal > 0) return stored.grandTotal;
+  if (stored.addonsSubtotal > 0 || stored.loadSubtotal > 0) {
+    const loads = Array.isArray(transaction.loadDetails)
+      ? (transaction.loadDetails as Array<{ price?: number | string | null }>)
+      : [];
+    const loadPart =
+      stored.loadSubtotal > 0 ? stored.loadSubtotal : getLoadTotal(loads);
+    return loadPart + stored.addonsSubtotal;
+  }
+  return null;
 };

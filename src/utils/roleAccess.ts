@@ -27,6 +27,7 @@ const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
     "/reports/expenses",
     "/reports/sales",
     "/reports/sales-expense-graph",
+    "/reports/collection",
     "/users",
     "/settings/database",
     "/settings/addons-pricing",

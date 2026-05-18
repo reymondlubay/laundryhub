@@ -33,6 +33,11 @@ import transactionService, {
 } from "../../services/transactionService";
 import customerService, { type Customer } from "../../services/customerService";
 import { toPascalCase } from "../../utils/stringUtils";
+import addonsPricingService, {
+  DEFAULT_ADDONS_PRICING,
+  type AddonsPricing,
+} from "../../services/addonsPricingService";
+import { getTransactionGrandTotal as resolveTransactionGrandTotal } from "../../utils/pricing";
 
 type TransactionWithLegacyFields = Transaction & {
   customerid?: string;
@@ -40,6 +45,8 @@ type TransactionWithLegacyFields = Transaction & {
   dateloaded?: string;
   datepickup?: string;
   grandtotal?: number | string | null;
+  loadsubtotal?: number | string | null;
+  addonssubtotal?: number | string | null;
   deletereason?: string | null;
 };
 
@@ -74,6 +81,7 @@ type TransactionStatus =
   | "pending"
   | "with-balance"
   | "unpaid"
+  | "paid"
   | "not-picked"
   | "withdrawn"
   | "wrong-record"
@@ -116,8 +124,11 @@ const formatCurrency = (value: number): string => {
   })}`;
 };
 
-const getBalance = (transaction: Transaction): number => {
-  const total = getTransactionGrandTotal(transaction);
+const getBalance = (
+  transaction: Transaction,
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): number => {
+  const total = getTransactionGrandTotal(transaction, addonsPricing);
   const paid =
     transaction.paymentDetails?.reduce(
       (sum, payment) => sum + Number(payment.amount || 0),
@@ -144,22 +155,20 @@ const getTotalLoads = (transaction: Transaction): number => {
   );
 };
 
-const getTotalPrice = (transaction: Transaction): number => {
-  return (
-    transaction.loadDetails?.reduce(
-      (sum, load) => sum + Number(load.price || 0),
-      0,
-    ) || 0
-  );
-};
-
-const getTransactionGrandTotal = (transaction: Transaction): number => {
+const getTransactionGrandTotal = (
+  transaction: Transaction,
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): number => {
   const tx = transaction as TransactionWithLegacyFields;
-  const explicitGrandTotal = Number(
-    transaction.grandTotal ?? tx.grandtotal ?? 0,
+  return resolveTransactionGrandTotal(
+    {
+      ...transaction,
+      grandtotal: tx.grandtotal,
+      loadsubtotal: tx.loadsubtotal,
+      addonssubtotal: tx.addonssubtotal,
+    },
+    addonsPricing,
   );
-  if (explicitGrandTotal > 0) return explicitGrandTotal;
-  return getTotalPrice(transaction);
 };
 
 const getDeleteReason = (transaction: Transaction): string => {
@@ -220,6 +229,7 @@ const hasBackdatePickup = (transaction: Transaction): boolean => {
 const matchesFilter = (
   transaction: Transaction,
   status: TransactionStatus,
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
 ): boolean => {
   if (status === "all") return true;
 
@@ -235,7 +245,7 @@ const matchesFilter = (
     case "pending":
       return !dateLoaded;
     case "with-balance": {
-      const total = getTransactionGrandTotal(transaction);
+      const total = getTransactionGrandTotal(transaction, addonsPricing);
       const paymentRows = transaction.paymentDetails?.length ?? 0;
       if (paymentRows < 1 || totalPaid <= 0) return false;
       return totalPaid < total;
@@ -244,6 +254,11 @@ const matchesFilter = (
       const paymentRows = transaction.paymentDetails?.length ?? 0;
       if (paymentRows === 0) return true;
       return totalPaid === 0;
+    }
+    case "paid": {
+      const total = getTransactionGrandTotal(transaction, addonsPricing);
+      if (total <= 0) return totalPaid > 0;
+      return totalPaid >= total;
     }
     case "not-picked":
       return !datePickup;
@@ -263,6 +278,9 @@ const matchesFilter = (
 const TransactionSummary = () => {
   const [customers, setCustomers] = React.useState<Customer[]>([]);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
+  const [addonsPricing, setAddonsPricing] = React.useState<AddonsPricing>(
+    DEFAULT_ADDONS_PRICING,
+  );
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -288,12 +306,14 @@ const TransactionSummary = () => {
       try {
         setLoading(true);
         setError(null);
-        const [customerData, transactionData] = await Promise.all([
+        const [customerData, transactionData, pricing] = await Promise.all([
           customerService.getAll(),
           transactionService.getAll({ includeDeleted: true }),
+          addonsPricingService.get(),
         ]);
         setCustomers(customerData);
         setTransactions(transactionData);
+        setAddonsPricing(pricing);
       } catch (err: unknown) {
         setError(
           err instanceof Error
@@ -353,11 +373,11 @@ const TransactionSummary = () => {
       }
 
       if (isDeleted) return false;
-      return matchesFilter(transaction, statusFilter);
+      return matchesFilter(transaction, statusFilter, addonsPricing);
     });
 
     return result;
-  }, [transactions, selectedCustomer, dateFrom, dateTo, statusFilter]);
+  }, [transactions, selectedCustomer, dateFrom, dateTo, statusFilter, addonsPricing]);
 
   const paginatedTransactions = React.useMemo(() => {
     return filteredTransactions.slice(
@@ -384,9 +404,9 @@ const TransactionSummary = () => {
 
       totalLoads += getTotalLoads(t);
       totalKg += getTotalKg(t);
-      totalPrice += getTransactionGrandTotal(t);
+      totalPrice += getTransactionGrandTotal(t, addonsPricing);
       totalPaid += getTotalPaid(t);
-      totalUnpaidBalance += getBalance(t);
+      totalUnpaidBalance += getBalance(t, addonsPricing);
 
       const pickup = getTransactionFieldDate(t, "datePickup");
       if (pickup) pickedUpCount += 1;
@@ -404,7 +424,7 @@ const TransactionSummary = () => {
       pickedUpCount,
       notPickedUpCount,
     };
-  }, [filteredTransactions]);
+  }, [filteredTransactions, addonsPricing]);
 
   const handlePageChange = (
     _event: React.MouseEvent<HTMLButtonElement> | null,
@@ -514,6 +534,7 @@ const TransactionSummary = () => {
                 <MenuItem value="pending">Pending</MenuItem>
                 <MenuItem value="with-balance">With balance</MenuItem>
                 <MenuItem value="unpaid">Unpaid</MenuItem>
+                <MenuItem value="paid">Paid</MenuItem>
                 <MenuItem value="not-picked">Not picked up</MenuItem>
                 <MenuItem value="backdate-payment">Backdate payment</MenuItem>
                 <MenuItem value="backdate-pickup">Backdate pickup</MenuItem>
@@ -586,7 +607,9 @@ const TransactionSummary = () => {
                     {getTotalLoads(transaction)}
                   </TableCell>
                   <TableCell align="right">
-                    {formatCurrency(getTransactionGrandTotal(transaction))}
+                    {formatCurrency(
+                      getTransactionGrandTotal(transaction, addonsPricing),
+                    )}
                   </TableCell>
                   <TableCell>
                     {formatDateTime(
@@ -600,7 +623,10 @@ const TransactionSummary = () => {
 
                       const paymentHistory = getPaymentHistory(transaction);
                       const totalPaid = getTotalPaid(transaction);
-                      const totalPrice = getTransactionGrandTotal(transaction);
+                      const totalPrice = getTransactionGrandTotal(
+                        transaction,
+                        addonsPricing,
+                      );
                       const hasBalance =
                         totalPaid > 0 && totalPaid < totalPrice;
                       const hasPaidOrOver = totalPaid >= totalPrice;

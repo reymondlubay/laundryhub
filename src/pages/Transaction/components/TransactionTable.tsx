@@ -58,7 +58,7 @@ import { toBackendPaymentMode } from "../../../constants/payment";
 import TransactionDeleteDialog, {
   type DeleteReason,
 } from "../../../components/TransactionDeleteDialog/TransactionDeleteDialog";
-import { getAddonsTotal, getStoredSnapshots } from "../../../utils/pricing";
+import { getTransactionGrandTotal } from "../../../utils/pricing";
 import { getTransactionNoteDetailLines } from "../../../utils/transactionNoteDetails";
 import "./TransactionTable.css";
 
@@ -263,11 +263,6 @@ const getTransactionTotals = (
   addonsPricing: AddonsPricing,
 ): { totalPrice: number; totalPaid: number; balance: number } => {
   const loadDetails = transaction.loadDetails || [];
-  const loadTotal = loadDetails.reduce(
-    (sum: number, load: { price?: number | string | null }) =>
-      sum + Number(load.price || 0),
-    0,
-  );
 
   const payments = transaction.paymentDetails || [];
   const totalPaid = payments.reduce(
@@ -283,28 +278,17 @@ const getTransactionTotals = (
     grandtotal?: number;
   };
 
-  const whitePrice = Number(transaction.whitePrice ?? tx2.whiteprice ?? 0);
-  const fabconQty = Number(transaction.fabconQty ?? tx2.fabconqty ?? 0);
-  const detergentQty = Number(
-    transaction.detergentQty ?? tx2.detergentqty ?? 0,
-  );
-  const colorSafeQty = Number(
-    transaction.colorSafeQty ?? tx2.colorsafeqty ?? 0,
-  );
-
-  const stored = getStoredSnapshots({
-    grandTotal: transaction.grandTotal,
-    grandtotal: tx2.grandtotal,
-  });
-
-  const addonsTotal = getAddonsTotal(
-    { whitePrice, fabconQty, detergentQty, colorSafeQty },
+  const totalPrice = getTransactionGrandTotal(
+    {
+      ...transaction,
+      grandtotal: tx2.grandtotal,
+      loadsubtotal: (transaction as { loadsubtotal?: number }).loadsubtotal,
+      addonssubtotal: (transaction as { addonssubtotal?: number })
+        .addonssubtotal,
+      loadDetails,
+    },
     addonsPricing,
   );
-
-  const totalPrice = stored.hasGrandTotal
-    ? stored.grandTotal
-    : loadTotal + addonsTotal;
 
   const balance = Math.max(totalPrice - totalPaid, 0);
 
@@ -362,12 +346,6 @@ function flattenTransactionRows(
       sum + Number(load.loads || 0),
     0,
   );
-  const loadTotal = loadDetails.reduce(
-    (sum: number, load: { price?: number | string | null }) =>
-      sum + Number(load.price || 0),
-    0,
-  );
-
   // Get latest payment date if payments exist
   const payments = transaction.paymentDetails || [];
   const totalPaid = payments.reduce(
@@ -389,23 +367,17 @@ function flattenTransactionRows(
   const colorSafeQty = Number(
     transaction.colorSafeQty ?? tx2.colorsafeqty ?? 0,
   );
-
-  const stored = getStoredSnapshots({
-    grandTotal: transaction.grandTotal,
-    grandtotal: tx2.grandtotal,
-  });
-  const addonsTotal = getAddonsTotal(
+  const totalPrice = getTransactionGrandTotal(
     {
-      whitePrice,
-      fabconQty,
-      detergentQty,
-      colorSafeQty,
+      ...transaction,
+      grandtotal: tx2.grandtotal,
+      loadsubtotal: (transaction as { loadsubtotal?: number }).loadsubtotal,
+      addonssubtotal: (transaction as { addonssubtotal?: number })
+        .addonssubtotal,
+      loadDetails,
     },
     addonsPricing,
   );
-  const totalPrice = stored.hasGrandTotal
-    ? stored.grandTotal
-    : loadTotal + addonsTotal;
   const balance =
     payments.length > 0 && totalPaid < totalPrice ? totalPrice - totalPaid : 0;
 

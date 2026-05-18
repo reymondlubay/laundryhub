@@ -41,12 +41,14 @@ import fixedMonthlyExpenseService, {
   type FixedMonthlyExpense,
 } from "../../services/fixedMonthlyExpenseService";
 import { toPascalCase } from "../../utils/stringUtils";
-import { getAddonsTotal, getStoredSnapshots } from "../../utils/pricing";
+import { getTransactionGrandTotal } from "../../utils/pricing";
 
 type TransactionLegacy = Transaction & {
   customerid?: string;
   datereceived?: string;
   grandtotal?: number | string | null;
+  loadsubtotal?: number | string | null;
+  addonssubtotal?: number | string | null;
   isdeleted?: boolean;
 };
 
@@ -86,16 +88,15 @@ const getTransactionPrice = (
   addonsPricing: AddonsPricing,
 ): number => {
   const tx = transaction as TransactionLegacy;
-  const stored = getStoredSnapshots({
-    grandTotal: transaction.grandTotal,
-    grandtotal: tx.grandtotal,
-  });
-  if (stored.hasGrandTotal) return stored.grandTotal;
-  const loads = Array.isArray(transaction.loadDetails)
-    ? transaction.loadDetails
-    : [];
-  const loadTotal = loads.reduce((sum, l) => sum + toNumber(l.price), 0);
-  return loadTotal + getAddonsTotal(transaction, addonsPricing);
+  return getTransactionGrandTotal(
+    {
+      ...transaction,
+      grandtotal: tx.grandtotal,
+      loadsubtotal: tx.loadsubtotal,
+      addonssubtotal: tx.addonssubtotal,
+    },
+    addonsPricing,
+  );
 };
 
 const isInMonth = (dateValue: string | undefined, month: Dayjs) => {

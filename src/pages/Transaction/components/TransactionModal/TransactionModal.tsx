@@ -62,6 +62,11 @@ import {
 } from "../../../../constants/payment";
 import { toTitleCaseWords } from "../../../../utils/stringUtils";
 import { ignoreBackdropClose } from "../../../../utils/muiDialogClose";
+import {
+  DEFAULT_ADDONS_PRICING,
+  type AddonsPricing,
+} from "../../../../services/addonsPricingService";
+import { getTransactionAddonPricing } from "../../../../utils/pricing";
 
 type TransactionModalProps = {
   isOpen: boolean;
@@ -146,8 +151,23 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [customers, setCustomers] = React.useState<Customer[]>([]);
   const [employees, setEmployees] = React.useState<EmployeeOption[]>([]);
+  const [lockedAddonPricing, setLockedAddonPricing] =
+    React.useState<AddonsPricing | null>(null);
   const [loading, setLoading] = React.useState(false);
   const submitLockRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!isOpen || !transaction?.id) {
+      setLockedAddonPricing(null);
+      return;
+    }
+
+    const row = transaction as unknown as Record<string, unknown>;
+    setLockedAddonPricing(
+      getTransactionAddonPricing(row, DEFAULT_ADDONS_PRICING),
+    );
+
+  }, [isOpen, transaction?.id, transaction]);
   const [addCustomerOpen, setAddCustomerOpen] = React.useState(false);
   const [addingCustomer, setAddingCustomer] = React.useState(false);
   const [newCustomerError, setNewCustomerError] = React.useState<string>("");
@@ -1246,6 +1266,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     transactionFormValues={values}
                     payments={payments}
                     onPaymentsChange={setPayments}
+                    lockedAddonPricing={
+                      isEditing ? lockedAddonPricing : undefined
+                    }
                   />
                 </Grid>
               </Grid>
