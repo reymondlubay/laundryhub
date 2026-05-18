@@ -37,7 +37,7 @@ import expenseRecordService, {
   type ExpenseRecord,
 } from "../../services/expenseRecordService";
 import fixedMonthlyExpenseService, {
-  getActiveFixedMonthlyTotal,
+  getFixedMonthlyTotalForMonth,
   type FixedMonthlyExpense,
 } from "../../services/fixedMonthlyExpenseService";
 import { toPascalCase } from "../../utils/stringUtils";
@@ -138,6 +138,9 @@ const SalesReport: React.FC = () => {
   const [fixedMonthlyExpenses, setFixedMonthlyExpenses] = React.useState<
     FixedMonthlyExpense[]
   >([]);
+  const [fixedMonthlySnapshots, setFixedMonthlySnapshots] = React.useState<
+    Record<string, number>
+  >({});
 
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -159,14 +162,14 @@ const SalesReport: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const [txData, pricingData, invItems, expItems, expRecords, fixedItems] =
+        const [txData, pricingData, invItems, expItems, expRecords, fixedBundle] =
           await Promise.all([
             transactionService.getAll(),
             addonsPricingService.get(),
             inventoryItemService.getAllForLookup(),
             expenseItemService.getAllForLookup(),
             expenseRecordService.getAll(),
-            fixedMonthlyExpenseService.getAll(),
+            fixedMonthlyExpenseService.getAllWithSnapshots(),
           ]);
         setAddonsPricing(pricingData);
         setTransactions(
@@ -177,7 +180,8 @@ const SalesReport: React.FC = () => {
         setInventoryItems(invItems);
         setExpenseItems(expItems);
         setExpenseRecords(expRecords);
-        setFixedMonthlyExpenses(fixedItems);
+        setFixedMonthlyExpenses(fixedBundle.items);
+        setFixedMonthlySnapshots(fixedBundle.monthSnapshots);
       } catch (err: unknown) {
         setError(
           err instanceof Error ? err.message : "Failed to load sales report.",
@@ -291,7 +295,14 @@ const SalesReport: React.FC = () => {
   const totals = React.useMemo(() => {
     const totalSales = salesRows.reduce((s, r) => s + r.price, 0);
     const recordedInternalExpenses = expenseRows.reduce((s, r) => s + r.amount, 0);
-    const fixedMonthlyTotal = getActiveFixedMonthlyTotal(fixedMonthlyExpenses);
+    const monthKey = selectedMonth.isValid()
+      ? selectedMonth.format("YYYY-MM")
+      : dayjs().format("YYYY-MM");
+    const fixedMonthlyTotal = getFixedMonthlyTotalForMonth(
+      fixedMonthlyExpenses,
+      monthKey,
+      fixedMonthlySnapshots,
+    );
     const totalExpenses = recordedInternalExpenses + fixedMonthlyTotal;
     const totalUnpaid = salesRows.reduce((s, r) => s + r.balance, 0);
     const netSales = totalSales - totalExpenses;
@@ -305,7 +316,14 @@ const SalesReport: React.FC = () => {
       totalPaid: totalPaidInMonth,
       totalUnpaid,
     };
-  }, [expenseRows, fixedMonthlyExpenses, salesRows, totalPaidInMonth]);
+  }, [
+    expenseRows,
+    fixedMonthlyExpenses,
+    fixedMonthlySnapshots,
+    salesRows,
+    selectedMonth,
+    totalPaidInMonth,
+  ]);
 
   const monthText = selectedMonth.isValid()
     ? selectedMonth.format("MMMM YYYY")
