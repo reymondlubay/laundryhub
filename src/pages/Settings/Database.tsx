@@ -19,6 +19,7 @@ import {
   Typography,
   InputAdornment,
   IconButton,
+  Checkbox,
 } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
 import dayjs from "dayjs";
@@ -68,6 +69,14 @@ const DatabaseSettings: React.FC = () => {
   const [deleteConfirmText, setDeleteConfirmText] = React.useState("");
   const [deleteLoading, setDeleteLoading] = React.useState(false);
 
+  const [selectedBackupIds, setSelectedBackupIds] = React.useState<string[]>(
+    [],
+  );
+  const [batchDeleteOpen, setBatchDeleteOpen] = React.useState(false);
+  const [batchDeleteConfirmText, setBatchDeleteConfirmText] =
+    React.useState("");
+  const [batchDeleteLoading, setBatchDeleteLoading] = React.useState(false);
+
   const [downloadId, setDownloadId] = React.useState<string | null>(null);
 
   const [folderPaths, setFolderPaths] = React.useState<BackupFolderPathItem[]>(
@@ -84,6 +93,18 @@ const DatabaseSettings: React.FC = () => {
   >(null);
 
   const hasPendingOperation = backups.some((item) => item.status === "Pending");
+
+  const deletableBackups = React.useMemo(
+    () => backups.filter((item) => item.status !== "Pending"),
+    [backups],
+  );
+
+  const allDeletableSelected =
+    deletableBackups.length > 0 &&
+    deletableBackups.every((item) => selectedBackupIds.includes(item.id));
+
+  const someDeletableSelected =
+    selectedBackupIds.length > 0 && !allDeletableSelected;
   const surfaceColor = darkMode ? "#1b222c" : "#ffffff";
   const borderColor = darkMode ? "#2b3440" : "#e8edf3";
   const headingColor = darkMode ? "#eef5ff" : "#0d213f";
@@ -301,6 +322,7 @@ const DatabaseSettings: React.FC = () => {
       await backupService.deleteBackup(deleteId);
       setDeleteId(null);
       setDeleteConfirmText("");
+      setSelectedBackupIds((prev) => prev.filter((id) => id !== deleteId));
       await fetchBackups();
     } catch (err: unknown) {
       const message =
@@ -308,6 +330,51 @@ const DatabaseSettings: React.FC = () => {
       setError(message);
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  const toggleBackupSelection = (id: string) => {
+    setSelectedBackupIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAllDeletable = () => {
+    if (allDeletableSelected) {
+      setSelectedBackupIds([]);
+      return;
+    }
+    setSelectedBackupIds(deletableBackups.map((item) => item.id));
+  };
+
+  const handleConfirmBatchDelete = async () => {
+    if (batchDeleteConfirmText !== "DELETE" || selectedBackupIds.length === 0) {
+      return;
+    }
+
+    try {
+      setBatchDeleteLoading(true);
+      setError(null);
+      const ids = [...selectedBackupIds];
+      for (const id of ids) {
+        await backupService.deleteBackup(id);
+      }
+      setBatchDeleteOpen(false);
+      setBatchDeleteConfirmText("");
+      setSelectedBackupIds([]);
+      await fetchBackups();
+      setSuccessMessage(
+        ids.length === 1
+          ? "Backup deleted successfully."
+          : `${ids.length} backups deleted successfully.`,
+      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to delete backups.";
+      setError(message);
+      await fetchBackups();
+    } finally {
+      setBatchDeleteLoading(false);
     }
   };
 
@@ -598,11 +665,33 @@ const DatabaseSettings: React.FC = () => {
       ) : null}
 
       <Paper sx={{ bgcolor: surfaceColor, border: `1px solid ${borderColor}` }}>
+        {selectedBackupIds.length > 0 ? (
+          <Stack
+            direction="row"
+            justifyContent="flex-end"
+            sx={{ px: 2, pt: 2 }}
+          >
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              disabled={
+                batchDeleteLoading ||
+                deleteLoading ||
+                restoreLoading ||
+                hasPendingOperation
+              }
+              onClick={() => setBatchDeleteOpen(true)}
+            >
+              Delete selected ({selectedBackupIds.length})
+            </Button>
+          </Stack>
+        ) : null}
         {initialLoading ? (
           <TableContainer>
             <Table size="small">
-              <TableHeaderSkeleton columns={6} />
-              <TableSkeleton columns={6} rows={5} />
+              <TableHeaderSkeleton columns={7} />
+              <TableSkeleton columns={7} rows={5} />
             </Table>
           </TableContainer>
         ) : (
@@ -610,6 +699,27 @@ const DatabaseSettings: React.FC = () => {
             <Table size="small">
               <TableHead sx={{ bgcolor: headBg }}>
                 <TableRow>
+                  <TableCell
+                    padding="checkbox"
+                    sx={{ color: headColor, borderBottomColor: borderColor }}
+                  >
+                    <Checkbox
+                      size="small"
+                      checked={allDeletableSelected}
+                      indeterminate={someDeletableSelected}
+                      disabled={
+                        deletableBackups.length === 0 ||
+                        batchDeleteLoading ||
+                        deleteLoading
+                      }
+                      onChange={toggleSelectAllDeletable}
+                      sx={{
+                        color: headColor,
+                        "&.Mui-checked": { color: headColor },
+                        "&.MuiCheckbox-indeterminate": { color: headColor },
+                      }}
+                    />
+                  </TableCell>
                   <TableCell
                     sx={{ color: headColor, borderBottomColor: borderColor }}
                   >
@@ -647,7 +757,7 @@ const DatabaseSettings: React.FC = () => {
                 {backups.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       align="center"
                       sx={{ color: cellColor, borderBottomColor: borderColor }}
                     >
@@ -658,7 +768,22 @@ const DatabaseSettings: React.FC = () => {
                   backups.map((backup) => {
                     const isPending = backup.status === "Pending";
                     return (
-                      <TableRow key={backup.id}>
+                      <TableRow key={backup.id} selected={selectedBackupIds.includes(backup.id)}>
+                        <TableCell
+                          padding="checkbox"
+                          sx={{ borderBottomColor: borderColor }}
+                        >
+                          <Checkbox
+                            size="small"
+                            checked={selectedBackupIds.includes(backup.id)}
+                            disabled={
+                              isPending ||
+                              batchDeleteLoading ||
+                              deleteLoading
+                            }
+                            onChange={() => toggleBackupSelection(backup.id)}
+                          />
+                        </TableCell>
                         <TableCell
                           sx={{
                             color: cellColor,
@@ -820,6 +945,59 @@ const DatabaseSettings: React.FC = () => {
             disabled={restoreLoading}
           >
             {restoreLoading ? "Starting..." : "Confirm Restore"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={batchDeleteOpen}
+        onClose={ignoreBackdropClose(() => {
+          if (batchDeleteLoading) return;
+          setBatchDeleteOpen(false);
+          setBatchDeleteConfirmText("");
+        })}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { bgcolor: paperDialogBg, color: cellColor } }}
+      >
+        <DialogTitle>Delete Selected Backups</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 1.5 }}>
+            Permanently delete {selectedBackupIds.length} backup file
+            {selectedBackupIds.length === 1 ? "" : "s"}. Type DELETE to confirm.
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            value={batchDeleteConfirmText}
+            onChange={(e) => setBatchDeleteConfirmText(e.target.value)}
+            placeholder="DELETE"
+            sx={{
+              "& .MuiInputBase-input": {
+                color: cellColor,
+              },
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setBatchDeleteOpen(false);
+              setBatchDeleteConfirmText("");
+            }}
+            disabled={batchDeleteLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => void handleConfirmBatchDelete()}
+            disabled={
+              batchDeleteLoading || batchDeleteConfirmText !== "DELETE"
+            }
+          >
+            {batchDeleteLoading ? "Deleting..." : "Delete selected"}
           </Button>
         </DialogActions>
       </Dialog>

@@ -54,6 +54,9 @@ const SalesReportPage = lazy(() => import("./pages/Reports/SalesReport"));
 const SalesExpenseGraphReportPage = lazy(
   () => import("./pages/Reports/SalesExpenseGraphReport"),
 );
+const CollectionReportPage = lazy(
+  () => import("./pages/Reports/CollectionReport"),
+);
 
 function App() {
   return (
@@ -272,6 +275,18 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <SalesExpenseGraphReportPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.REPORT_COLLECTION}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <CollectionReportPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>

@@ -30,13 +30,15 @@ import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../services/addonsPricingService";
-import { getAddonsTotal, getStoredSnapshots } from "../../utils/pricing";
+import { getTransactionGrandTotal } from "../../utils/pricing";
 import { toPascalCase } from "../../utils/stringUtils";
 
 type TransactionWithLegacyFields = Transaction & {
   customerid?: string;
   datereceived?: string;
   grandtotal?: number | string | null;
+  loadsubtotal?: number | string | null;
+  addonssubtotal?: number | string | null;
   loaddetails?: Array<{
     loads?: number | string | null;
     price?: number | string | null;
@@ -259,19 +261,17 @@ const CustomerReport: React.FC = () => {
 
       const loadRows = getLoadRows(transaction);
       const loads = loadRows.reduce((sum, row) => sum + toNumber(row.loads), 0);
-      const loadTotal = loadRows.reduce(
-        (sum, row) => sum + toNumber(row.price),
-        0,
-      );
-      const addonsTotal = getAddonsTotal(transaction, addonsPricing);
       const tx = transaction as TransactionWithLegacyFields;
-      const stored = getStoredSnapshots({
-        grandTotal: transaction.grandTotal,
-        grandtotal: tx.grandtotal,
-      });
-      const totalPrice = stored.hasGrandTotal
-        ? stored.grandTotal
-        : loadTotal + addonsTotal;
+      const totalPrice = getTransactionGrandTotal(
+        {
+          ...transaction,
+          grandtotal: tx.grandtotal,
+          loadsubtotal: tx.loadsubtotal,
+          addonssubtotal: tx.addonssubtotal,
+          loadDetails: loadRows,
+        },
+        addonsPricing,
+      );
 
       const paidWithinRange = (transaction.paymentDetails || []).reduce(
         (sum, payment) => {

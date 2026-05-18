@@ -82,8 +82,8 @@ const ActivityLogPage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
-  const [dateFrom, setDateFrom] = useState<Dayjs | null>(null);
-  const [dateTo, setDateTo] = useState<Dayjs | null>(null);
+  const [dateFrom, setDateFrom] = useState<Dayjs | null>(() => dayjs());
+  const [dateTo, setDateTo] = useState<Dayjs | null>(() => dayjs());
   const [moduleFilter, setModuleFilter] = useState("");
   const [search, setSearch] = useState("");
 

@@ -23,16 +23,18 @@ import expenseRecordService, {
   type ExpenseRecord,
 } from "../../services/expenseRecordService";
 import fixedMonthlyExpenseService, {
-  getActiveFixedMonthlyTotal,
+  getFixedMonthlyTotalForMonth,
   type FixedMonthlyExpense,
 } from "../../services/fixedMonthlyExpenseService";
-import { getAddonsTotal, getStoredSnapshots } from "../../utils/pricing";
+import { getTransactionGrandTotal } from "../../utils/pricing";
 
 const MONTHS_WINDOW = 24;
 
 type TransactionLegacy = Transaction & {
   datereceived?: string;
   grandtotal?: number | string | null;
+  loadsubtotal?: number | string | null;
+  addonssubtotal?: number | string | null;
   isdeleted?: boolean;
 };
 
@@ -57,16 +59,15 @@ const getTransactionPrice = (
   addonsPricing: AddonsPricing,
 ): number => {
   const tx = transaction as TransactionLegacy;
-  const stored = getStoredSnapshots({
-    grandTotal: transaction.grandTotal,
-    grandtotal: tx.grandtotal,
-  });
-  if (stored.hasGrandTotal) return stored.grandTotal;
-  const loads = Array.isArray(transaction.loadDetails)
-    ? transaction.loadDetails
-    : [];
-  const loadTotal = loads.reduce((sum, l) => sum + toNumber(l.price), 0);
-  return loadTotal + getAddonsTotal(transaction, addonsPricing);
+  return getTransactionGrandTotal(
+    {
+      ...transaction,
+      grandtotal: tx.grandtotal,
+      loadsubtotal: tx.loadsubtotal,
+      addonssubtotal: tx.addonssubtotal,
+    },
+    addonsPricing,
+  );
 };
 
 type MonthlyPoint = {
@@ -398,13 +399,16 @@ const SalesExpenseGraphReport: React.FC = () => {
   const [fixedMonthlyItems, setFixedMonthlyItems] = React.useState<
     FixedMonthlyExpense[]
   >([]);
+  const [fixedMonthlySnapshots, setFixedMonthlySnapshots] = React.useState<
+    Record<string, number>
+  >({});
 
   React.useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
         setError(null);
-        const [txData, pricingData, records, fixedItems] = await Promise.all([
+        const [txData, pricingData, records, fixedBundle] = await Promise.all([
           transactionService.getAll({
             fromDate: rangeStart.format("YYYY-MM-DD"),
             toDate: rangeEnd.format("YYYY-MM-DD"),
@@ -412,7 +416,7 @@ const SalesExpenseGraphReport: React.FC = () => {
           }),
           addonsPricingService.get(),
           expenseRecordService.getAll(),
-          fixedMonthlyExpenseService.getAll(),
+          fixedMonthlyExpenseService.getAllWithSnapshots(),
         ]);
         setAddonsPricing(pricingData);
         setTransactions(
@@ -421,7 +425,8 @@ const SalesExpenseGraphReport: React.FC = () => {
           ),
         );
         setExpenseRecords(records);
-        setFixedMonthlyItems(fixedItems);
+        setFixedMonthlyItems(fixedBundle.items);
+        setFixedMonthlySnapshots(fixedBundle.monthSnapshots);
       } catch (err: unknown) {
         setError(
           err instanceof Error
@@ -466,9 +471,13 @@ const SalesExpenseGraphReport: React.FC = () => {
       months[idx].internalExpenses += r.amount == null ? 0 : toNumber(r.amount);
     }
 
-    const fixedMonthlyTotal = getActiveFixedMonthlyTotal(fixedMonthlyItems);
-    if (fixedMonthlyTotal > 0) {
-      for (const m of months) {
+    for (const m of months) {
+      const fixedMonthlyTotal = getFixedMonthlyTotalForMonth(
+        fixedMonthlyItems,
+        m.monthKey,
+        fixedMonthlySnapshots,
+      );
+      if (fixedMonthlyTotal > 0) {
         m.internalExpenses += fixedMonthlyTotal;
       }
     }
@@ -482,6 +491,7 @@ const SalesExpenseGraphReport: React.FC = () => {
     addonsPricing,
     expenseRecords,
     fixedMonthlyItems,
+    fixedMonthlySnapshots,
     rangeEnd,
     rangeStart,
     transactions,

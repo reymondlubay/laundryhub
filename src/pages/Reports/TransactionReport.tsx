@@ -34,7 +34,7 @@ import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../services/addonsPricingService";
-import { getAddonsTotal, getStoredSnapshots } from "../../utils/pricing";
+import { getTransactionGrandTotal } from "../../utils/pricing";
 
 type PaymentModeTotals = {
   cash: number;
@@ -73,6 +73,8 @@ type TransactionWithLegacyFields = Transaction & {
   detergentqty?: number | string | null;
   colorsafeqty?: number | string | null;
   grandtotal?: number | string | null;
+  loadsubtotal?: number | string | null;
+  addonssubtotal?: number | string | null;
   loaddetails?: Array<{
     kg?: number | string | null;
     loads?: number | string | null;
@@ -159,6 +161,19 @@ const formatDateTime = (value?: string | null): string => {
   return dayjs(value).isValid() ? dayjs(value).format("MM-DD-YY h:mm A") : "-";
 };
 
+/** Newest datetime first; rows without a valid date sort to the bottom. */
+const compareDateTimeDesc = (
+  a?: string | null,
+  b?: string | null,
+): number => {
+  const aValid = Boolean(a && dayjs(a).isValid());
+  const bValid = Boolean(b && dayjs(b).isValid());
+  if (!aValid && !bValid) return 0;
+  if (!aValid) return 1;
+  if (!bValid) return -1;
+  return dayjs(b).valueOf() - dayjs(a).valueOf();
+};
+
 const formatCount = (value: number): string => {
   return Math.round(value).toLocaleString("en-US");
 };
@@ -213,17 +228,19 @@ const getTransactionTotals = (
       : null;
 
   const tx = transaction as TransactionWithLegacyFields;
-  const stored = getStoredSnapshots({
-    grandTotal: transaction.grandTotal,
-    grandtotal: tx.grandtotal,
-  });
-  const addonsTotal = getAddonsTotal(transaction, addonsPricing);
 
   return {
     ...totals,
-    price: stored.hasGrandTotal
-      ? stored.grandTotal
-      : totals.price + addonsTotal,
+    price: getTransactionGrandTotal(
+      {
+        ...transaction,
+        grandtotal: tx.grandtotal,
+        loadsubtotal: tx.loadsubtotal,
+        addonssubtotal: tx.addonssubtotal,
+        loadDetails: getLoadDetails(transaction),
+      },
+      addonsPricing,
+    ),
     latestPaymentDate,
   };
 };
@@ -237,6 +254,25 @@ const filterPaymentsByRange = (
   return (payments || []).filter((payment) =>
     isWithinRange(getPaymentDate(payment), range.from, range.to),
   );
+};
+
+const getLatestPaymentDate = (
+  payments: PaymentDetail[],
+): string | undefined => {
+  let latest: string | undefined;
+  let latestMs = -1;
+
+  for (const payment of payments) {
+    const date = getPaymentDate(payment);
+    if (!date || !dayjs(date).isValid()) continue;
+    const ms = dayjs(date).valueOf();
+    if (ms > latestMs) {
+      latestMs = ms;
+      latest = date;
+    }
+  }
+
+  return latest;
 };
 
 const TransactionReport: React.FC = () => {
@@ -325,6 +361,17 @@ const TransactionReport: React.FC = () => {
     );
   }, [dateFrom, dateTo, filteredByCustomer]);
 
+  const sortedLoadReportRows = React.useMemo(
+    () =>
+      [...loadReportRows].sort((a, b) =>
+        compareDateTimeDesc(
+          getTransactionFieldDate(a, "dateLoaded"),
+          getTransactionFieldDate(b, "dateLoaded"),
+        ),
+      ),
+    [loadReportRows],
+  );
+
   const totalLoads = React.useMemo(() => {
     return loadReportRows.reduce((sum, transaction) => {
       const totals = getTransactionTotals(transaction, addonsPricing);
@@ -403,7 +450,7 @@ const TransactionReport: React.FC = () => {
 
       const datePaid =
         paymentsInRange.length > 0
-          ? getPaymentDate(paymentsInRange[paymentsInRange.length - 1])
+          ? getLatestPaymentDate(paymentsInRange)
           : null;
 
       return {
@@ -421,6 +468,14 @@ const TransactionReport: React.FC = () => {
       };
     });
   }, [addonsPricing, dateFrom, dateTo, paymentReportRows]);
+
+  const sortedPaymentRowsWithRangePayments = React.useMemo(
+    () =>
+      [...paymentRowsWithRangePayments].sort((a, b) =>
+        compareDateTimeDesc(a.datePaid, b.datePaid),
+      ),
+    [paymentRowsWithRangePayments],
+  );
 
   const parseMoneyInput = React.useCallback((raw: string): number | null => {
     const trimmed = raw.trim().replace(/,/g, "");
@@ -695,7 +750,7 @@ const TransactionReport: React.FC = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    loadReportRows
+                    sortedLoadReportRows
                       .slice(
                         loadPage * loadRowsPerPage,
                         loadPage * loadRowsPerPage + loadRowsPerPage,
@@ -799,7 +854,7 @@ const TransactionReport: React.FC = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paymentRowsWithRangePayments
+                    sortedPaymentRowsWithRangePayments
                       .slice(
                         payPage * payRowsPerPage,
                         payPage * payRowsPerPage + payRowsPerPage,

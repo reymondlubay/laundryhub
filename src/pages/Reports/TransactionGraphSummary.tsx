@@ -19,6 +19,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import transactionService, {
   type Transaction,
 } from "../../services/transactionService";
+import { getTransactionGrandTotal } from "../../utils/pricing";
 
 type TransactionWithLegacyFields = Transaction & {
   datereceived?: string;
@@ -31,6 +32,8 @@ type TransactionWithLegacyFields = Transaction & {
     price?: number | string | null;
   }>;
   grandtotal?: number | string | null;
+  loadsubtotal?: number | string | null;
+  addonssubtotal?: number | string | null;
   isdeleted?: boolean;
 };
 
@@ -60,13 +63,17 @@ const getLoadDetails = (
 const getTotalLoads = (t: Transaction): number =>
   getLoadDetails(t).reduce((sum, row) => sum + toNumber(row.loads), 0);
 
-const getTotalPrice = (t: Transaction): number =>
-  getLoadDetails(t).reduce((sum, row) => sum + toNumber(row.price), 0);
-
 const getTransactionAmount = (t: Transaction): number => {
   const tx = t as TransactionWithLegacyFields;
-  const explicit = toNumber(t.grandTotal ?? tx.grandtotal ?? 0);
-  return explicit > 0 ? explicit : getTotalPrice(t);
+  return getTransactionGrandTotal({
+    ...t,
+    grandtotal: tx.grandtotal,
+    loadsubtotal: tx.loadsubtotal,
+    addonssubtotal: tx.addonssubtotal,
+    loadDetails: getLoadDetails(t) as Array<{
+      price?: number | string | null;
+    }>,
+  });
 };
 
 const formatCurrency = (value: number): string =>

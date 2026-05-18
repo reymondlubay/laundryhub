@@ -16,12 +16,18 @@ export const DEFAULT_ADDONS_PRICING: AddonsPricing = {
 const normalizePricing = (raw: unknown): AddonsPricing => {
   const item = raw as Record<string, unknown>;
   return {
-    fabconPrice: Number(item.fabconPrice ?? DEFAULT_ADDONS_PRICING.fabconPrice),
+    fabconPrice: Number(
+      item.fabconPrice ?? item.fabconprice ?? DEFAULT_ADDONS_PRICING.fabconPrice,
+    ),
     detergentPrice: Number(
-      item.detergentPrice ?? DEFAULT_ADDONS_PRICING.detergentPrice,
+      item.detergentPrice ??
+        item.detergentprice ??
+        DEFAULT_ADDONS_PRICING.detergentPrice,
     ),
     colorSafePrice: Number(
-      item.colorSafePrice ?? DEFAULT_ADDONS_PRICING.colorSafePrice,
+      item.colorSafePrice ??
+        item.colorsafeprice ??
+        DEFAULT_ADDONS_PRICING.colorSafePrice,
     ),
   };
 };

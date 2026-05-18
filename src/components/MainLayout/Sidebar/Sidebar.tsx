@@ -267,6 +267,12 @@ export default function SidebarMenu() {
             >
               Sales & Expense Graph
             </MenuItem>
+            <MenuItem
+              component={<Link to={route.REPORT_COLLECTION} />}
+              active={activePath === route.REPORT_COLLECTION}
+            >
+              Collection Report
+            </MenuItem>
           </SubMenu>
         )}
       </Menu>

@@ -2,6 +2,7 @@ import axiosClient from "./axiosClient";
 import API_ROUTES from "../constants/apiRoutes";
 import { API_ERRORS } from "../constants/messages";
 import { toBackendPaymentMode } from "../constants/payment";
+import { normalizeTransactionRow } from "../utils/normalizeTransaction";
 
 export interface LoadDetail {
   id: string;
@@ -50,6 +51,9 @@ export interface Transaction {
   loadSubtotal?: number;
   addonsSubtotal?: number;
   grandTotal?: number;
+  fabconUnitPrice?: number;
+  detergentUnitPrice?: number;
+  colorSafeUnitPrice?: number;
   isDelivered: boolean;
   notes?: string;
   isDeleted: boolean;
@@ -213,7 +217,7 @@ export function mergeServerWritePayload(
     merged.releasedByUser = prev.releasedByUser;
   }
 
-  return merged;
+  return normalizeTransactionRow(merged);
 }
 
 export interface UpdateTransactionRequest {
@@ -263,7 +267,10 @@ const transactionService = {
         return [];
       }
 
-      return data.data || data.transactions || [];
+      const rows = data.data || data.transactions || [];
+      return Array.isArray(rows)
+        ? rows.map((row: Transaction) => normalizeTransactionRow(row))
+        : [];
     } catch (error: unknown) {
       if (
         typeof error === "object" &&

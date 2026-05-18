@@ -12,17 +12,25 @@ const BillSummary = ({
   transactionFormValues,
   payments,
   onPaymentsChange,
+  lockedAddonPricing,
 }: {
   transactionFormValues: TransactionFormValues;
   payments: Payment[];
   onPaymentsChange: (payments: Payment[]) => void;
+  /** When editing an existing transaction, use prices stored on that transaction. */
+  lockedAddonPricing?: AddonsPricing | null;
 }) => {
   const [total, setTotal] = useState(0);
   const [addonsPricing, setAddonsPricing] = useState<AddonsPricing>(
-    DEFAULT_ADDONS_PRICING,
+    lockedAddonPricing ?? DEFAULT_ADDONS_PRICING,
   );
 
   useEffect(() => {
+    if (lockedAddonPricing) {
+      setAddonsPricing(lockedAddonPricing);
+      return;
+    }
+
     const loadPricing = async () => {
       try {
         const pricing = await addonsPricingService.get();
@@ -33,7 +41,7 @@ const BillSummary = ({
     };
 
     void loadPricing();
-  }, []);
+  }, [lockedAddonPricing]);
 
   const calculateTotals = (values: TransactionFormValues) => {
     const itemsTotal = values.items.reduce(

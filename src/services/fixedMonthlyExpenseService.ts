@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import axiosClient from "./axiosClient";
 import API_ROUTES from "../constants/apiRoutes";
 import { API_ERRORS } from "../constants/messages";
@@ -56,7 +57,7 @@ const extractErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
-/** Sum of `monthlyAmount` for active items (applied once per calendar month in reports). */
+/** Sum of `monthlyAmount` for active items (current month and forward). */
 export const getActiveFixedMonthlyTotal = (
   items: FixedMonthlyExpense[],
 ): number =>
@@ -64,16 +65,66 @@ export const getActiveFixedMonthlyTotal = (
     .filter((i) => i.isActive)
     .reduce((s, i) => s + (Number.isFinite(i.monthlyAmount) ? i.monthlyAmount : 0), 0);
 
+export type FixedMonthlyExpenseBundle = {
+  items: FixedMonthlyExpense[];
+  monthSnapshots: Record<string, number>;
+};
+
+const normalizeMonthSnapshots = (raw: unknown): Record<string, number> => {
+  if (!raw || typeof raw !== "object") return {};
+  const map: Record<string, number> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}$/.test(key)) continue;
+    const amount = Number(value);
+    map[key] = Number.isFinite(amount) ? amount : 0;
+  }
+  return map;
+};
+
+/**
+ * Past months use frozen snapshot totals; current month and future use live active items.
+ */
+export const getFixedMonthlyTotalForMonth = (
+  items: FixedMonthlyExpense[],
+  monthKey: string,
+  monthSnapshots: Record<string, number>,
+): number => {
+  const currentMonthKey = dayjs().format("YYYY-MM");
+  if (monthKey >= currentMonthKey) {
+    return getActiveFixedMonthlyTotal(items);
+  }
+  if (Object.prototype.hasOwnProperty.call(monthSnapshots, monthKey)) {
+    return monthSnapshots[monthKey];
+  }
+  return getActiveFixedMonthlyTotal(items);
+};
+
 const fixedMonthlyExpenseService = {
   getAll: async (): Promise<FixedMonthlyExpense[]> => {
+    const bundle = await fixedMonthlyExpenseService.getAllWithSnapshots();
+    return bundle.items;
+  },
+
+  getAllWithSnapshots: async (): Promise<FixedMonthlyExpenseBundle> => {
     try {
       const { data } = await axiosClient.get(API_ROUTES.FIXED_MONTHLY_EXPENSES);
       const rows = Array.isArray(data.items)
         ? data.items
-        : Array.isArray(data.data)
-          ? data.data
-          : [];
-      return rows.map(normalize);
+        : Array.isArray(data.data?.items)
+          ? data.data.items
+          : Array.isArray(data.data)
+            ? data.data
+            : [];
+      const snapshots =
+        data.monthSnapshots != null
+          ? normalizeMonthSnapshots(data.monthSnapshots)
+          : data.data?.monthSnapshots != null
+            ? normalizeMonthSnapshots(data.data.monthSnapshots)
+            : {};
+      return {
+        items: rows.map(normalize),
+        monthSnapshots: snapshots,
+      };
     } catch (error: unknown) {
       throw new Error(extractErrorMessage(error, API_ERRORS.SAVE_FAILED));
     }
