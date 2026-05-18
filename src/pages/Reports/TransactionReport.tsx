@@ -58,6 +58,7 @@ type BackdatePickupRow = {
 };
 
 type LoadLike = {
+  type?: string | null;
   kg?: number | string | null;
   loads?: number | string | null;
   price?: number | string | null;
@@ -76,11 +77,13 @@ type TransactionWithLegacyFields = Transaction & {
   loadsubtotal?: number | string | null;
   addonssubtotal?: number | string | null;
   loaddetails?: Array<{
+    type?: string | null;
     kg?: number | string | null;
     loads?: number | string | null;
     price?: number | string | null;
   }>;
   load_details?: Array<{
+    type?: string | null;
     kg?: number | string | null;
     loads?: number | string | null;
     price?: number | string | null;
@@ -176,6 +179,70 @@ const compareDateTimeDesc = (
 
 const formatCount = (value: number): string => {
   return Math.round(value).toLocaleString("en-US");
+};
+
+const formatKg = (value: number): string => {
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+};
+
+const normalizeLoadType = (type: unknown): string =>
+  String(type ?? "Clothes")
+    .trim()
+    .toLowerCase();
+
+const sumLoadReportByType = (rows: Transaction[]) => {
+  let clothesKg = 0;
+  let clothesLoads = 0;
+  let beddingsKg = 0;
+  let beddingsLoads = 0;
+  let comforterLoads = 0;
+
+  for (const transaction of rows) {
+    for (const row of getLoadDetails(transaction)) {
+      const loadType = normalizeLoadType(row.type);
+      const kg = toNumber(row.kg);
+      const loads = toNumber(row.loads);
+
+      if (loadType === "comforter") {
+        comforterLoads += loads;
+      } else if (loadType === "beddings") {
+        beddingsKg += kg;
+        beddingsLoads += loads;
+      } else {
+        clothesKg += kg;
+        clothesLoads += loads;
+      }
+    }
+  }
+
+  const totalKgLoad = clothesKg + beddingsKg;
+  const totalKgLoads = clothesLoads + beddingsLoads;
+
+  return {
+    clothesKg,
+    clothesLoads,
+    beddingsKg,
+    beddingsLoads,
+    comforterLoads,
+    totalKgLoad,
+    totalKgLoads,
+    clothesAvgKg: clothesLoads > 0 ? clothesKg / clothesLoads : 0,
+    beddingsAvgKg: beddingsLoads > 0 ? beddingsKg / beddingsLoads : 0,
+    totalKgLoadAvg: totalKgLoads > 0 ? totalKgLoad / totalKgLoads : 0,
+  };
+};
+
+const formatKgWithAvg = (
+  label: string,
+  totalKg: number,
+  loadCount: number,
+  avgKg: number,
+): string => {
+  const avgText = loadCount > 0 ? `${formatKg(avgKg)} KG` : "-";
+  return `${label} - ${formatCount(loadCount)} Loads | ${formatKg(totalKg)} KG | Avg. ${avgText}`;
 };
 
 const formatCurrency = (value: number): string => {
@@ -378,6 +445,11 @@ const TransactionReport: React.FC = () => {
       return sum + totals.loads;
     }, 0);
   }, [addonsPricing, loadReportRows]);
+
+  const loadReportTypeTotals = React.useMemo(
+    () => sumLoadReportByType(loadReportRows),
+    [loadReportRows],
+  );
 
   const paymentReportRows = React.useMemo(() => {
     return filteredByCustomer.filter((transaction) => {
@@ -824,6 +896,33 @@ const TransactionReport: React.FC = () => {
               <Divider sx={{ my: 1 }} />
               <Typography sx={{ fontWeight: 700 }}>
                 Total Loads - {formatCount(totalLoads)}
+              </Typography>
+              <Typography sx={{ fontWeight: 700 }}>
+                {formatKgWithAvg(
+                  "Total Clothes KG",
+                  loadReportTypeTotals.clothesKg,
+                  loadReportTypeTotals.clothesLoads,
+                  loadReportTypeTotals.clothesAvgKg,
+                )}
+              </Typography>
+              <Typography sx={{ fontWeight: 700 }}>
+                {formatKgWithAvg(
+                  "Total Beddings KG",
+                  loadReportTypeTotals.beddingsKg,
+                  loadReportTypeTotals.beddingsLoads,
+                  loadReportTypeTotals.beddingsAvgKg,
+                )}
+              </Typography>
+              <Typography sx={{ fontWeight: 700 }}>
+                Total Comforter - {formatCount(loadReportTypeTotals.comforterLoads)}
+              </Typography>
+              <Typography sx={{ fontWeight: 700 }}>
+                {formatKgWithAvg(
+                  "Total KG Load",
+                  loadReportTypeTotals.totalKgLoad,
+                  loadReportTypeTotals.totalKgLoads,
+                  loadReportTypeTotals.totalKgLoadAvg,
+                )}
               </Typography>
             </Box>
           </Paper>

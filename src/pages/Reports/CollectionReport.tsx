@@ -250,15 +250,17 @@ const CollectionReport: React.FC = () => {
 
   const dailyChartPoints = React.useMemo(
     () =>
-      dailyRows.map((row) => ({
-        label: row.label,
-        value: row.total,
-        tooltipTitle: dayjs(row.dateKey).format("MMM D, YYYY"),
-        tooltipLines: [
-          `Cash: ${formatCurrency(row.cash)}`,
-          `Gcash: ${formatCurrency(row.gcash)}`,
-        ],
-      })),
+      dailyRows
+        .filter((row) => row.total > 0)
+        .map((row) => ({
+          label: row.label,
+          value: row.total,
+          tooltipTitle: dayjs(row.dateKey).format("MMM D, YYYY"),
+          tooltipLines: [
+            `Cash: ${formatCurrency(row.cash)}`,
+            `Gcash: ${formatCurrency(row.gcash)}`,
+          ],
+        })),
     [dailyRows],
   );
 
@@ -293,15 +295,17 @@ const CollectionReport: React.FC = () => {
 
   const monthlyChartForDisplay = React.useMemo(
     () =>
-      monthlyChartPoints.map((row) => ({
-        label: row.label,
-        value: row.total,
-        tooltipTitle: dayjs(row.monthKey).format("MMMM YYYY"),
-        tooltipLines: [
-          `Cash: ${formatCurrency(row.cash)}`,
-          `Gcash: ${formatCurrency(row.gcash)}`,
-        ],
-      })),
+      monthlyChartPoints
+        .filter((row) => row.total > 0)
+        .map((row) => ({
+          label: row.label,
+          value: row.total,
+          tooltipTitle: dayjs(row.monthKey).format("MMMM YYYY"),
+          tooltipLines: [
+            `Cash: ${formatCurrency(row.cash)}`,
+            `Gcash: ${formatCurrency(row.gcash)}`,
+          ],
+        })),
     [monthlyChartPoints],
   );
 

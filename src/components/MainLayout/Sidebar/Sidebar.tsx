@@ -273,6 +273,12 @@ export default function SidebarMenu() {
             >
               Collection Report
             </MenuItem>
+            <MenuItem
+              component={<Link to={route.REPORT_LOAD} />}
+              active={activePath === route.REPORT_LOAD}
+            >
+              Load Report
+            </MenuItem>
           </SubMenu>
         )}
       </Menu>
