@@ -57,6 +57,7 @@ const SalesExpenseGraphReportPage = lazy(
 const CollectionReportPage = lazy(
   () => import("./pages/Reports/CollectionReport"),
 );
+const LoadReportPage = lazy(() => import("./pages/Reports/LoadReport"));
 
 function App() {
   return (
@@ -287,6 +288,18 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <CollectionReportPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.REPORT_LOAD}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <LoadReportPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>
