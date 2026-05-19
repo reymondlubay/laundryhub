@@ -4,7 +4,7 @@ import authService from "../services/authService";
 
 /**
  * Define module access by role
- * Employee: Dashboard, Transaction, Customer, Record Expense, Settings (db)
+ * Employee: Dashboard, Transaction, Customer, Transaction Report, Record Expense, Settings (db)
  * Admin: All modules
  */
 const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
@@ -39,6 +39,7 @@ const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
     "/dashboard",
     "/transaction",
     "/customer",
+    "/reports/transaction",
     "/expenses/records",
     "/settings/database",
   ],
