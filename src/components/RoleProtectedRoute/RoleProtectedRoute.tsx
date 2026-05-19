@@ -10,7 +10,7 @@ interface RoleProtectedRouteProps {
 
 /**
  * Route guard that checks both authentication and role-based authorization
- * Employees can only access: Dashboard, Transaction, Customer
+ * Employees can only access: Dashboard, Transaction, Customer, Transaction Report, Record Expense, Settings (db)
  * Admins can access all protected routes
  */
 const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({

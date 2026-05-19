@@ -202,6 +202,16 @@ export default function SidebarMenu() {
           </MenuItem>
         </SubMenu>
 
+        {!isAdminUser && (
+          <MenuItem
+            component={<Link to={route.REPORT_TRANSACTION} />}
+            icon={<FaFileAlt />}
+            active={activePath === route.REPORT_TRANSACTION}
+          >
+            Transaction Report
+          </MenuItem>
+        )}
+
         {isAdminUser && (
           <SubMenu
             label="Report"

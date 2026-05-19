@@ -35,6 +35,7 @@ import addonsPricingService, {
   type AddonsPricing,
 } from "../../services/addonsPricingService";
 import { getTransactionGrandTotal } from "../../utils/pricing";
+import { isEmployee } from "../../utils/roleAccess";
 
 type PaymentModeTotals = {
   cash: number;
@@ -343,6 +344,7 @@ const getLatestPaymentDate = (
 };
 
 const TransactionReport: React.FC = () => {
+  const hideFilters = isEmployee();
   const [customers, setCustomers] = React.useState<Customer[]>([]);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -740,49 +742,51 @@ const TransactionReport: React.FC = () => {
         Transaction Report
       </Typography>
 
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Autocomplete
-              size="small"
-              options={customers}
-              value={
-                customers.find(
-                  (customer) => customer.id === selectedCustomer,
-                ) || null
-              }
-              onChange={(_, value) => setSelectedCustomer(value?.id || "")}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              getOptionLabel={(option) => option.name || ""}
-              renderInput={(params) => (
-                <TextField {...params} label="Customer Filter" />
-              )}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 4 }}>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DatePicker
-                label="Date From"
-                value={dateFrom}
-                onChange={(value) => setDateFrom(value || dayjs())}
-                slotProps={{ textField: { size: "small", fullWidth: true } }}
+      {!hideFilters && (
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Autocomplete
+                size="small"
+                options={customers}
+                value={
+                  customers.find(
+                    (customer) => customer.id === selectedCustomer,
+                  ) || null
+                }
+                onChange={(_, value) => setSelectedCustomer(value?.id || "")}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                getOptionLabel={(option) => option.name || ""}
+                renderInput={(params) => (
+                  <TextField {...params} label="Customer Filter" />
+                )}
               />
-            </LocalizationProvider>
-          </Grid>
+            </Grid>
 
-          <Grid size={{ xs: 12, md: 4 }}>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DatePicker
-                label="Date To"
-                value={dateTo}
-                onChange={(value) => setDateTo(value || dayjs())}
-                slotProps={{ textField: { size: "small", fullWidth: true } }}
-              />
-            </LocalizationProvider>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DatePicker
+                  label="Date From"
+                  value={dateFrom}
+                  onChange={(value) => setDateFrom(value || dayjs())}
+                  slotProps={{ textField: { size: "small", fullWidth: true } }}
+                />
+              </LocalizationProvider>
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 4 }}>
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DatePicker
+                  label="Date To"
+                  value={dateTo}
+                  onChange={(value) => setDateTo(value || dayjs())}
+                  slotProps={{ textField: { size: "small", fullWidth: true } }}
+                />
+              </LocalizationProvider>
+            </Grid>
           </Grid>
-        </Grid>
-      </Paper>
+        </Paper>
+      )}
 
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }}>
