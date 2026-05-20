@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
-import { Box } from "@mui/material";
+import { Box, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import { appConfig } from "../../config/app.config";
 import { useThemeContext } from "../ThemeContext/ThemeContext";
 import "./WashingMachineLoader.css";
 
@@ -9,6 +11,7 @@ type WashingMachineLoaderProps = {
 
 const WashingMachineLoader = ({ message }: WashingMachineLoaderProps) => {
   const { darkMode } = useThemeContext();
+  const theme = useTheme();
 
   const cssVars = (darkMode
     ? {
@@ -41,8 +44,22 @@ const WashingMachineLoader = ({ message }: WashingMachineLoaderProps) => {
       role="status"
       aria-live="polite"
       aria-busy="true"
-      aria-label={message}
+      aria-label={`${appConfig.companyName}. ${message}`}
     >
+      <Typography
+        variant="h5"
+        component="p"
+        sx={{
+          m: 0,
+          mb: 0.5,
+          fontWeight: 700,
+          letterSpacing: 0.02,
+          color: theme.palette.primary.main,
+          textAlign: "center",
+        }}
+      >
+        {appConfig.companyName}
+      </Typography>
       <div className="washing-loader__machine">
         <div className="washing-loader__body">
           <div className="washing-loader__panel">

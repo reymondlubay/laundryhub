@@ -39,6 +39,18 @@ import activityLogService, {
 } from "../../services/activityLogService";
 import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
+const ACTION_OPTIONS = [
+  "Added",
+  "Updated",
+  "Deleted",
+  "Changed",
+  "Signed in",
+  "Signed out",
+  "Marked loaded",
+  "Marked pickup",
+  "Marked paid",
+] as const;
+
 const MODULE_OPTIONS = [
   "Login",
   "Transactions",
@@ -85,6 +97,7 @@ const ActivityLogPage: React.FC = () => {
   const [dateFrom, setDateFrom] = useState<Dayjs | null>(() => dayjs());
   const [dateTo, setDateTo] = useState<Dayjs | null>(() => dayjs());
   const [moduleFilter, setModuleFilter] = useState("");
+  const [actionFilter, setActionFilter] = useState("");
   const [search, setSearch] = useState("");
 
   const [cleanupOpen, setCleanupOpen] = useState(false);
@@ -113,6 +126,7 @@ const ActivityLogPage: React.FC = () => {
         dateFrom: dateFrom ? dateFrom.startOf("day").toISOString() : undefined,
         dateTo: dateTo ? dateTo.endOf("day").toISOString() : undefined,
         module: moduleFilter || undefined,
+        action: actionFilter || undefined,
         search: search.trim() || undefined,
       });
       setItems(result.items);
@@ -122,7 +136,7 @@ const ActivityLogPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, dateFrom, dateTo, moduleFilter, search]);
+  }, [page, rowsPerPage, dateFrom, dateTo, moduleFilter, actionFilter, search]);
 
   useEffect(() => {
     void loadSettings();
@@ -280,6 +294,27 @@ const ActivityLogPage: React.FC = () => {
             </FormControl>
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel id="action-filter-label">Action</InputLabel>
+              <Select
+                labelId="action-filter-label"
+                label="Action"
+                value={actionFilter}
+                onChange={(e) => {
+                  setActionFilter(e.target.value);
+                  setPage(0);
+                }}
+              >
+                <MenuItem value="">All actions</MenuItem>
+                {ACTION_OPTIONS.map((a) => (
+                  <MenuItem key={a} value={a}>
+                    {a}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12 }}>
             <TextField
               fullWidth
               size="small"
