@@ -17,16 +17,16 @@ const normalizePricing = (raw: unknown): AddonsPricing => {
   const item = raw as Record<string, unknown>;
   return {
     fabconPrice: Number(
-      item.fabconPrice ?? item.fabconprice ?? DEFAULT_ADDONS_PRICING.fabconPrice,
+      item.fabconprice ?? item.fabconPrice ?? DEFAULT_ADDONS_PRICING.fabconPrice,
     ),
     detergentPrice: Number(
-      item.detergentPrice ??
-        item.detergentprice ??
+      item.detergentprice ??
+        item.detergentPrice ??
         DEFAULT_ADDONS_PRICING.detergentPrice,
     ),
     colorSafePrice: Number(
-      item.colorSafePrice ??
-        item.colorsafeprice ??
+      item.colorsafeprice ??
+        item.colorSafePrice ??
         DEFAULT_ADDONS_PRICING.colorSafePrice,
     ),
   };

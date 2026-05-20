@@ -199,25 +199,18 @@ export function mergeServerWritePayload(
   const loadDetails = mapLoadDetails(body.loadDetails, prev);
   const paymentDetails = mapPaymentDetails(body.paymentDetails, prev);
 
-  const merged = {
-    ...(prev ?? ({} as Transaction)),
-    ...txRow,
+  const normalized = normalizeTransactionRow(txRow);
+
+  return {
+    ...normalized,
     loadDetails,
     paymentDetails,
-  } as Transaction;
-
-  if (!merged.customer && prev?.customer) {
-    merged.customer = prev.customer;
-  }
-
-  if (
-    merged.releasedByUser === undefined &&
-    prev?.releasedByUser !== undefined
-  ) {
-    merged.releasedByUser = prev.releasedByUser;
-  }
-
-  return normalizeTransactionRow(merged);
+    customer: normalized.customer ?? prev?.customer,
+    releasedByUser:
+      normalized.releasedByUser !== undefined
+        ? normalized.releasedByUser
+        : prev?.releasedByUser,
+  };
 }
 
 export interface UpdateTransactionRequest {
