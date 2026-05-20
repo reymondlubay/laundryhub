@@ -66,6 +66,7 @@ import {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../../../services/addonsPricingService";
+import { pickTransactionNum } from "../../../../utils/normalizeTransaction";
 import { getTransactionAddonPricing } from "../../../../utils/pricing";
 
 type TransactionModalProps = {
@@ -318,6 +319,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       releasedby?: string;
     };
 
+    const txRecord = tx as unknown as Record<string, unknown>;
+
     return {
       customer: transaction.customerId || tx.customerid || "",
       receiveDate: dayjs(tx.dateReceived || tx.datereceived || dayjs()),
@@ -343,10 +346,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               price: Number(item.price || 0),
             }))
           : [{ type: "Clothes", kg: 0, loads: 0, price: 0 }],
-      whitePrice: Number(tx.whitePrice ?? tx.whiteprice ?? 0),
-      fabcon: Number(tx.fabconQty ?? tx.fabconqty ?? 0),
-      detergent: Number(tx.detergentQty ?? tx.detergentqty ?? 0),
-      cs: Number(tx.colorSafeQty ?? tx.colorsafeqty ?? 0),
+      whitePrice: pickTransactionNum(txRecord, "whiteprice", "whitePrice"),
+      fabcon: pickTransactionNum(txRecord, "fabconqty", "fabconQty"),
+      detergent: pickTransactionNum(txRecord, "detergentqty", "detergentQty"),
+      cs: pickTransactionNum(txRecord, "colorsafeqty", "colorSafeQty"),
       releaseBy: tx.releasedBy || tx.releasedby || "",
       notes: transaction.notes || "",
     };

@@ -1,3 +1,5 @@
+import { pickTransactionNum } from "./normalizeTransaction";
+
 /**
  * Same detail lines as the Transaction table Customer column info tooltip
  * (delivery, add-ons, notes).
@@ -25,10 +27,19 @@ export function getTransactionNoteDetailLines(
   if (!row) return [];
   const noteText = row.notes && row.notes !== "-" ? String(row.notes) : "";
   const isDelivered = Boolean(row.isDelivered ?? row.isdelivered);
-  const whitePrice = Number(row.whitePrice ?? row.whiteprice ?? 0);
-  const fabconQty = Number(row.fabconQty ?? row.fabconqty ?? 0);
-  const detergentQty = Number(row.detergentQty ?? row.detergentqty ?? 0);
-  const colorSafeQty = Number(row.colorSafeQty ?? row.colorsafeqty ?? 0);
+  const source = row as Record<string, unknown>;
+  const whitePrice = pickTransactionNum(source, "whiteprice", "whitePrice");
+  const fabconQty = pickTransactionNum(source, "fabconqty", "fabconQty");
+  const detergentQty = pickTransactionNum(
+    source,
+    "detergentqty",
+    "detergentQty",
+  );
+  const colorSafeQty = pickTransactionNum(
+    source,
+    "colorsafeqty",
+    "colorSafeQty",
+  );
 
   const details: string[] = [];
   if (isDelivered) details.push("Delivery");

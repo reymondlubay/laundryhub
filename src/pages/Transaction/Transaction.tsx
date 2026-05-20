@@ -2,14 +2,10 @@ import React from "react";
 import TransactionTable from "./components/TransactionTable";
 import {
   Autocomplete,
-  Box,
   Button,
-  Checkbox,
-  FormControlLabel,
   Grid,
   Stack,
   TextField,
-  Typography,
   InputAdornment,
   IconButton,
   Snackbar,
@@ -22,9 +18,16 @@ import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import TransactionModal from "./components/TransactionModal/TransactionModal";
+import TransactionListControls from "./components/TransactionListControls";
 import type { Transaction } from "../../services/transactionService";
 import customerService, { type Customer } from "../../services/customerService";
 import { useTransactionSearch } from "./hooks/useTransactionSearch";
+import {
+  filterAndSortTransactions,
+  type TransactionLoadTypeFilter,
+  type TransactionSortBy,
+  type TransactionSortDirection,
+} from "./utils/transactionListFilters";
 
 const Transaction = () => {
   const [openTransaction, setOpenTransaction] = React.useState(false);
@@ -33,6 +36,11 @@ const Transaction = () => {
   const [showPendingOnly, setShowPendingOnly] = React.useState(false);
   const [showReadyForPickupOnly, setShowReadyForPickupOnly] =
     React.useState(false);
+  const [sortBy, setSortBy] = React.useState<TransactionSortBy>("default");
+  const [sortDirection, setSortDirection] =
+    React.useState<TransactionSortDirection>("desc");
+  const [loadTypeFilter, setLoadTypeFilter] =
+    React.useState<TransactionLoadTypeFilter>("");
   const [jumpToFirstPageNonce, setJumpToFirstPageNonce] = React.useState(0);
   const [flashRowRequest, setFlashRowRequest] = React.useState<{
     transactionId: string;
@@ -134,6 +142,9 @@ const Transaction = () => {
   const handleClearFilters = React.useCallback(() => {
     setShowPendingOnly(false);
     setShowReadyForPickupOnly(false);
+    setSortBy("default");
+    setSortDirection("desc");
+    setLoadTypeFilter("");
     clearFilters();
   }, [clearFilters]);
 
@@ -155,23 +166,24 @@ const Transaction = () => {
     [search],
   );
 
-  const filteredTransactions = React.useMemo(() => {
-    if (!showPendingOnly && !showReadyForPickupOnly) return transactions;
-
-    return transactions.filter((transaction) => {
-      const tx = transaction as Transaction & {
-        dateloaded?: string | null;
-        datepickup?: string | null;
-      };
-      const loadedDate = transaction.dateLoaded || tx.dateloaded || null;
-      const pickupDate = transaction.datePickup || tx.datepickup || null;
-
-      if (showPendingOnly && loadedDate) return false;
-      if (showReadyForPickupOnly && (!loadedDate || pickupDate)) return false;
-
-      return true;
-    });
-  }, [showPendingOnly, showReadyForPickupOnly, transactions]);
+  const displayedTransactions = React.useMemo(
+    () =>
+      filterAndSortTransactions(transactions, {
+        showPendingOnly,
+        showReadyForPickupOnly,
+        loadTypeFilter,
+        sortBy,
+        sortDirection,
+      }),
+    [
+      transactions,
+      showPendingOnly,
+      showReadyForPickupOnly,
+      loadTypeFilter,
+      sortBy,
+      sortDirection,
+    ],
+  );
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent) => {
@@ -352,77 +364,21 @@ const Transaction = () => {
         </Grid>
       </Grid>
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 1.5,
-        }}
-      >
-        <Stack direction="row" spacing={1} alignItems="center">
-          <FormControlLabel
-            sx={{ m: 0 }}
-            control={
-              <Checkbox
-                size="small"
-                checked={showPendingOnly}
-                onChange={(event) => setShowPendingOnly(event.target.checked)}
-              />
-            }
-            label="Show pending"
-          />
-          <FormControlLabel
-            sx={{ m: 0 }}
-            control={
-              <Checkbox
-                size="small"
-                checked={showReadyForPickupOnly}
-                onChange={(event) =>
-                  handleReadyForPickupChange(event.target.checked)
-                }
-              />
-            }
-            label="Show Ready for pickup"
-          />
-        </Stack>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Stack direction="row" spacing={0.75} alignItems="center">
-            <Box
-              sx={{
-                width: 10,
-                height: 10,
-                minWidth: 10,
-                borderRadius: "50%",
-                border: "1px solid rgba(0, 0, 0, 0.25)",
-                backgroundColor: "#d8f0d2",
-              }}
-            />
-            <Typography variant="caption" sx={{ fontWeight: 700 }}>
-              Loaded
-            </Typography>
-          </Stack>
-
-          <Stack direction="row" spacing={0.75} alignItems="center">
-            <Box
-              sx={{
-                width: 10,
-                height: 10,
-                minWidth: 10,
-                borderRadius: "50%",
-                border: "1px solid rgba(0, 0, 0, 0.25)",
-                backgroundColor: "#ffe7b3",
-              }}
-            />
-            <Typography variant="caption" sx={{ fontWeight: 700 }}>
-              Picked
-            </Typography>
-          </Stack>
-        </Stack>
-      </Box>
+      <TransactionListControls
+        showPendingOnly={showPendingOnly}
+        showReadyForPickupOnly={showReadyForPickupOnly}
+        sortBy={sortBy}
+        sortDirection={sortDirection}
+        loadTypeFilter={loadTypeFilter}
+        onShowPendingOnlyChange={setShowPendingOnly}
+        onShowReadyForPickupOnlyChange={handleReadyForPickupChange}
+        onSortByChange={setSortBy}
+        onSortDirectionChange={setSortDirection}
+        onLoadTypeFilterChange={setLoadTypeFilter}
+      />
 
       <TransactionTable
-        transactions={filteredTransactions}
+        transactions={displayedTransactions}
         loading={loading}
         error={error}
         onEditTransaction={handleEditTransaction}

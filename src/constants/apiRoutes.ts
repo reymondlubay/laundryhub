@@ -11,6 +11,7 @@ export const API_ROUTES = {
   FIXED_MONTHLY_EXPENSES: "/fixed-monthly-expenses",
   BACKUP: "/backup",
   BACKUP_UPLOAD: "/backup/upload",
+  BACKUP_SCHEDULE_TIMES: "/backup/schedule-times",
   BACKUP_FOLDER_PATHS: "/backup/folder-paths",
   BACKUPS: "/backups",
   RESTORE: "/restore",

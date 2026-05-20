@@ -1,5 +1,12 @@
 import { DEFAULT_ADDONS_PRICING } from "../services/addonsPricingService";
 import type { AddonsPricing } from "../services/addonsPricingService";
+import {
+  pickOptionalTransactionNum,
+  pickTransactionNum,
+} from "./normalizeTransaction";
+
+const asRecord = (value: object): Record<string, unknown> =>
+  value as Record<string, unknown>;
 
 const toNumber = (value: unknown): number => {
   const parsed = Number(value ?? 0);
@@ -19,10 +26,11 @@ export const getAddonsTotal = (
   },
   pricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
 ): number => {
-  const whitePrice = toNumber(payload.whitePrice ?? payload.whiteprice);
-  const fabconQty = toNumber(payload.fabconQty ?? payload.fabconqty);
-  const detergentQty = toNumber(payload.detergentQty ?? payload.detergentqty);
-  const colorSafeQty = toNumber(payload.colorSafeQty ?? payload.colorsafeqty);
+  const row = asRecord(payload);
+  const whitePrice = pickTransactionNum(row, "whiteprice", "whitePrice");
+  const fabconQty = pickTransactionNum(row, "fabconqty", "fabconQty");
+  const detergentQty = pickTransactionNum(row, "detergentqty", "detergentQty");
+  const colorSafeQty = pickTransactionNum(row, "colorsafeqty", "colorSafeQty");
 
   return (
     whitePrice +
@@ -46,19 +54,21 @@ export const getStoredSnapshots = (payload: {
   addonsSubtotal?: number | string | null;
   addonssubtotal?: number | string | null;
 }) => {
-  const grandTotal = toNumber(payload.grandTotal ?? payload.grandtotal);
-  const loadSubtotal = toNumber(payload.loadSubtotal ?? payload.loadsubtotal);
-  const addonsSubtotal = toNumber(
-    payload.addonsSubtotal ?? payload.addonssubtotal,
+  const row = asRecord(payload);
+  const grandTotal = pickTransactionNum(row, "grandtotal", "grandTotal");
+  const loadSubtotal = pickTransactionNum(row, "loadsubtotal", "loadSubtotal");
+  const addonsSubtotal = pickTransactionNum(
+    row,
+    "addonssubtotal",
+    "addonsSubtotal",
   );
 
   const hasGrandTotal =
-    payload.grandTotal !== undefined || payload.grandtotal !== undefined;
+    row.grandTotal !== undefined || row.grandtotal !== undefined;
   const hasLoadSubtotal =
-    payload.loadSubtotal !== undefined || payload.loadsubtotal !== undefined;
+    row.loadSubtotal !== undefined || row.loadsubtotal !== undefined;
   const hasAddonsSubtotal =
-    payload.addonsSubtotal !== undefined ||
-    payload.addonssubtotal !== undefined;
+    row.addonsSubtotal !== undefined || row.addonssubtotal !== undefined;
 
   const hasPersistedSnapshots =
     grandTotal > 0 || loadSubtotal > 0 || addonsSubtotal > 0;
@@ -82,18 +92,24 @@ export const inferAddonPricingFromSnapshots = (
   transaction: Record<string, unknown>,
   fallback: AddonsPricing = DEFAULT_ADDONS_PRICING,
 ): AddonsPricing | null => {
-  const addonsSubtotal = toNumber(
-    transaction.addonsSubtotal ?? transaction.addonssubtotal,
+  const addonsSubtotal = pickTransactionNum(
+    transaction,
+    "addonssubtotal",
+    "addonsSubtotal",
   );
   if (addonsSubtotal <= 0) return null;
 
-  const whitePrice = toNumber(transaction.whitePrice ?? transaction.whiteprice);
-  const fabconQty = toNumber(transaction.fabconQty ?? transaction.fabconqty);
-  const detergentQty = toNumber(
-    transaction.detergentQty ?? transaction.detergentqty,
+  const whitePrice = pickTransactionNum(transaction, "whiteprice", "whitePrice");
+  const fabconQty = pickTransactionNum(transaction, "fabconqty", "fabconQty");
+  const detergentQty = pickTransactionNum(
+    transaction,
+    "detergentqty",
+    "detergentQty",
   );
-  const colorSafeQty = toNumber(
-    transaction.colorSafeQty ?? transaction.colorsafeqty,
+  const colorSafeQty = pickTransactionNum(
+    transaction,
+    "colorsafeqty",
+    "colorSafeQty",
   );
 
   const addonRemainder = Math.max(0, addonsSubtotal - whitePrice);
@@ -117,14 +133,20 @@ export const inferAddonPricingFromSnapshots = (
   }
 
   const stored: AddonsPricing = {
-    fabconPrice: toNumber(
-      transaction.fabconUnitPrice ?? transaction.fabconunitprice,
+    fabconPrice: pickTransactionNum(
+      transaction,
+      "fabconunitprice",
+      "fabconUnitPrice",
     ),
-    detergentPrice: toNumber(
-      transaction.detergentUnitPrice ?? transaction.detergentunitprice,
+    detergentPrice: pickTransactionNum(
+      transaction,
+      "detergentunitprice",
+      "detergentUnitPrice",
     ),
-    colorSafePrice: toNumber(
-      transaction.colorSafeUnitPrice ?? transaction.colorsafeunitprice,
+    colorSafePrice: pickTransactionNum(
+      transaction,
+      "colorsafeunitprice",
+      "colorSafeUnitPrice",
     ),
   };
 
@@ -176,21 +198,24 @@ export const getTransactionAddonPricing = (
   }
 
   return {
-    fabconPrice: toNumber(
-      transaction.fabconUnitPrice ??
-        transaction.fabconunitprice ??
-        currentPricing.fabconPrice,
-    ),
-    detergentPrice: toNumber(
-      transaction.detergentUnitPrice ??
-        transaction.detergentunitprice ??
-        currentPricing.detergentPrice,
-    ),
-    colorSafePrice: toNumber(
-      transaction.colorSafeUnitPrice ??
-        transaction.colorsafeunitprice ??
-        currentPricing.colorSafePrice,
-    ),
+    fabconPrice:
+      pickOptionalTransactionNum(
+        transaction,
+        "fabconunitprice",
+        "fabconUnitPrice",
+      ) ?? currentPricing.fabconPrice,
+    detergentPrice:
+      pickOptionalTransactionNum(
+        transaction,
+        "detergentunitprice",
+        "detergentUnitPrice",
+      ) ?? currentPricing.detergentPrice,
+    colorSafePrice:
+      pickOptionalTransactionNum(
+        transaction,
+        "colorsafeunitprice",
+        "colorSafeUnitPrice",
+      ) ?? currentPricing.colorSafePrice,
   };
 };
 
