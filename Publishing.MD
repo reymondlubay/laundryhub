@@ -263,7 +263,11 @@ In your axios client config, prefer:
 - Relative base path: `/api`
 
 Or if environment-based:
-- `VITE_API_BASE_URL=/api`
+- `VITE_API_BASE_URL=/api` (must be relative `/api` for same-origin health checks and API calls)
+- `VITE_COMPANY_NAME=Laundry Hub` (login title, sidebar, browser tab, startup screen)
+- `VITE_COMPANY_LOGO_URL=/company-logo.png` (file must exist under `public/` before build)
+
+Add the same keys to `.env.laundry-local` and `.env.laundry-network` before `npm run deploy:all`.
 
 Then rebuild frontend:
 

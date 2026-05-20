@@ -68,4 +68,7 @@ export const UI_TEXT = {
   CLEAR: "Clear",
   SIGN_IN: "Sign In",
   READ_NOTES: "Read Notes",
+  RECONNECTING: "Reconnecting to server…",
+  BACKEND_UNAVAILABLE: "Could not reach the server.",
+  RETRY: "Retry",
 } as const;
