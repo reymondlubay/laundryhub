@@ -11,6 +11,8 @@ import { Box, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useThemeContext } from "../../ThemeContext/ThemeContext";
 import { Link, useLocation } from "react-router-dom";
+import CompanyLogo from "../../CompanyLogo/CompanyLogo";
+import { appConfig } from "../../../config/app.config";
 import route from "../../../constants/route";
 import { isAdmin } from "../../../utils/roleAccess";
 import "./sidebar.scss";
@@ -48,25 +50,7 @@ export default function SidebarMenu() {
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Box
-            sx={{
-              width: 36,
-              height: 36,
-              background: `linear-gradient(135deg, ${primary.dark}, ${primary.light})`,
-              borderRadius: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: theme.palette.primary.contrastText,
-              fontWeight: "bold",
-              fontSize: "18px",
-              flexShrink: 0,
-              boxShadow: "none",
-              border: `1px solid ${theme.palette.divider}`,
-            }}
-          >
-            LH
-          </Box>
+          <CompanyLogo size={36} />
 
           {!collapsed && (
             <Typography
@@ -78,7 +62,7 @@ export default function SidebarMenu() {
                 letterSpacing: 0.5,
               }}
             >
-              Laundry Hub
+              {appConfig.companyName}
             </Typography>
           )}
         </Box>

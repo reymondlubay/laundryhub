@@ -1,0 +1,256 @@
+.washing-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.washing-loader__machine {
+  position: relative;
+  width: 180px;
+  height: 200px;
+  animation: machineWobble 2.8s ease-in-out infinite;
+}
+
+.washing-loader__body {
+  position: absolute;
+  inset: 28px 8px 0;
+  border-radius: 16px;
+  border: 3px solid var(--wm-border, #5c7a94);
+  background: linear-gradient(
+    180deg,
+    var(--wm-body-top, #e8eef5) 0%,
+    var(--wm-body-bottom, #d2dde8) 100%
+  );
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.washing-loader__panel {
+  position: absolute;
+  top: 36px;
+  right: 14px;
+  width: 36px;
+  height: 48px;
+  border-radius: 6px;
+  border: 2px solid var(--wm-border, #5c7a94);
+  background: var(--wm-panel, #f1f5f9);
+}
+
+.washing-loader__panel-dot {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wm-accent, #4a7ba7);
+}
+
+.washing-loader__panel-dot:nth-child(1) {
+  top: 10px;
+}
+
+.washing-loader__panel-dot:nth-child(2) {
+  top: 22px;
+  animation: panelBlink 1.2s ease-in-out infinite;
+}
+
+.washing-loader__panel-dot:nth-child(3) {
+  top: 34px;
+  animation: panelBlink 1.2s ease-in-out 0.4s infinite;
+}
+
+.washing-loader__door {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%);
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 4px solid var(--wm-border, #5c7a94);
+  background: var(--wm-door-bg, #b8cfe0);
+  overflow: hidden;
+}
+
+.washing-loader__water {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 60%,
+    var(--wm-water, #7eb8d8) 0%,
+    var(--wm-water-deep, #4a8fb5) 70%
+  );
+  opacity: 0.85;
+}
+
+.washing-loader__drum {
+  position: absolute;
+  inset: 14px;
+  border-radius: 50%;
+  border: 3px dashed rgba(255, 255, 255, 0.55);
+  animation: drumSpin 2.2s linear infinite;
+}
+
+.washing-loader__drum-inner {
+  position: absolute;
+  inset: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+}
+
+.washing-loader__bubble {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  animation: bubbleRise 2.4s ease-in infinite;
+  opacity: 0;
+}
+
+.washing-loader__bubble--1 {
+  width: 14px;
+  height: 14px;
+  left: 18%;
+  bottom: 38%;
+  animation-delay: 0s;
+}
+
+.washing-loader__bubble--2 {
+  width: 10px;
+  height: 10px;
+  left: 42%;
+  bottom: 32%;
+  animation-delay: 0.5s;
+}
+
+.washing-loader__bubble--3 {
+  width: 16px;
+  height: 16px;
+  left: 58%;
+  bottom: 40%;
+  animation-delay: 1s;
+}
+
+.washing-loader__bubble--4 {
+  width: 8px;
+  height: 8px;
+  left: 72%;
+  bottom: 35%;
+  animation-delay: 1.5s;
+}
+
+.washing-loader__bubble--5 {
+  width: 12px;
+  height: 12px;
+  left: 30%;
+  bottom: 28%;
+  animation-delay: 0.8s;
+}
+
+.washing-loader__bubble--6 {
+  width: 9px;
+  height: 9px;
+  left: 50%;
+  bottom: 22%;
+  animation-delay: 1.8s;
+}
+
+.washing-loader__bubble--7 {
+  width: 11px;
+  height: 11px;
+  left: 65%;
+  bottom: 26%;
+  animation-delay: 2.1s;
+}
+
+.washing-loader__bubble--8 {
+  width: 7px;
+  height: 7px;
+  left: 38%;
+  bottom: 18%;
+  animation-delay: 0.3s;
+}
+
+.washing-loader__caption {
+  font-family: "Montserrat", "Helvetica Neue", Arial, sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--wm-caption, #5c6d7e);
+  text-align: center;
+  margin: 0;
+}
+
+.washing-loader__caption--pulse {
+  animation: captionPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes drumSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bubbleRise {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-72px) scale(1.1);
+    opacity: 0;
+  }
+}
+
+@keyframes machineWobble {
+  0%,
+  100% {
+    transform: rotate(-0.8deg);
+  }
+  50% {
+    transform: rotate(0.8deg);
+  }
+}
+
+@keyframes panelBlink {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes captionPulse {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .washing-loader__machine,
+  .washing-loader__drum,
+  .washing-loader__bubble,
+  .washing-loader__panel-dot,
+  .washing-loader__caption--pulse {
+    animation: none;
+  }
+
+  .washing-loader__caption--pulse {
+    opacity: 0.85;
+  }
+}

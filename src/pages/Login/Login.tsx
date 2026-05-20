@@ -12,6 +12,8 @@ import {
   Skeleton,
   Stack,
 } from "@mui/material";
+import CompanyLogo from "../../components/CompanyLogo/CompanyLogo";
+import { appConfig } from "../../config/app.config";
 import authService from "../../services/authService";
 import route from "../../constants/route";
 import { API_ERRORS, FORM_ERRORS, UI_TEXT } from "../../constants/messages";
@@ -87,17 +89,27 @@ const Login: React.FC = () => {
             width: "100%",
           }}
         >
-          <Typography
-            variant="h4"
-            component="h1"
+          <Box
             sx={{
-              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
               marginBottom: 3,
-              fontWeight: 600,
             }}
           >
-            LaundryHub
-          </Typography>
+            <CompanyLogo size={80} />
+            <Typography
+              variant="h5"
+              component="h1"
+              sx={{
+                textAlign: "center",
+                marginTop: 1.5,
+                fontWeight: 600,
+              }}
+            >
+              {appConfig.companyName}
+            </Typography>
+          </Box>
 
           <Typography
             variant="body2"

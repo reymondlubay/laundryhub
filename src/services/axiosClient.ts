@@ -1,5 +1,6 @@
 import axios, { AxiosError } from "axios";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
+import { notifyNetworkFailure } from "../utils/backendNetworkHandler";
 import { storage, storageKey } from "../utils/storage";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
@@ -42,6 +43,11 @@ axiosClient.interceptors.response.use(
       localStorage.removeItem("user");
       window.location.href = "/login";
     }
+
+    if (!error.response && !isLoginRequest) {
+      notifyNetworkFailure();
+    }
+
     return Promise.reject(error);
   },
 );
