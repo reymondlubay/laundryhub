@@ -15,6 +15,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   TextField,
   Typography,
   InputAdornment,
@@ -33,6 +34,7 @@ import {
   TableSkeleton,
   TableHeaderSkeleton,
 } from "../../components/Skeletons/SkeletonComponents";
+import DatabaseScheduleSection from "./DatabaseScheduleSection";
 import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
 const formatSize = (bytes: number): string => {
@@ -92,7 +94,25 @@ const DatabaseSettings: React.FC = () => {
     { path: string; reason: string }[] | null
   >(null);
 
+  const [backupPage, setBackupPage] = React.useState(0);
+  const [backupRowsPerPage, setBackupRowsPerPage] = React.useState(10);
+
   const hasPendingOperation = backups.some((item) => item.status === "Pending");
+
+  const pagedBackups = React.useMemo(() => {
+    const start = backupPage * backupRowsPerPage;
+    return backups.slice(start, start + backupRowsPerPage);
+  }, [backups, backupPage, backupRowsPerPage]);
+
+  React.useEffect(() => {
+    const maxPage = Math.max(
+      0,
+      Math.ceil(backups.length / backupRowsPerPage) - 1,
+    );
+    if (backupPage > maxPage) {
+      setBackupPage(maxPage);
+    }
+  }, [backups.length, backupRowsPerPage, backupPage]);
 
   const deletableBackups = React.useMemo(
     () => backups.filter((item) => item.status !== "Pending"),
@@ -429,27 +449,12 @@ const DatabaseSettings: React.FC = () => {
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        flexWrap="wrap"
-        gap={2}
-        sx={{ mb: 2 }}
+      <Typography
+        variant="h6"
+        sx={{ color: headingColor, fontWeight: 700, mb: 2 }}
       >
-        <Typography variant="h6" sx={{ color: headingColor, fontWeight: 700 }}>
-          Settings - Database Backup
-        </Typography>
-        <Button
-          variant="contained"
-          onClick={handleCreateBackup}
-          disabled={
-            creating || uploading || initialLoading || hasPendingOperation
-          }
-        >
-          {creating ? "Starting..." : "Create Backup"}
-        </Button>
-      </Stack>
+        Settings - Database Backup
+      </Typography>
 
       <Paper
         sx={{
@@ -633,6 +638,7 @@ const DatabaseSettings: React.FC = () => {
               </TableContainer>
             </Box>
           ) : null}
+
         </Stack>
       </Paper>
 
@@ -665,12 +671,15 @@ const DatabaseSettings: React.FC = () => {
       ) : null}
 
       <Paper sx={{ bgcolor: surfaceColor, border: `1px solid ${borderColor}` }}>
-        {selectedBackupIds.length > 0 ? (
-          <Stack
-            direction="row"
-            justifyContent="flex-end"
-            sx={{ px: 2, pt: 2 }}
-          >
+        <Stack
+          direction="row"
+          justifyContent="flex-end"
+          alignItems="center"
+          flexWrap="wrap"
+          gap={1}
+          sx={{ px: 2, pt: 2 }}
+        >
+          {selectedBackupIds.length > 0 ? (
             <Button
               size="small"
               variant="contained"
@@ -685,13 +694,22 @@ const DatabaseSettings: React.FC = () => {
             >
               Delete selected ({selectedBackupIds.length})
             </Button>
-          </Stack>
-        ) : null}
+          ) : null}
+          <Button
+            variant="contained"
+            onClick={handleCreateBackup}
+            disabled={
+              creating || uploading || initialLoading || hasPendingOperation
+            }
+          >
+            {creating ? "Starting..." : "Create Backup"}
+          </Button>
+        </Stack>
         {initialLoading ? (
           <TableContainer>
             <Table size="small">
-              <TableHeaderSkeleton columns={7} />
-              <TableSkeleton columns={7} rows={5} />
+              <TableHeaderSkeleton columns={8} />
+              <TableSkeleton columns={8} rows={5} />
             </Table>
           </TableContainer>
         ) : (
@@ -738,6 +756,11 @@ const DatabaseSettings: React.FC = () => {
                   <TableCell
                     sx={{ color: headColor, borderBottomColor: borderColor }}
                   >
+                    Source
+                  </TableCell>
+                  <TableCell
+                    sx={{ color: headColor, borderBottomColor: borderColor }}
+                  >
                     File Size
                   </TableCell>
                   <TableCell
@@ -757,7 +780,7 @@ const DatabaseSettings: React.FC = () => {
                 {backups.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       align="center"
                       sx={{ color: cellColor, borderBottomColor: borderColor }}
                     >
@@ -765,7 +788,7 @@ const DatabaseSettings: React.FC = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  backups.map((backup) => {
+                  pagedBackups.map((backup) => {
                     const isPending = backup.status === "Pending";
                     return (
                       <TableRow key={backup.id} selected={selectedBackupIds.includes(backup.id)}>
@@ -813,6 +836,14 @@ const DatabaseSettings: React.FC = () => {
                                 "MM-DD-YYYY h:mm A",
                               )
                             : "-"}
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            color: cellColor,
+                            borderBottomColor: borderColor,
+                          }}
+                        >
+                          {backup.backup_source === "auto" ? "Auto" : "Manual"}
                         </TableCell>
                         <TableCell
                           sx={{
@@ -919,7 +950,40 @@ const DatabaseSettings: React.FC = () => {
             </Table>
           </TableContainer>
         )}
+        {!initialLoading && backups.length > 0 ? (
+          <TablePagination
+            count={backups.length}
+            page={backupPage}
+            onPageChange={(_, newPage) => setBackupPage(newPage)}
+            rowsPerPage={backupRowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setBackupRowsPerPage(parseInt(event.target.value, 10));
+              setBackupPage(0);
+            }}
+            rowsPerPageOptions={[10, 25, 50]}
+          />
+        ) : null}
       </Paper>
+
+      {isAdmin ? (
+        <Paper
+          sx={{
+            bgcolor: surfaceColor,
+            border: `1px solid ${borderColor}`,
+            mt: 2,
+            p: 2,
+          }}
+        >
+          <DatabaseScheduleSection
+            headingColor={headingColor}
+            borderColor={borderColor}
+            headBg={headBg}
+            headColor={headColor}
+            cellColor={cellColor}
+            onError={setError}
+          />
+        </Paper>
+      ) : null}
 
       <Dialog
         open={Boolean(restoreId)}

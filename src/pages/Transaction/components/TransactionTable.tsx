@@ -833,47 +833,6 @@ function TransactionTableInner({
     selectedTransactionForMark,
   ]);
 
-  const sortedTransactions = useMemo(() => {
-    return [...transactions].sort((a, b) => {
-      const aTx = a as Transaction & {
-        datereceived?: string;
-        dateloaded?: string;
-        estimatedpickup?: string;
-        datepickup?: string;
-      };
-      const bTx = b as Transaction & {
-        datereceived?: string;
-        dateloaded?: string;
-        estimatedpickup?: string;
-        datepickup?: string;
-      };
-
-      const aEstimated = dayjs(a.estimatedPickup || aTx.estimatedpickup);
-      const bEstimated = dayjs(b.estimatedPickup || bTx.estimatedpickup);
-      const aLoaded = Boolean(a.dateLoaded || aTx.dateloaded);
-      const bLoaded = Boolean(b.dateLoaded || bTx.dateloaded);
-      const aPriority = !aLoaded && aEstimated.isValid();
-      const bPriority = !bLoaded && bEstimated.isValid();
-
-      if (aPriority && !bPriority) return -1;
-      if (!aPriority && bPriority) return 1;
-
-      if (aPriority && bPriority) {
-        const pickupDiff = aEstimated.valueOf() - bEstimated.valueOf();
-        if (pickupDiff !== 0) return pickupDiff;
-      }
-
-      const aDate = dayjs(a.dateReceived || aTx.datereceived);
-      const bDate = dayjs(b.dateReceived || bTx.datereceived);
-
-      if (!aDate.isValid() && !bDate.isValid()) return 0;
-      if (!aDate.isValid()) return 1;
-      if (!bDate.isValid()) return -1;
-
-      return bDate.valueOf() - aDate.valueOf();
-    });
-  }, [transactions]);
-
   React.useEffect(() => {
     const loadPricing = async () => {
       try {
@@ -889,10 +848,10 @@ function TransactionTableInner({
 
   const rowData = useMemo<FlatTransactionRow[]>(
     () =>
-      sortedTransactions.flatMap((transaction) =>
+      transactions.flatMap((transaction) =>
         flattenTransactionRows(transaction, addonsPricing),
       ),
-    [addonsPricing, sortedTransactions],
+    [addonsPricing, transactions],
   );
 
   const themeDarkWarm = themeQuartz.withPart(
