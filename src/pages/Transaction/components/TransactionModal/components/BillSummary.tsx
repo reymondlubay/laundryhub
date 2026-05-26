@@ -65,6 +65,9 @@ const BillSummary = ({
     setTotal(calculateTotals(transactionFormValues).grandTotal);
   }, [addonsPricing, transactionFormValues]);
 
+  const paidTotal = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const balance = Math.max(total - paidTotal, 0);
+
   return (
     <Paper elevation={1} sx={{ p: 2 }}>
       <Typography gutterBottom align="center">
@@ -134,6 +137,7 @@ const BillSummary = ({
       <PaymentManager
         initialPayments={payments}
         onPaymentsChange={onPaymentsChange}
+        balance={balance}
       />
     </Paper>
   );
