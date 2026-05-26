@@ -19,6 +19,9 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import transactionService, {
   type Transaction,
 } from "../../services/transactionService";
+import ColoredLoadCount from "../../components/LoadsThresholdLegend/ColoredLoadCount";
+import LoadsThresholdLegend from "../../components/LoadsThresholdLegend/LoadsThresholdLegend";
+import { DOW_WEEKEND_TEXT_COLOR } from "../../utils/loadsThresholdColor";
 import { getTransactionGrandTotal } from "../../utils/pricing";
 
 type TransactionWithLegacyFields = Transaction & {
@@ -113,18 +116,6 @@ type BarChartPoint = {
 const isFriSatSun = (dateKey: string): boolean => {
   const d = dayjs(dateKey).day();
   return d === 5 || d === 6 || d === 0;
-};
-
-/**
- * Tier text colors only (no cell fill): &lt;20 red, 20–30 orange, 31–40 green,
- * &gt;40 blue.
- */
-const getLoadTextColor = (loads: number): string => {
-  const v = Math.round(loads);
-  if (v < 20) return "#7f1d1d";
-  if (v <= 30) return "#92400e";
-  if (v <= 40) return "#166534";
-  return "#1d4ed8";
 };
 
 const BarChart: React.FC<{
@@ -521,9 +512,14 @@ const TransactionGraphSummary: React.FC = () => {
       ) : (
         <Stack spacing={2}>
           <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1.5, fontWeight: 700 }}>
+            <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Daily Summary
             </Typography>
+            <LoadsThresholdLegend
+              labelPrefix="Sum of Load"
+              showDowLegend
+              sx={{ mb: 1.5 }}
+            />
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -544,33 +540,27 @@ const TransactionGraphSummary: React.FC = () => {
                   ) : (
                     <>
                       {dailyRows.map((r) => {
-                        const loadColor = getLoadTextColor(r.loads);
                         const weekendDow = isFriSatSun(r.date);
                         return (
                           <TableRow key={r.date}>
                             <TableCell>
                               {dayjs(r.date).format("M/D/YYYY")}
                             </TableCell>
-                            <TableCell
-                              sx={
-                                weekendDow
-                                  ? {
-                                      color: "#9f1239",
-                                      fontWeight: 600,
-                                    }
-                                  : undefined
-                              }
-                            >
-                              {r.dow}
+                            <TableCell>
+                              <Box
+                                component="span"
+                                sx={{
+                                  color: weekendDow
+                                    ? DOW_WEEKEND_TEXT_COLOR
+                                    : "inherit",
+                                  fontWeight: weekendDow ? 600 : undefined,
+                                }}
+                              >
+                                {r.dow}
+                              </Box>
                             </TableCell>
-                            <TableCell
-                              align="right"
-                              sx={{
-                                color: loadColor,
-                                fontWeight: 600,
-                              }}
-                            >
-                              {formatNumber(Math.round(r.loads))}
+                            <TableCell align="right">
+                              <ColoredLoadCount loads={r.loads} />
                             </TableCell>
                             <TableCell align="right">
                               {formatCurrency(r.amount)}
@@ -584,7 +574,10 @@ const TransactionGraphSummary: React.FC = () => {
                           Summary (Totals)
                         </TableCell>
                         <TableCell align="right" sx={{ fontWeight: 800 }}>
-                          {formatNumber(Math.round(dailySummary.totalLoads))}
+                          <ColoredLoadCount
+                            loads={dailySummary.totalLoads}
+                            fontWeight={800}
+                          />
                         </TableCell>
                         <TableCell align="right" sx={{ fontWeight: 800 }}>
                           {formatCurrency(dailySummary.totalAmount)}
@@ -597,7 +590,11 @@ const TransactionGraphSummary: React.FC = () => {
                           {dailySummary.days === 1 ? "" : "s"})
                         </TableCell>
                         <TableCell align="right" sx={{ fontWeight: 700 }}>
-                          {formatNumber(Number(dailySummary.avgLoads.toFixed(2)))}
+                          <ColoredLoadCount
+                            loads={dailySummary.avgLoads}
+                            fontWeight={700}
+                            decimals={2}
+                          />
                         </TableCell>
                         <TableCell align="right" sx={{ fontWeight: 700 }}>
                           {formatCurrency(dailySummary.avgAmount)}

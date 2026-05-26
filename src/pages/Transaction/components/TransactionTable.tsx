@@ -46,13 +46,21 @@ import transactionService from "../../../services/transactionService";
 import type { Transaction } from "../../../services/transactionService";
 import type { Payment } from "../../../services/apiTypes";
 import { PaymentModal } from "../../../components/Payment/PaymentModal";
-import userService, { type UserItem } from "../../../services/userService";
+import userService from "../../../services/userService";
 import authService from "../../../services/authService";
+import { USER_STATUS_ACTIVE } from "../../../constants/status";
+import {
+  buildEmployeeDisplayName,
+  mapUsersToEmployeeOptions,
+  mergeEmployeeOptions,
+  type EmployeeOption,
+} from "../../../utils/employeeOptions";
+import type { UserStatusValue } from "../../../constants/status";
 import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../../services/addonsPricingService";
-import { EMPTY_STATES, UI_TEXT } from "../../../constants/messages";
+import { EMPTY_STATES, FORM_ERRORS, UI_TEXT } from "../../../constants/messages";
 import { USER_ROLE_EMPLOYEE } from "../../../constants/roles";
 import { toBackendPaymentMode } from "../../../constants/payment";
 import TransactionDeleteDialog, {
@@ -65,7 +73,12 @@ import "./TransactionTable.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-type EmployeeOption = { id: string; name: string };
+const isTransactionLoaded = (transaction: Transaction): boolean => {
+  const tx = transaction as Transaction & { dateloaded?: string };
+  const dateLoaded = transaction.dateLoaded || tx.dateloaded;
+  if (!dateLoaded) return false;
+  return dayjs(dateLoaded).isValid();
+};
 
 interface FlatTransactionRow {
   id: string;
@@ -467,7 +480,10 @@ export type TransactionTableProps = {
   /** Merge one row from API after mark / pay / inline edit (no full list refetch). */
   onTransactionSynced?: (transaction: Transaction) => void;
   onTransactionDeleted?: (transactionId: string) => void;
-  onToast?: (payload: { severity: "success" | "error"; message: string }) => void;
+  onToast?: (payload: {
+    severity: "success" | "error" | "warning";
+    message: string;
+  }) => void;
   /** Increment after a new transaction is saved and list refetched — grid goes to page 1 / top. */
   jumpToFirstPageNonce?: number;
   /** Set after create/edit save so the row highlight animation runs (AG Grid may not pick up class changes otherwise). */
@@ -505,6 +521,7 @@ function TransactionTableInner({
   const [markDateTime, setMarkDateTime] = useState<Dayjs | null>(dayjs());
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [notLoadedDialogOpen, setNotLoadedDialogOpen] = useState(false);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [releaseBy, setReleaseBy] = useState<string>("");
   const releaseByInputRef = useRef<HTMLInputElement | null>(null);
@@ -686,6 +703,10 @@ function TransactionTableInner({
 
   const handleOpenMarkModal = useCallback(
     (transaction: Transaction, type: "loaded" | "pickup") => {
+      if (type === "pickup" && !isTransactionLoaded(transaction)) {
+        setNotLoadedDialogOpen(true);
+        return;
+      }
       setSelectedTransactionForMark(transaction);
       setMarkModalType(type);
       setMarkDateTime(dayjs());
@@ -708,29 +729,36 @@ function TransactionTableInner({
     const loadEmployees = async () => {
       try {
         const users = await userService.getAll();
-        const employeeUsers = users
-          .filter((user) => user.role === USER_ROLE_EMPLOYEE)
-          .map((user: UserItem) => ({
-            id: user.id,
-            name:
-              [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-              user.userName ||
-              USER_ROLE_EMPLOYEE,
-          }));
-        setEmployees(employeeUsers);
+        setEmployees(
+          mergeEmployeeOptions(
+            mapUsersToEmployeeOptions(users),
+            selectedTransactionForMark?.releasedByUser ?? undefined,
+          ),
+        );
       } catch {
         const currentUser = authService.getCurrentUser();
         if (currentUser?.role === USER_ROLE_EMPLOYEE && currentUser.id) {
-          const fallbackName =
-            [currentUser.firstName, currentUser.lastName]
-              .filter(Boolean)
-              .join(" ") ||
-            currentUser.userName ||
-            currentUser.username ||
-            USER_ROLE_EMPLOYEE;
-          setEmployees([{ id: currentUser.id, name: fallbackName }]);
+          setEmployees(
+            mergeEmployeeOptions(
+              [
+                {
+                  id: currentUser.id,
+                  name: buildEmployeeDisplayName(currentUser),
+                  status:
+                    (currentUser as { status?: UserStatusValue }).status ??
+                    USER_STATUS_ACTIVE,
+                },
+              ],
+              selectedTransactionForMark?.releasedByUser ?? undefined,
+            ),
+          );
         } else {
-          setEmployees([]);
+          setEmployees(
+            mergeEmployeeOptions(
+              [],
+              selectedTransactionForMark?.releasedByUser ?? undefined,
+            ),
+          );
         }
       }
     };
@@ -738,7 +766,7 @@ function TransactionTableInner({
     if (markModalOpen && markModalType === "pickup") {
       loadEmployees();
     }
-  }, [markModalOpen, markModalType]);
+  }, [markModalOpen, markModalType, selectedTransactionForMark]);
 
   React.useEffect(() => {
     if (!(markModalOpen && markModalType === "pickup")) return;
@@ -765,6 +793,11 @@ function TransactionTableInner({
         }
         transactionUpdate.dateLoaded = toApiDateTimeString(markDateTime);
       } else {
+        if (!isTransactionLoaded(selectedTransactionForMark)) {
+          handleCloseMarkModal();
+          setNotLoadedDialogOpen(true);
+          return;
+        }
         if (!markDateTime?.isValid()) {
           setActionError("Pickup date is required.");
           return;
@@ -1828,6 +1861,28 @@ function TransactionTableInner({
             }
           >
             {UI_TEXT.SAVE}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={notLoadedDialogOpen}
+        onClose={ignoreBackdropClose(() => setNotLoadedDialogOpen(false))}
+        disableEscapeKeyDown
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Mark as Pickup</DialogTitle>
+        <DialogContent>
+          <Typography>{FORM_ERRORS.TRANSACTION_NOT_YET_LOADED}</Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            variant="contained"
+            onClick={() => setNotLoadedDialogOpen(false)}
+            autoFocus
+          >
+            OK
           </Button>
         </DialogActions>
       </Dialog>

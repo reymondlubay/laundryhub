@@ -19,6 +19,8 @@ import {
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import transactionService, { type Transaction } from "../../services/transactionService";
+import ColoredLoadCount from "../../components/LoadsThresholdLegend/ColoredLoadCount";
+import LoadsThresholdLegend from "../../components/LoadsThresholdLegend/LoadsThresholdLegend";
 import ReportBarChart from "../../components/ReportBarChart/ReportBarChart";
 import {
   filterTransactionsByDateLoaded,
@@ -86,7 +88,7 @@ const LoadSummaryBlock: React.FC<{
   <Box sx={{ mt: 2 }}>
     <Typography sx={{ fontWeight: 700, mb: 1 }}>{label}</Typography>
     <Typography sx={{ fontWeight: 700 }}>
-      Total Loads — {formatCount(totals.totalLoads)}
+      Total Loads — <ColoredLoadCount loads={totals.totalLoads} fontWeight={700} />
     </Typography>
     <Typography sx={{ fontWeight: 700 }}>
       {formatKgWithAvg(
@@ -341,6 +343,8 @@ const LoadReport: React.FC = () => {
               </LocalizationProvider>
             </Stack>
 
+            <LoadsThresholdLegend sx={{ mb: 1.5 }} />
+
             <TableContainer sx={{ maxHeight: 360, mb: 2 }}>
               <Table size="small" stickyHeader>
                 <LoadMetricsTableHead periodLabel="Date" />
@@ -376,7 +380,7 @@ const LoadReport: React.FC = () => {
                           {formatKg(row.totalKgLoad)}
                         </TableCell>
                         <TableCell align="right">
-                          {formatCount(row.totalLoads)}
+                          <ColoredLoadCount loads={row.totalLoads} />
                         </TableCell>
                       </TableRow>
                     ))
@@ -421,6 +425,8 @@ const LoadReport: React.FC = () => {
               </Box>
             </Stack>
 
+            <LoadsThresholdLegend sx={{ mb: 1.5 }} />
+
             <TableContainer sx={{ maxHeight: 360, mb: 2 }}>
               <Table size="small" stickyHeader>
                 <LoadMetricsTableHead periodLabel="Month" />
@@ -457,7 +463,7 @@ const LoadReport: React.FC = () => {
                         {formatKg(row.totalKgLoad)}
                       </TableCell>
                       <TableCell align="right">
-                        {formatCount(row.totalLoads)}
+                        <ColoredLoadCount loads={row.totalLoads} />
                       </TableCell>
                     </TableRow>
                   ))}

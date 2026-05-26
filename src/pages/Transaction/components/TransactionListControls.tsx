@@ -7,6 +7,7 @@ import {
   MenuItem,
   Select,
   Stack,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -29,14 +30,27 @@ const compactSelectSx = {
 type TransactionListControlsProps = {
   showPendingOnly: boolean;
   showReadyForPickupOnly: boolean;
+  showUnpaidOnly: boolean;
   sortBy: TransactionSortBy;
   sortDirection: TransactionSortDirection;
   loadTypeFilter: TransactionLoadTypeFilter;
+  priceMin: string;
+  priceMax: string;
+  priceRangeInvalid: boolean;
   onShowPendingOnlyChange: (checked: boolean) => void;
   onShowReadyForPickupOnlyChange: (checked: boolean) => void;
+  onShowUnpaidOnlyChange: (checked: boolean) => void;
   onSortByChange: (value: TransactionSortBy) => void;
   onSortDirectionChange: (value: TransactionSortDirection) => void;
   onLoadTypeFilterChange: (value: TransactionLoadTypeFilter) => void;
+  onPriceMinChange: (value: string) => void;
+  onPriceMaxChange: (value: string) => void;
+};
+
+const compactPriceFieldSx = {
+  width: 72,
+  "& .MuiInputBase-root": { height: 32, fontSize: "0.8125rem" },
+  "& .MuiInputBase-input": { py: 0.5, px: 1 },
 };
 
 const ControlLabel = ({ children }: { children: React.ReactNode }) => (
@@ -87,14 +101,21 @@ const StatusLegend = () => (
 const TransactionListControls: React.FC<TransactionListControlsProps> = ({
   showPendingOnly,
   showReadyForPickupOnly,
+  showUnpaidOnly,
   sortBy,
   sortDirection,
   loadTypeFilter,
+  priceMin,
+  priceMax,
+  priceRangeInvalid,
   onShowPendingOnlyChange,
   onShowReadyForPickupOnlyChange,
+  onShowUnpaidOnlyChange,
   onSortByChange,
   onSortDirectionChange,
   onLoadTypeFilterChange,
+  onPriceMinChange,
+  onPriceMaxChange,
 }) => {
   return (
     <Box
@@ -138,7 +159,7 @@ const TransactionListControls: React.FC<TransactionListControlsProps> = ({
               }
             />
             <FormControlLabel
-              sx={{ m: 0 }}
+              sx={{ m: 0, mr: 0.5 }}
               control={
                 <Checkbox
                   size="small"
@@ -151,6 +172,21 @@ const TransactionListControls: React.FC<TransactionListControlsProps> = ({
               label={
                 <Typography variant="body2" sx={{ fontSize: "0.8125rem" }}>
                   Ready
+                </Typography>
+              }
+            />
+            <FormControlLabel
+              sx={{ m: 0 }}
+              control={
+                <Checkbox
+                  size="small"
+                  checked={showUnpaidOnly}
+                  onChange={(e) => onShowUnpaidOnlyChange(e.target.checked)}
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontSize: "0.8125rem" }}>
+                  Unpaid
                 </Typography>
               }
             />
@@ -173,6 +209,7 @@ const TransactionListControls: React.FC<TransactionListControlsProps> = ({
               <MenuItem value="default">Default</MenuItem>
               <MenuItem value="kg">KG</MenuItem>
               <MenuItem value="loads">Load</MenuItem>
+              <MenuItem value="price">Price</MenuItem>
             </Select>
             <ToggleButtonGroup
               size="small"
@@ -230,6 +267,29 @@ const TransactionListControls: React.FC<TransactionListControlsProps> = ({
               <MenuItem value="Beddings">Bedding</MenuItem>
               <MenuItem value="Comforter">Comforter</MenuItem>
             </Select>
+          </Stack>
+
+          <Stack direction="row" spacing={0.75} alignItems="center">
+            <ControlLabel>Price</ControlLabel>
+            <TextField
+              size="small"
+              placeholder="Min"
+              type="number"
+              value={priceMin}
+              onChange={(e) => onPriceMinChange(e.target.value)}
+              slotProps={{ htmlInput: { min: 0, step: "0.01" } }}
+              sx={compactPriceFieldSx}
+            />
+            <TextField
+              size="small"
+              placeholder="Max"
+              type="number"
+              value={priceMax}
+              onChange={(e) => onPriceMaxChange(e.target.value)}
+              error={priceRangeInvalid}
+              slotProps={{ htmlInput: { min: 0, step: "0.01" } }}
+              sx={compactPriceFieldSx}
+            />
           </Stack>
         </Stack>
 

@@ -9,6 +9,8 @@ type PaymentManagerProps = {
   transactionId?: string;
   onPaymentsChange?: (payments: Payment[]) => void;
   initialPayments?: Payment[];
+  /** If provided, used by the Add Payment modal to prefill Amount. */
+  balance?: number;
 };
 
 /**
@@ -28,6 +30,7 @@ export const PaymentManager: React.FC<PaymentManagerProps> = ({
   transactionId: _transactionId,
   onPaymentsChange,
   initialPayments = [],
+  balance,
 }) => {
   const [payments, setPayments] = useState<Payment[]>(initialPayments);
   const [modalOpen, setModalOpen] = useState(false);
@@ -156,6 +159,7 @@ export const PaymentManager: React.FC<PaymentManagerProps> = ({
         onSave={handleSavePayment}
         editingPayment={editingPayment}
         isEditMode={isEditMode}
+        balance={balance}
       />
     </Box>
   );

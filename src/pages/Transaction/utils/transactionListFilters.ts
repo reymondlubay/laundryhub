@@ -1,8 +1,13 @@
 import dayjs from "dayjs";
 import type { LaundryType } from "../../../services/apiTypes";
+import {
+  DEFAULT_ADDONS_PRICING,
+  type AddonsPricing,
+} from "../../../services/addonsPricingService";
 import type { Transaction } from "../../../services/transactionService";
+import { getTransactionGrandTotal } from "../../../utils/pricing";
 
-export type TransactionSortBy = "default" | "kg" | "loads";
+export type TransactionSortBy = "default" | "kg" | "loads" | "price";
 export type TransactionSortDirection = "asc" | "desc";
 export type TransactionLoadTypeFilter = "" | LaundryType;
 
@@ -38,6 +43,37 @@ export const getTransactionTotalLoads = (transaction: Transaction): number =>
     (sum, load) => sum + Number(load.loads ?? 0),
     0,
   );
+
+export const parsePriceFilter = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const amount = Number(trimmed);
+  if (!Number.isFinite(amount) || amount < 0) return null;
+  return amount;
+};
+
+export const isTransactionUnpaid = (transaction: Transaction): boolean => {
+  const payments = transaction.paymentDetails ?? [];
+  if (payments.length === 0) return true;
+  const totalPaid = payments.reduce(
+    (sum, payment) => sum + Number(payment.amount || 0),
+    0,
+  );
+  return totalPaid === 0;
+};
+
+export const transactionMatchesPriceRange = (
+  transaction: Transaction,
+  priceMin: number | null,
+  priceMax: number | null,
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): boolean => {
+  if (priceMin == null && priceMax == null) return true;
+  const total = getTransactionGrandTotal(transaction, addonsPricing);
+  if (priceMin != null && total < priceMin) return false;
+  if (priceMax != null && total > priceMax) return false;
+  return true;
+};
 
 export const transactionMatchesLoadType = (
   transaction: Transaction,
@@ -88,10 +124,16 @@ const compareDefault = (a: Transaction, b: Transaction): number => {
   return bDate.valueOf() - aDate.valueOf();
 };
 
+export const getTransactionPrice = (
+  transaction: Transaction,
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): number => getTransactionGrandTotal(transaction, addonsPricing);
+
 export const sortTransactions = (
   transactions: Transaction[],
   sortBy: TransactionSortBy,
   sortDirection: TransactionSortDirection,
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
 ): Transaction[] => {
   const list = [...transactions];
 
@@ -102,6 +144,10 @@ export const sortTransactions = (
       result = getTransactionTotalKg(a) - getTransactionTotalKg(b);
     } else if (sortBy === "loads") {
       result = getTransactionTotalLoads(a) - getTransactionTotalLoads(b);
+    } else if (sortBy === "price") {
+      result =
+        getTransactionPrice(a, addonsPricing) -
+        getTransactionPrice(b, addonsPricing);
     } else {
       result = compareDefault(a, b);
       return sortDirection === "asc" ? -result : result;
@@ -123,7 +169,11 @@ export const filterAndSortTransactions = (
   options: {
     showPendingOnly: boolean;
     showReadyForPickupOnly: boolean;
+    showUnpaidOnly: boolean;
     loadTypeFilter: TransactionLoadTypeFilter;
+    priceMin: number | null;
+    priceMax: number | null;
+    addonsPricing: AddonsPricing;
     sortBy: TransactionSortBy;
     sortDirection: TransactionSortDirection;
   },
@@ -148,11 +198,31 @@ export const filterAndSortTransactions = (
     });
   }
 
+  if (options.showUnpaidOnly) {
+    list = list.filter((transaction) => isTransactionUnpaid(transaction));
+  }
+
   if (options.loadTypeFilter) {
     list = list.filter((transaction) =>
       transactionMatchesLoadType(transaction, options.loadTypeFilter),
     );
   }
 
-  return sortTransactions(list, options.sortBy, options.sortDirection);
+  if (options.priceMin != null || options.priceMax != null) {
+    list = list.filter((transaction) =>
+      transactionMatchesPriceRange(
+        transaction,
+        options.priceMin,
+        options.priceMax,
+        options.addonsPricing,
+      ),
+    );
+  }
+
+  return sortTransactions(
+    list,
+    options.sortBy,
+    options.sortDirection,
+    options.addonsPricing,
+  );
 };
