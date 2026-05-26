@@ -33,6 +33,12 @@ export interface Transaction {
     name: string;
     mobileNumber: string;
   };
+  receivedByUser?: {
+    id: string;
+    userName?: string;
+    firstName?: string;
+    lastName?: string;
+  } | null;
   releasedByUser?: {
     id: string;
     userName?: string;
@@ -55,6 +61,8 @@ export interface Transaction {
   detergentUnitPrice?: number;
   colorSafeUnitPrice?: number;
   isDelivered: boolean;
+  receivedBy?: string;
+  releasedBy?: string;
   notes?: string;
   isDeleted: boolean;
   deleteReason?: string;
@@ -75,6 +83,7 @@ export interface CreateTransactionRequest {
   fabconQty?: number;
   detergentQty?: number;
   colorSafeQty?: number;
+  receivedBy: string;
   releasedBy?: string | null;
   notes?: string;
   loadDetails: Array<{
@@ -206,6 +215,10 @@ export function mergeServerWritePayload(
     loadDetails,
     paymentDetails,
     customer: normalized.customer ?? prev?.customer,
+    receivedByUser:
+      normalized.receivedByUser !== undefined
+        ? normalized.receivedByUser
+        : prev?.receivedByUser,
     releasedByUser:
       normalized.releasedByUser !== undefined
         ? normalized.releasedByUser
@@ -224,6 +237,7 @@ export interface UpdateTransactionRequest {
   fabconQty?: number;
   detergentQty?: number;
   colorSafeQty?: number;
+  receivedBy?: string;
   releasedBy?: string | null;
   notes?: string;
   loadDetails?: Array<{

@@ -39,6 +39,7 @@ import transactionService, {
   type Transaction,
 } from "../../services/transactionService";
 import { toPascalCase } from "../../utils/stringUtils";
+import { getLoadsThresholdColor } from "../../utils/loadsThresholdColor";
 import { getTransactionNoteDetailLines } from "../../utils/transactionNoteDetails";
 
 const DASHBOARD_AUTO_REFRESH_KEY = "laundryhub.dashboard.autoRefresh";
@@ -352,13 +353,41 @@ const Dashboard = () => {
       });
   }, [activeTransactions]);
 
-  const pendingTotalLoads = React.useMemo(
-    () =>
-      pendingTransactions.reduce(
+  const sumPendingLoads = React.useCallback(
+    (list: Transaction[]) =>
+      list.reduce(
         (sum, transaction) => sum + getTransactionLoads(transaction),
         0,
       ),
-    [pendingTransactions],
+    [],
+  );
+
+  const pendingTodayLoads = React.useMemo(
+    () =>
+      sumPendingLoads(
+        pendingTransactions.filter((transaction) =>
+          isSameDay(getTransactionDate(transaction, "dateReceived")),
+        ),
+      ),
+    [pendingTransactions, sumPendingLoads],
+  );
+
+  const pendingOlderLoads = React.useMemo(
+    () =>
+      sumPendingLoads(
+        pendingTransactions.filter((transaction) => {
+          const received = getTransactionDate(transaction, "dateReceived");
+          if (!received) return true;
+          const date = dayjs(received);
+          return !date.isValid() || !date.isSame(dayjs(), "day");
+        }),
+      ),
+    [pendingTransactions, sumPendingLoads],
+  );
+
+  const pendingTotalLoads = React.useMemo(
+    () => sumPendingLoads(pendingTransactions),
+    [pendingTransactions, sumPendingLoads],
   );
 
   const loadedTodayTotalLoads = React.useMemo(
@@ -487,6 +516,19 @@ const Dashboard = () => {
   const tableHeadBg = darkMode ? "#232d39" : "#f5f8fc";
   const tableHeadColor = darkMode ? "#e7f0fa" : "#3b5b7a";
   const tableCellColor = darkMode ? "#d8e2ee" : "#17304f";
+  const tableTotalValueColor = darkMode ? "#42a5f5" : "#1976d2";
+
+  const tableTotalNum = (value: number) => (
+    <Box component="span" sx={{ color: tableTotalValueColor }}>
+      {formatCount(value)}
+    </Box>
+  );
+
+  const tableTotalLabelSx = {
+    color: titleColor,
+    fontWeight: 700,
+    textAlign: "right" as const,
+  };
 
   return (
     <Box sx={{ width: "100%" }}>
@@ -688,6 +730,14 @@ const Dashboard = () => {
                 typeof secondaryVal === "number" &&
                 pairedLabels.length === 2;
 
+              const loadsThresholdColor =
+                card.key === "todays-transaction" &&
+                typeof secondaryVal === "number"
+                  ? getLoadsThresholdColor(secondaryVal)
+                  : card.key === "todays-loaded"
+                    ? getLoadsThresholdColor(card.value)
+                    : undefined;
+
               const valueTypographySx = {
                 fontWeight: 700,
                 color: valueColor,
@@ -802,7 +852,15 @@ const Dashboard = () => {
                             pl: { xs: 1, sm: 1.25 },
                           }}
                         >
-                          <Typography variant="h4" sx={valueTypographySx}>
+                          <Typography
+                            variant="h4"
+                            sx={{
+                              ...valueTypographySx,
+                              ...(loadsThresholdColor
+                                ? { color: loadsThresholdColor }
+                                : {}),
+                            }}
+                          >
                             <AnimatedCount value={secondaryVal} />
                           </Typography>
                           <Typography variant="caption" sx={metricCaptionSx}>
@@ -816,7 +874,7 @@ const Dashboard = () => {
                       variant="h4"
                       sx={{
                         fontWeight: 700,
-                        color: valueColor,
+                        color: loadsThresholdColor ?? valueColor,
                         lineHeight: 1,
                         letterSpacing: 0.3,
                         fontSize: { xs: "1.6rem", sm: "2rem" },
@@ -877,12 +935,7 @@ const Dashboard = () => {
                   border: `1px solid ${borderColor}`,
                 }}
               >
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  sx={{ mb: 1.5 }}
-                >
+                <Stack spacing={0.75} sx={{ mb: 1.5 }}>
                   <Stack direction="row" spacing={0.75} alignItems="center">
                     <PendingActionsOutlinedIcon
                       sx={{ color: "#cf8b00", fontSize: 20 }}
@@ -901,12 +954,16 @@ const Dashboard = () => {
                   <Typography
                     variant="body2"
                     sx={{
-                      color: titleColor,
-                      fontWeight: 700,
-                      textAlign: "right",
+                      ...tableTotalLabelSx,
+                      whiteSpace: "nowrap",
+                      fontSize: { xs: "0.7rem", sm: "0.875rem" },
                     }}
                   >
-                    Total Pending: {formatCount(pendingTotalLoads)}
+                    Today: {tableTotalNum(pendingTodayLoads)}
+                    {" · "}
+                    Older than Today: {tableTotalNum(pendingOlderLoads)}
+                    {" · "}
+                    Total Pending: {tableTotalNum(pendingTotalLoads)}
                   </Typography>
                 </Stack>
                 <TableContainer sx={{ maxHeight: "25vh" }}>
@@ -1115,15 +1172,8 @@ const Dashboard = () => {
                       Done Today
                     </Typography>
                   </Stack>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: titleColor,
-                      fontWeight: 700,
-                      textAlign: "right",
-                    }}
-                  >
-                    Total Loads: {formatCount(loadedTodayTotalLoads)}
+                  <Typography variant="body2" sx={tableTotalLabelSx}>
+                    Total Loads: {tableTotalNum(loadedTodayTotalLoads)}
                   </Typography>
                 </Stack>
                 <TableContainer sx={{ maxHeight: "25vh" }}>
@@ -1262,16 +1312,10 @@ const Dashboard = () => {
                       Ready for Pickup
                     </Typography>
                   </Stack>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: titleColor,
-                      fontWeight: 700,
-                      textAlign: "right",
-                    }}
-                  >
-                    Transactions: {readyForPickupTransactions.length} | Loads:{" "}
-                    {readyForPickupTotalLoads}
+                  <Typography variant="body2" sx={tableTotalLabelSx}>
+                    Transactions:{" "}
+                    {tableTotalNum(readyForPickupTransactions.length)} | Loads:{" "}
+                    {tableTotalNum(readyForPickupTotalLoads)}
                   </Typography>
                 </Stack>
                 <TableContainer sx={{ maxHeight: "35vh" }}>
@@ -1509,15 +1553,8 @@ const Dashboard = () => {
                       Pickup Today
                     </Typography>
                   </Stack>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: titleColor,
-                      fontWeight: 700,
-                      textAlign: "right",
-                    }}
-                  >
-                    Total Loads: {formatCount(pickupTodayTotalLoads)}
+                  <Typography variant="body2" sx={tableTotalLabelSx}>
+                    Total Loads: {tableTotalNum(pickupTodayTotalLoads)}
                   </Typography>
                 </Stack>
                 <TableContainer sx={{ maxHeight: "35vh" }}>

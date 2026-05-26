@@ -22,8 +22,13 @@ import TransactionListControls from "./components/TransactionListControls";
 import type { Transaction } from "../../services/transactionService";
 import customerService, { type Customer } from "../../services/customerService";
 import { useTransactionSearch } from "./hooks/useTransactionSearch";
+import addonsPricingService, {
+  DEFAULT_ADDONS_PRICING,
+  type AddonsPricing,
+} from "../../services/addonsPricingService";
 import {
   filterAndSortTransactions,
+  parsePriceFilter,
   type TransactionLoadTypeFilter,
   type TransactionSortBy,
   type TransactionSortDirection,
@@ -41,6 +46,12 @@ const Transaction = () => {
     React.useState<TransactionSortDirection>("desc");
   const [loadTypeFilter, setLoadTypeFilter] =
     React.useState<TransactionLoadTypeFilter>("");
+  const [showUnpaidOnly, setShowUnpaidOnly] = React.useState(false);
+  const [priceMin, setPriceMin] = React.useState("");
+  const [priceMax, setPriceMax] = React.useState("");
+  const [addonsPricing, setAddonsPricing] = React.useState<AddonsPricing>(
+    DEFAULT_ADDONS_PRICING,
+  );
   const [jumpToFirstPageNonce, setJumpToFirstPageNonce] = React.useState(0);
   const [flashRowRequest, setFlashRowRequest] = React.useState<{
     transactionId: string;
@@ -50,7 +61,7 @@ const Transaction = () => {
   const [toast, setToast] = React.useState<{
     open: boolean;
     message: string;
-    severity: "success" | "error";
+    severity: "success" | "error" | "warning";
   }>({ open: false, message: "", severity: "success" });
 
   const [customerSuggestions, setCustomerSuggestions] = React.useState<
@@ -60,6 +71,34 @@ const Transaction = () => {
   React.useEffect(() => {
     return customerService.subscribeToCustomerLookup(setCustomerSuggestions);
   }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const pricing = await addonsPricingService.get();
+        if (!cancelled) setAddonsPricing(pricing);
+      } catch {
+        if (!cancelled) setAddonsPricing(DEFAULT_ADDONS_PRICING);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const parsedPriceMin = React.useMemo(
+    () => parsePriceFilter(priceMin),
+    [priceMin],
+  );
+  const parsedPriceMax = React.useMemo(
+    () => parsePriceFilter(priceMax),
+    [priceMax],
+  );
+  const priceRangeInvalid =
+    parsedPriceMin != null &&
+    parsedPriceMax != null &&
+    parsedPriceMax < parsedPriceMin;
 
   const ToastTransition = React.useMemo(() => {
     return React.forwardRef(function ToastTransition(
@@ -142,9 +181,12 @@ const Transaction = () => {
   const handleClearFilters = React.useCallback(() => {
     setShowPendingOnly(false);
     setShowReadyForPickupOnly(false);
+    setShowUnpaidOnly(false);
     setSortBy("default");
     setSortDirection("desc");
     setLoadTypeFilter("");
+    setPriceMin("");
+    setPriceMax("");
     clearFilters();
   }, [clearFilters]);
 
@@ -171,7 +213,11 @@ const Transaction = () => {
       filterAndSortTransactions(transactions, {
         showPendingOnly,
         showReadyForPickupOnly,
+        showUnpaidOnly,
         loadTypeFilter,
+        priceMin: priceRangeInvalid ? null : parsedPriceMin,
+        priceMax: priceRangeInvalid ? null : parsedPriceMax,
+        addonsPricing,
         sortBy,
         sortDirection,
       }),
@@ -179,7 +225,12 @@ const Transaction = () => {
       transactions,
       showPendingOnly,
       showReadyForPickupOnly,
+      showUnpaidOnly,
       loadTypeFilter,
+      parsedPriceMin,
+      parsedPriceMax,
+      priceRangeInvalid,
+      addonsPricing,
       sortBy,
       sortDirection,
     ],
@@ -201,7 +252,10 @@ const Transaction = () => {
   }, [customerSuggestions, searchText]);
 
   const handleTableToast = React.useCallback(
-    (payload: { severity: "success" | "error"; message: string }) => {
+    (payload: {
+      severity: "success" | "error" | "warning";
+      message: string;
+    }) => {
       setToast({ open: true, ...payload });
     },
     [],
@@ -367,14 +421,21 @@ const Transaction = () => {
       <TransactionListControls
         showPendingOnly={showPendingOnly}
         showReadyForPickupOnly={showReadyForPickupOnly}
+        showUnpaidOnly={showUnpaidOnly}
         sortBy={sortBy}
         sortDirection={sortDirection}
         loadTypeFilter={loadTypeFilter}
+        priceMin={priceMin}
+        priceMax={priceMax}
+        priceRangeInvalid={priceRangeInvalid}
         onShowPendingOnlyChange={setShowPendingOnly}
         onShowReadyForPickupOnlyChange={handleReadyForPickupChange}
+        onShowUnpaidOnlyChange={setShowUnpaidOnly}
         onSortByChange={setSortBy}
         onSortDirectionChange={setSortDirection}
         onLoadTypeFilterChange={setLoadTypeFilter}
+        onPriceMinChange={setPriceMin}
+        onPriceMaxChange={setPriceMax}
       />
 
       <TransactionTable

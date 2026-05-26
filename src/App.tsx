@@ -58,6 +58,9 @@ const CollectionReportPage = lazy(
   () => import("./pages/Reports/CollectionReport"),
 );
 const LoadReportPage = lazy(() => import("./pages/Reports/LoadReport"));
+const ReceiveReleaseReportPage = lazy(
+  () => import("./pages/Reports/ReceiveReleaseReport"),
+);
 
 function App() {
   return (
@@ -300,6 +303,18 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <LoadReportPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.REPORT_RECEIVE_RELEASE}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <ReceiveReleaseReportPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>

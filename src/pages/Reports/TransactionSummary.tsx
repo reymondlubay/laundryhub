@@ -83,10 +83,31 @@ type TransactionStatus =
   | "unpaid"
   | "paid"
   | "not-picked"
+  | "pickup"
   | "withdrawn"
   | "wrong-record"
   | "backdate-payment"
   | "backdate-pickup";
+
+const parseAmountFilter = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const amount = Number(trimmed);
+  if (!Number.isFinite(amount) || amount < 0) return null;
+  return amount;
+};
+
+const matchesAmountRange = (
+  transaction: Transaction,
+  amountMin: number | null,
+  amountMax: number | null,
+  addonsPricing: AddonsPricing,
+): boolean => {
+  const total = getTransactionGrandTotal(transaction, addonsPricing);
+  if (amountMin != null && total < amountMin) return false;
+  if (amountMax != null && total > amountMax) return false;
+  return true;
+};
 
 const formatDateTime = (value?: string | null): string => {
   if (!value) return "-";
@@ -262,6 +283,8 @@ const matchesFilter = (
     }
     case "not-picked":
       return !datePickup;
+    case "pickup":
+      return Boolean(datePickup);
     case "backdate-payment":
       return hasBackdatePayment(transaction);
     case "backdate-pickup":
@@ -293,13 +316,31 @@ const TransactionSummary = () => {
   const [dateTo, setDateTo] = React.useState<Dayjs>(dayjs());
   const [statusFilter, setStatusFilter] =
     React.useState<TransactionStatus>("all");
+  const [amountMin, setAmountMin] = React.useState("");
+  const [amountMax, setAmountMax] = React.useState("");
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(20);
+
+  const parsedAmountMin = React.useMemo(
+    () => parseAmountFilter(amountMin),
+    [amountMin],
+  );
+  const parsedAmountMax = React.useMemo(
+    () => parseAmountFilter(amountMax),
+    [amountMax],
+  );
 
   // Reset page when filters change
   React.useEffect(() => {
     setPage(0);
-  }, [selectedCustomer, dateFrom, dateTo, statusFilter]);
+  }, [
+    selectedCustomer,
+    dateFrom,
+    dateTo,
+    statusFilter,
+    amountMin,
+    amountMax,
+  ]);
 
   React.useEffect(() => {
     const loadData = async () => {
@@ -350,6 +391,11 @@ const TransactionSummary = () => {
       );
     });
 
+    const amountRangeValid =
+      parsedAmountMin == null ||
+      parsedAmountMax == null ||
+      parsedAmountMax >= parsedAmountMin;
+
     // Status filter
     result = result.filter((transaction) => {
       const isDeleted =
@@ -373,11 +419,29 @@ const TransactionSummary = () => {
       }
 
       if (isDeleted) return false;
-      return matchesFilter(transaction, statusFilter, addonsPricing);
+      if (!matchesFilter(transaction, statusFilter, addonsPricing)) {
+        return false;
+      }
+      if (!amountRangeValid) return true;
+      return matchesAmountRange(
+        transaction,
+        parsedAmountMin,
+        parsedAmountMax,
+        addonsPricing,
+      );
     });
 
     return result;
-  }, [transactions, selectedCustomer, dateFrom, dateTo, statusFilter, addonsPricing]);
+  }, [
+    transactions,
+    selectedCustomer,
+    dateFrom,
+    dateTo,
+    statusFilter,
+    parsedAmountMin,
+    parsedAmountMax,
+    addonsPricing,
+  ]);
 
   const paginatedTransactions = React.useMemo(() => {
     return filteredTransactions.slice(
@@ -515,11 +579,12 @@ const TransactionSummary = () => {
             </Grid>
           </Grid>
 
-          {/* Status Filter - Standalone */}
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={2}
             alignItems="flex-start"
+            flexWrap="wrap"
+            useFlexGap
           >
             <FormControl sx={{ minWidth: 200 }} size="small">
               <InputLabel>Transaction Status</InputLabel>
@@ -536,12 +601,44 @@ const TransactionSummary = () => {
                 <MenuItem value="unpaid">Unpaid</MenuItem>
                 <MenuItem value="paid">Paid</MenuItem>
                 <MenuItem value="not-picked">Not picked up</MenuItem>
+                <MenuItem value="pickup">Pickup</MenuItem>
                 <MenuItem value="backdate-payment">Backdate payment</MenuItem>
                 <MenuItem value="backdate-pickup">Backdate pickup</MenuItem>
                 <MenuItem value="withdrawn">Withdrawn</MenuItem>
                 <MenuItem value="wrong-record">Wrong Record</MenuItem>
               </Select>
             </FormControl>
+
+            <TextField
+              label="Min amount"
+              size="small"
+              type="number"
+              value={amountMin}
+              onChange={(e) => setAmountMin(e.target.value)}
+              slotProps={{ htmlInput: { min: 0, step: "0.01" } }}
+              sx={{ width: { xs: "100%", sm: 140 } }}
+            />
+            <TextField
+              label="Max amount"
+              size="small"
+              type="number"
+              value={amountMax}
+              onChange={(e) => setAmountMax(e.target.value)}
+              slotProps={{ htmlInput: { min: 0, step: "0.01" } }}
+              sx={{ width: { xs: "100%", sm: 140 } }}
+              error={
+                parsedAmountMin != null &&
+                parsedAmountMax != null &&
+                parsedAmountMax < parsedAmountMin
+              }
+              helperText={
+                parsedAmountMin != null &&
+                parsedAmountMax != null &&
+                parsedAmountMax < parsedAmountMin
+                  ? "Max must be ≥ min"
+                  : undefined
+              }
+            />
           </Stack>
         </Stack>
       </Paper>

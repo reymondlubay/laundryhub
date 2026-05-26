@@ -12,6 +12,14 @@ export const FORM_ERRORS = {
   NEGATIVE_NOT_ALLOWED: "Cannot be negative",
   FUTURE_DATE_NOT_ALLOWED: "Cannot select a future date",
   DATE_RECEIVED_REQUIRED: "Date received is required",
+  RECEIVE_BY_REQUIRED: "Receive by is required",
+  DATE_PICKUP_REQUIRED_WITH_RELEASE_BY:
+    "Date pickup is required when release by is selected",
+  RELEASE_BY_REQUIRED_WITH_DATE_PICKUP:
+    "Release by is required when date pickup is set",
+  TRANSACTION_NOT_YET_LOADED: "This transaction is not yet loaded.",
+  RELEASE_AFTER_LOADED_HINT:
+    "Mark the transaction as loaded before setting pickup.",
 } as const;
 
 export const API_ERRORS = {

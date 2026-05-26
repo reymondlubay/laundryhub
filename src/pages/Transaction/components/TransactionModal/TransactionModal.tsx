@@ -46,7 +46,7 @@ import BillSummary from "./components/BillSummary";
 import type { Transaction } from "../../../../services/transactionService";
 import transactionService from "../../../../services/transactionService";
 import customerService from "../../../../services/customerService";
-import userService, { type UserItem } from "../../../../services/userService";
+import userService from "../../../../services/userService";
 import authService from "../../../../services/authService";
 import {
   API_ERRORS,
@@ -54,6 +54,10 @@ import {
   UI_TEXT,
 } from "../../../../constants/messages";
 import { USER_ROLE_EMPLOYEE } from "../../../../constants/roles";
+import {
+  USER_STATUS_ACTIVE,
+  type UserStatusValue,
+} from "../../../../constants/status";
 import {
   PAYMENT_MODE_CASH,
   PAYMENT_MODE_GCASH,
@@ -68,6 +72,12 @@ import {
 } from "../../../../services/addonsPricingService";
 import { pickTransactionNum } from "../../../../utils/normalizeTransaction";
 import { getTransactionAddonPricing } from "../../../../utils/pricing";
+import {
+  buildEmployeeDisplayName,
+  mapUsersToEmployeeOptions,
+  mergeEmployeeOptions,
+  type EmployeeOption,
+} from "../../../../utils/employeeOptions";
 
 type TransactionModalProps = {
   isOpen: boolean;
@@ -96,11 +106,6 @@ type NewCustomerFormValues = {
   notes: string;
 };
 
-type EmployeeOption = {
-  id: string;
-  name: string;
-};
-
 export type TransactionFormValues = {
   customer: string;
   receiveDate: Dayjs;
@@ -113,6 +118,7 @@ export type TransactionFormValues = {
   fabcon: number;
   detergent: number;
   cs: number;
+  receiveBy: string;
   releaseBy: string;
   notes: string;
 };
@@ -185,6 +191,27 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const isEditing = !!transaction;
 
+  const resolveEmployeeLabel = React.useCallback(
+    (id: string): string => {
+      if (!id) return "";
+      const match = employees.find((entry) => String(entry.id) === String(id));
+      if (match) return match.name;
+
+      const receiveUser = transaction?.receivedByUser;
+      if (receiveUser && String(receiveUser.id) === String(id)) {
+        return buildEmployeeDisplayName(receiveUser);
+      }
+
+      const releaseUser = transaction?.releasedByUser;
+      if (releaseUser && String(releaseUser.id) === String(id)) {
+        return buildEmployeeDisplayName(releaseUser);
+      }
+
+      return "";
+    },
+    [employees, transaction],
+  );
+
   const fetchCustomers = React.useCallback(async (): Promise<Customer[]> => {
     const customerData = await customerService.getAll();
     setCustomers(customerData);
@@ -211,31 +238,35 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
         setCustomers(customerData);
 
-        const employeeUsers = userData
-          .filter((user) => user.role === USER_ROLE_EMPLOYEE)
-          .map((user: UserItem) => ({
-            id: user.id,
-            name:
-              [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-              user.userName ||
-              USER_ROLE_EMPLOYEE,
-          }));
-
-        setEmployees(employeeUsers);
+        setEmployees(
+          mergeEmployeeOptions(
+            mapUsersToEmployeeOptions(userData),
+            transaction?.receivedByUser ?? undefined,
+            transaction?.releasedByUser ?? undefined,
+          ),
+        );
       } catch {
         // Some roles may not be authorized to list users; fall back to current user if employee.
         const currentUser = authService.getCurrentUser();
+        let fallbackEmployees: EmployeeOption[] = [];
         if (currentUser?.role === USER_ROLE_EMPLOYEE && currentUser.id) {
-          const fallbackName =
-            [currentUser.firstName, currentUser.lastName]
-              .filter(Boolean)
-              .join(" ") ||
-            currentUser.userName ||
-            USER_ROLE_EMPLOYEE;
-          setEmployees([{ id: currentUser.id, name: fallbackName }]);
-        } else {
-          setEmployees([]);
+          fallbackEmployees = [
+            {
+              id: currentUser.id,
+              name: buildEmployeeDisplayName(currentUser),
+              status:
+                (currentUser as { status?: UserStatusValue }).status ??
+                USER_STATUS_ACTIVE,
+            },
+          ];
         }
+        setEmployees(
+          mergeEmployeeOptions(
+            fallbackEmployees,
+            transaction?.receivedByUser ?? undefined,
+            transaction?.releasedByUser ?? undefined,
+          ),
+        );
 
         try {
           const customerData = await fetchCustomers();
@@ -249,7 +280,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     if (isOpen) {
       fetchCustomersAndEmployees();
     }
-  }, [fetchCustomers, isOpen]);
+  }, [fetchCustomers, isOpen, transaction]);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -276,6 +307,12 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   }, [isOpen, transaction]);
 
   const initialValues: TransactionFormValues = React.useMemo(() => {
+    const currentUser = authService.getCurrentUser();
+    const defaultReceiveBy =
+      currentUser?.role === USER_ROLE_EMPLOYEE && currentUser.id
+        ? currentUser.id
+        : "";
+
     if (!transaction) {
       return {
         customer: "",
@@ -289,6 +326,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         fabcon: 0,
         detergent: 0,
         cs: 0,
+        receiveBy: defaultReceiveBy,
         releaseBy: "",
         notes: "",
       };
@@ -306,6 +344,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       fabconQty?: number;
       detergentQty?: number;
       colorSafeQty?: number;
+      receivedBy?: string;
       releasedBy?: string;
       datereceived?: string;
       dateloaded?: string;
@@ -316,6 +355,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       fabconqty?: number;
       detergentqty?: number;
       colorsafeqty?: number;
+      receivedby?: string;
       releasedby?: string;
     };
 
@@ -350,6 +390,13 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       fabcon: pickTransactionNum(txRecord, "fabconqty", "fabconQty"),
       detergent: pickTransactionNum(txRecord, "detergentqty", "detergentQty"),
       cs: pickTransactionNum(txRecord, "colorsafeqty", "colorSafeQty"),
+      receiveBy: String(
+        tx.receivedBy ||
+          tx.receivedby ||
+          transaction.receivedByUser?.id ||
+          defaultReceiveBy ||
+          "",
+      ),
       releaseBy: tx.releasedBy || tx.releasedby || "",
       notes: transaction.notes || "",
     };
@@ -369,7 +416,16 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     datePickup: Yup.date()
       .nullable()
       .notRequired()
-      .max(today, FORM_ERRORS.FUTURE_DATE_NOT_ALLOWED),
+      .max(today, FORM_ERRORS.FUTURE_DATE_NOT_ALLOWED)
+      .test(
+        "date-pickup-when-release-by",
+        FORM_ERRORS.DATE_PICKUP_REQUIRED_WITH_RELEASE_BY,
+        function (datePickup) {
+          const releaseBy = (this.parent as TransactionFormValues).releaseBy;
+          if (!String(releaseBy ?? "").trim()) return true;
+          return isPickupFilled(datePickup);
+        },
+      ),
     items: Yup.array().of(
       Yup.object().shape({
         type: Yup.string().required(),
@@ -396,15 +452,30 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     cs: Yup.number()
       .transform(yupCoerceNonNegative)
       .min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
-    releaseBy: Yup.string().when("datePickup", {
-      is: (datePickup: unknown) => isPickupFilled(datePickup),
-      then: (schema) =>
-        schema
-          .trim()
-          .required("Release by is required when date pickup is set")
-          .uuid("Select a valid employee"),
-      otherwise: (schema) => schema.optional(),
-    }),
+    receiveBy: Yup.string()
+      .trim()
+      .required(FORM_ERRORS.RECEIVE_BY_REQUIRED)
+      .uuid("Select a valid employee"),
+    releaseBy: Yup.string()
+      .trim()
+      .optional()
+      .test(
+        "release-by-when-date-pickup",
+        FORM_ERRORS.RELEASE_BY_REQUIRED_WITH_DATE_PICKUP,
+        function (releaseBy) {
+          const datePickup = (this.parent as TransactionFormValues).datePickup;
+          if (!isPickupFilled(datePickup)) return true;
+          return Boolean(String(releaseBy ?? "").trim());
+        },
+      )
+      .test(
+        "release-by-uuid",
+        "Select a valid employee",
+        function (releaseBy) {
+          if (!String(releaseBy ?? "").trim()) return true;
+          return Yup.string().uuid().isValidSync(String(releaseBy));
+        },
+      ),
     notes: Yup.string(),
   });
 
@@ -560,6 +631,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               fabconQty: yupCoerceNonNegative(undefined, values.fabcon),
               detergentQty: yupCoerceNonNegative(undefined, values.detergent),
               colorSafeQty: yupCoerceNonNegative(undefined, values.cs),
+              receivedBy: values.receiveBy.trim(),
               releasedBy: hasValidPickup
                 ? values.releaseBy?.trim() || null
                 : null,
@@ -601,6 +673,20 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 transaction,
               );
               updated.customer = customerForList;
+              if (values.receiveBy) {
+                const emp = employees.find((e) => e.id === values.receiveBy);
+                if (emp) {
+                  const parts = emp.name.trim().split(/\s+/);
+                  updated.receivedByUser = {
+                    id: emp.id,
+                    userName: emp.name,
+                    firstName: parts[0] || "",
+                    lastName: parts.slice(1).join(" ") || "",
+                  };
+                }
+              } else {
+                updated.receivedByUser = null;
+              }
               if (values.releaseBy) {
                 const emp = employees.find((e) => e.id === values.releaseBy);
                 if (emp) {
@@ -623,6 +709,18 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             } else {
               const created = await transactionService.create(payload);
               created.customer = customerForList;
+              if (values.receiveBy) {
+                const emp = employees.find((e) => e.id === values.receiveBy);
+                if (emp) {
+                  const parts = emp.name.trim().split(/\s+/);
+                  created.receivedByUser = {
+                    id: emp.id,
+                    userName: emp.name,
+                    firstName: parts[0] || "",
+                    lastName: parts.slice(1).join(" ") || "",
+                  };
+                }
+              }
               if (values.releaseBy) {
                 const emp = employees.find((e) => e.id === values.releaseBy);
                 if (emp) {
@@ -663,6 +761,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         }) => {
           //const totals = calculateTotals(values);
           //console.log("render:", values);
+          const releaseFieldsDisabled =
+            !isEditing || !isPickupFilled(values.dateLoaded);
+
           const renderDatePicker = (
             field:
               | "receiveDate"
@@ -672,11 +773,13 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             label: string,
             clearable = false,
             onDateCleared?: () => void,
+            disabled = false,
           ) => (
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DateTimePicker
                 label={label}
                 value={values[field]}
+                disabled={disabled}
                 onChange={(val) => setFieldValue(field, val)}
                 {...(field === "estimatedPickup"
                   ? { disablePast: true }
@@ -709,7 +812,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     size: "small",
                     fullWidth: true,
                     error: !!getIn(errors, field),
-                    helperText: getIn(errors, field),
+                    helperText:
+                      disabled && field === "datePickup"
+                        ? FORM_ERRORS.RELEASE_AFTER_LOADED_HINT
+                        : getIn(errors, field),
                   },
                   actionBar: { actions: ["today", "cancel", "accept"] }, // Now button
                 }}
@@ -718,7 +824,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
           );
 
           return (
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
               <Grid container spacing={0}>
                 {/* LEFT */}
                 <Grid
@@ -823,7 +929,85 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         {renderDatePicker("receiveDate", "Date Received")}
                       </Grid>
                       <Grid size={{ xs: 12, sm: 6 }}>
-                        {renderDatePicker("dateLoaded", "Date Loaded", true)}
+                        <FormControl
+                          fullWidth
+                          size="small"
+                          error={
+                            !!getIn(errors, "receiveBy") &&
+                            !!(
+                              getIn(touched, "receiveBy") || submitCount > 0
+                            )
+                          }
+                        >
+                          <InputLabel
+                            id="tx-modal-receive-by-label"
+                            shrink
+                            required
+                          >
+                            Receive By
+                          </InputLabel>
+                          <Select
+                            labelId="tx-modal-receive-by-label"
+                            label="Receive By"
+                            displayEmpty
+                            value={values.receiveBy || ""}
+                            onChange={(e) => {
+                              setFieldValue(
+                                "receiveBy",
+                                String(e.target.value),
+                              );
+                              void setFieldTouched("receiveBy", true, false);
+                            }}
+                            onBlur={() => void setFieldTouched("receiveBy", true)}
+                            error={
+                              !!getIn(errors, "receiveBy") &&
+                              !!(
+                                getIn(touched, "receiveBy") || submitCount > 0
+                              )
+                            }
+                            renderValue={(selected) => {
+                              if (!selected) {
+                                return (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    Select employee
+                                  </Typography>
+                                );
+                              }
+                              const label = resolveEmployeeLabel(
+                                String(selected),
+                              );
+                              return (
+                                label || (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    Select employee
+                                  </Typography>
+                                )
+                              );
+                            }}
+                          >
+                            {employees.map((employee) => (
+                              <MUIMenuItem
+                                key={employee.id}
+                                value={employee.id}
+                              >
+                                {employee.name}
+                              </MUIMenuItem>
+                            ))}
+                          </Select>
+                          {getIn(touched, "receiveBy") || submitCount > 0 ? (
+                            getIn(errors, "receiveBy") ? (
+                              <FormHelperText error>
+                                {String(getIn(errors, "receiveBy"))}
+                              </FormHelperText>
+                            ) : null
+                          ) : null}
+                        </FormControl>
                       </Grid>
                       <Grid size={{ xs: 12, sm: 6 }}>
                         {renderDatePicker(
@@ -832,15 +1016,27 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           true,
                         )}
                       </Grid>
-
-                      <Grid size={{ xs: 12 }} textAlign="center">
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        {renderDatePicker("dateLoaded", "Date Loaded", true)}
+                      </Grid>
+                      <Grid
+                        size={{ xs: 12, sm: 6 }}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                      >
                         <FormControlLabel
+                          sx={{ m: 0, whiteSpace: "nowrap" }}
                           control={
                             <Checkbox
                               size="small"
                               checked={values.isDelivered}
                               onChange={(e) =>
-                                setFieldValue("isDelivered", e.target.checked)
+                                setFieldValue(
+                                  "isDelivered",
+                                  e.target.checked,
+                                )
                               }
                             />
                           }
@@ -1166,8 +1362,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         {renderDatePicker(
                           "datePickup",
                           "Date Pickup",
-                          true,
-                          () => setFieldValue("releaseBy", ""),
+                          !releaseFieldsDisabled,
+                          () => {
+                            setFieldValue("releaseBy", "");
+                          },
+                          releaseFieldsDisabled,
                         )}
                       </Grid>
 
@@ -1176,6 +1375,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           <FormControl
                             fullWidth
                             size="small"
+                            disabled={releaseFieldsDisabled}
                             error={Boolean(getIn(errors, "releaseBy"))}
                           >
                             <InputLabel id="tx-modal-release-by-label" shrink>
@@ -1185,13 +1385,15 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                               labelId="tx-modal-release-by-label"
                               label="Release By"
                               displayEmpty
+                              disabled={releaseFieldsDisabled}
                               value={values.releaseBy || ""}
-                              onChange={(e) =>
-                                setFieldValue(
-                                  "releaseBy",
-                                  String(e.target.value),
-                                )
-                              }
+                              onChange={(e) => {
+                                const next = String(e.target.value);
+                                setFieldValue("releaseBy", next);
+                                if (!next) {
+                                  setFieldValue("datePickup", null);
+                                }
+                              }}
                               error={Boolean(getIn(errors, "releaseBy"))}
                               renderValue={(selected) => {
                                 if (!selected) {
@@ -1204,10 +1406,20 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                     </Typography>
                                   );
                                 }
-                                const emp = employees.find(
-                                  (e) => e.id === selected,
+                                const label = resolveEmployeeLabel(
+                                  String(selected),
                                 );
-                                return emp?.name ?? String(selected);
+                                if (!label) {
+                                  return (
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      Select employee
+                                    </Typography>
+                                  );
+                                }
+                                return label;
                               }}
                             >
                               {employees.map((employee) => (
@@ -1223,15 +1435,22 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                               <FormHelperText>
                                 {String(getIn(errors, "releaseBy"))}
                               </FormHelperText>
+                            ) : releaseFieldsDisabled ? (
+                              <FormHelperText>
+                                {FORM_ERRORS.RELEASE_AFTER_LOADED_HINT}
+                              </FormHelperText>
                             ) : null}
                           </FormControl>
-                          {values.releaseBy ? (
+                          {values.releaseBy && !releaseFieldsDisabled ? (
                             <Tooltip title="Clear release by">
                               <IconButton
                                 aria-label="clear release by"
                                 size="small"
                                 sx={{ mt: 0.25 }}
-                                onClick={() => setFieldValue("releaseBy", "")}
+                                onClick={() => {
+                                  setFieldValue("releaseBy", "");
+                                  setFieldValue("datePickup", null);
+                                }}
                               >
                                 <ClearIcon fontSize="small" />
                               </IconButton>

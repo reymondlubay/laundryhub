@@ -187,13 +187,22 @@ export default function SidebarMenu() {
         </SubMenu>
 
         {!isAdminUser && (
-          <MenuItem
-            component={<Link to={route.REPORT_TRANSACTION} />}
-            icon={<FaFileAlt />}
-            active={activePath === route.REPORT_TRANSACTION}
-          >
-            Transaction Report
-          </MenuItem>
+          <>
+            <MenuItem
+              component={<Link to={route.REPORT_TRANSACTION} />}
+              icon={<FaFileAlt />}
+              active={activePath === route.REPORT_TRANSACTION}
+            >
+              Transaction Report
+            </MenuItem>
+            <MenuItem
+              component={<Link to={route.REPORT_RECEIVE_RELEASE} />}
+              icon={<FaFileAlt />}
+              active={activePath === route.REPORT_RECEIVE_RELEASE}
+            >
+              Receive / Release Report
+            </MenuItem>
+          </>
         )}
 
         {isAdminUser && (
@@ -272,6 +281,12 @@ export default function SidebarMenu() {
               active={activePath === route.REPORT_LOAD}
             >
               Load Report
+            </MenuItem>
+            <MenuItem
+              component={<Link to={route.REPORT_RECEIVE_RELEASE} />}
+              active={activePath === route.REPORT_RECEIVE_RELEASE}
+            >
+              Receive / Release Report
             </MenuItem>
           </SubMenu>
         )}

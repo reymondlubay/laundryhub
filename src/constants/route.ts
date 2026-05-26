@@ -19,6 +19,7 @@ const route = {
   REPORT_SALES_EXPENSE_GRAPH: "/reports/sales-expense-graph",
   REPORT_COLLECTION: "/reports/collection",
   REPORT_LOAD: "/reports/load",
+  REPORT_RECEIVE_RELEASE: "/reports/receive-release",
   USERS: "/users",
   SETTINGS: "/settings/database",
   SETTINGS_ADDONS_PRICING: "/settings/addons-pricing",

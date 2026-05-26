@@ -29,6 +29,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import type { SxProps, Theme } from "@mui/material/styles";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import {
@@ -94,6 +95,34 @@ const phpFormatter = new Intl.NumberFormat("en-PH", {
   style: "currency",
   currency: "PHP",
 });
+
+/**
+ * Wrap disabled fields in a Box with this sx so hover shows not-allowed.
+ * MUI sets pointer-events: none on disabled inputs, so cursor must live on the wrapper.
+ */
+const disabledFieldWrapSx: SxProps<Theme> = {
+  cursor: "not-allowed",
+  width: "100%",
+  "& .MuiInputBase-root.Mui-disabled": {
+    pointerEvents: "none",
+    bgcolor: (theme) =>
+      theme.palette.mode === "dark"
+        ? "rgba(255, 255, 255, 0.1)"
+        : "rgba(0, 0, 0, 0.07)",
+    WebkitTextFillColor: (theme) => theme.palette.text.disabled,
+  },
+  "& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline": {
+    borderColor: (theme) => theme.palette.action.disabled,
+    borderStyle: "dashed",
+    borderWidth: 1.5,
+  },
+  "& .MuiInputLabel-root.Mui-disabled": {
+    color: (theme) => theme.palette.text.disabled,
+  },
+  "& .MuiIconButton-root.Mui-disabled": {
+    pointerEvents: "none",
+  },
+};
 
 const normalizeRange = (from: Dayjs, to: Dayjs): { from: Dayjs; to: Dayjs } => {
   if (from.isAfter(to)) return { from: to, to: from };
@@ -800,22 +829,25 @@ const RecordExpensePage: React.FC = () => {
               </Grid>
 
               <Grid size={12}>
-                <DateTimePicker
-                  label="Date"
-                  value={form.date}
-                  maxDateTime={dayjs()}
-                  onChange={(value) =>
-                    setForm((prev) => ({ ...prev, date: value || dayjs() }))
-                  }
-                  disabled={!form.option}
-                  slotProps={{
-                    textField: { fullWidth: true, size: "small" },
-                    actionBar: { actions: ["today", "cancel", "accept"] },
-                  }}
-                />
+                <Box sx={!form.option ? disabledFieldWrapSx : { width: "100%" }}>
+                  <DateTimePicker
+                    label="Date"
+                    value={form.date}
+                    maxDateTime={dayjs()}
+                    onChange={(value) =>
+                      setForm((prev) => ({ ...prev, date: value || dayjs() }))
+                    }
+                    disabled={!form.option}
+                    slotProps={{
+                      textField: { fullWidth: true, size: "small" },
+                      actionBar: { actions: ["today", "cancel", "accept"] },
+                    }}
+                  />
+                </Box>
               </Grid>
 
               <Grid size={12}>
+                <Box sx={!form.option ? disabledFieldWrapSx : { width: "100%" }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -860,20 +892,28 @@ const RecordExpensePage: React.FC = () => {
                           : ""
                   }
                 />
+                </Box>
               </Grid>
 
               <Grid size={12}>
+                <Box sx={!isExpense ? disabledFieldWrapSx : { width: "100%" }}>
                 <TextField
                   fullWidth
                   size="small"
                   label="Amount"
                   value={isExpense ? form.amount : ""}
                   disabled={!isExpense}
+                  helperText={
+                    !isExpense && form.option
+                      ? "Amount is auto-calculated for inventory items."
+                      : undefined
+                  }
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, amount: e.target.value }))
                   }
                   inputProps={{ min: 0.01, step: "0.01" }}
                 />
+                </Box>
               </Grid>
 
               <Grid size={12}>
