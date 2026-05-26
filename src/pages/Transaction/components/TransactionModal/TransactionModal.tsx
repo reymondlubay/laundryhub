@@ -307,12 +307,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   }, [isOpen, transaction]);
 
   const initialValues: TransactionFormValues = React.useMemo(() => {
-    const currentUser = authService.getCurrentUser();
-    const defaultReceiveBy =
-      currentUser?.role === USER_ROLE_EMPLOYEE && currentUser.id
-        ? currentUser.id
-        : "";
-
     if (!transaction) {
       return {
         customer: "",
@@ -326,7 +320,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         fabcon: 0,
         detergent: 0,
         cs: 0,
-        receiveBy: defaultReceiveBy,
+        receiveBy: "",
         releaseBy: "",
         notes: "",
       };
@@ -394,7 +388,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         tx.receivedBy ||
           tx.receivedby ||
           transaction.receivedByUser?.id ||
-          defaultReceiveBy ||
           "",
       ),
       releaseBy: tx.releasedBy || tx.releasedby || "",
