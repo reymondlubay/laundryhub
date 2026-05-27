@@ -195,13 +195,6 @@ export default function SidebarMenu() {
             >
               Transaction Report
             </MenuItem>
-            <MenuItem
-              component={<Link to={route.REPORT_RECEIVE_RELEASE} />}
-              icon={<FaFileAlt />}
-              active={activePath === route.REPORT_RECEIVE_RELEASE}
-            >
-              Receive / Release Report
-            </MenuItem>
           </>
         )}
 
