@@ -107,6 +107,7 @@ interface FlatTransactionRow {
   detergentQty: number;
   colorSafeQty: number;
   isDelivered: boolean;
+  receivedBy: string;
   releasedBy: string;
   action: string;
   /** One entry per load line; used to stack Customer / KG / Load in a single grid row. */
@@ -378,17 +379,23 @@ function flattenTransactionRows(
     return `${paidAt} - ${formatAmount(Number(payment.amount || 0))} ${payment.mode}`;
   });
 
-  const releasedBy = transaction.releasedByUser
-    ? [
-        transaction.releasedByUser.firstName,
-        transaction.releasedByUser.lastName,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .trim() ||
-      transaction.releasedByUser.userName ||
-      "-"
-    : "-";
+  const formatEmployeeName = (
+    user?: {
+      firstName?: string;
+      lastName?: string;
+      userName?: string;
+    } | null,
+  ): string => {
+    if (!user) return "-";
+    const name = [user.firstName, user.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    return name || user.userName || "-";
+  };
+
+  const receivedBy = formatEmployeeName(transaction.receivedByUser);
+  const releasedBy = formatEmployeeName(transaction.releasedByUser);
 
   const loadLines =
     loadDetails.length === 0
@@ -428,6 +435,7 @@ function flattenTransactionRows(
         detergentQty,
         colorSafeQty,
         isDelivered,
+        receivedBy,
         releasedBy,
         action: "",
         loadLines,
@@ -465,6 +473,7 @@ function flattenTransactionRows(
       detergentQty,
       colorSafeQty,
       isDelivered,
+      receivedBy,
       releasedBy,
       action: "",
       loadLines,
@@ -1419,6 +1428,15 @@ function TransactionTableInner({
             </Tooltip>
           );
         },
+      },
+      {
+        headerName: "Receive By",
+        field: "receivedBy",
+        width: 120,
+        suppressMovable: true,
+        sortable: false,
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) =>
+          params.data?.isFirstRow ? params.value : "",
       },
       {
         headerName: "Released By",
