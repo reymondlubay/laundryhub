@@ -4,6 +4,7 @@ import {
   Autocomplete,
   Alert,
   Box,
+  Button,
   CircularProgress,
   Divider,
   FormControl,
@@ -504,6 +505,80 @@ const TransactionSummary = () => {
     setPage(0);
   };
 
+  const handleExportToExcel = React.useCallback(() => {
+    if (filteredTransactions.length === 0) return;
+
+    const headers = [
+      "Date Received",
+      "Customer",
+      "KG",
+      "Load",
+      "Price",
+      "Date Loaded",
+      "Date Paid (Latest)",
+      "Date Pickup",
+    ];
+
+    const toCsvCell = (value: unknown): string => {
+      const s = value == null ? "" : String(value);
+      const needsQuotes = /[",\r\n]/.test(s);
+      const escaped = s.replace(/"/g, '""');
+      return needsQuotes ? `"${escaped}"` : escaped;
+    };
+
+    const rows = filteredTransactions.map((transaction) => {
+      const dateReceived = getTransactionFieldDate(
+        transaction,
+        "dateReceived",
+      );
+      const dateLoaded = getTransactionFieldDate(transaction, "dateLoaded");
+      const datePickup = getTransactionFieldDate(transaction, "datePickup");
+
+      const customer = toPascalCase(transaction.customer?.name || "-");
+      const kg = getTotalKg(transaction).toFixed(2);
+      const loads = getTotalLoads(transaction);
+      const price = formatCurrency(
+        getTransactionGrandTotal(transaction, addonsPricing),
+      );
+
+      const datePaid = getLatestPaymentDate(transaction);
+
+      return [
+        formatDateTime(dateReceived),
+        customer,
+        kg,
+        loads,
+        price,
+        formatDateTime(dateLoaded),
+        datePaid ? formatDateTime(datePaid) : "-",
+        formatDateTime(datePickup),
+      ];
+    });
+
+    const csvLines = [
+      headers.map(toCsvCell).join(","),
+      ...rows.map((r) => r.map(toCsvCell).join(",")),
+    ];
+    const csv = csvLines.join("\r\n");
+
+    // Excel is more reliable with BOM for UTF-8.
+    const blob = new Blob([`\uFEFF${csv}`], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+
+    const fileName = `TransactionSummary_${dateFrom.format(
+      "YYYY-MM-DD",
+    )}_to_${dateTo.format("YYYY-MM-DD")}.csv`;
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, [filteredTransactions, dateFrom, dateTo, addonsPricing]);
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
@@ -652,6 +727,24 @@ const TransactionSummary = () => {
         <Alert severity="info">No transactions found.</Alert>
       ) : (
         <TableContainer component={Paper} sx={{ mb: 2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              p: 1.5,
+              pb: 0,
+            }}
+          >
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleExportToExcel}
+            >
+              Export to excel
+            </Button>
+          </Box>
+
           <Table stickyHeader>
             <TableHead>
               <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
