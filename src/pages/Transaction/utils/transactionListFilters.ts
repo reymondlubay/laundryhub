@@ -87,24 +87,58 @@ export const transactionMatchesLoadType = (
   );
 };
 
+const getEstimatedPickup = (transaction: Transaction): dayjs.Dayjs => {
+  const tx = transaction as Transaction & { estimatedpickup?: string };
+  return dayjs(transaction.estimatedPickup || tx.estimatedpickup);
+};
+
+export const isEstimatedPickupTomorrow = (
+  estimatedPickup?: string | null,
+): boolean => {
+  const estimated = dayjs(estimatedPickup);
+  if (!estimated.isValid()) return false;
+  const tomorrow = dayjs().add(1, "day").startOf("day");
+  return estimated.startOf("day").isSame(tomorrow, "day");
+};
+
+export const formatEstimatedPickupTooltip = (
+  estimatedPickup?: string | null,
+): string => {
+  const estimated = dayjs(estimatedPickup);
+  if (!estimated.isValid()) return "";
+  const datePart = estimated.format("dddd, MMMM D, YYYY");
+  return isEstimatedPickupTomorrow(estimatedPickup)
+    ? `Tomorrow, ${datePart}`
+    : datePart;
+};
+
+/** Unloaded rows scheduled for tomorrow are pinned to the top; later dates use receive-date order. */
+const hasTomorrowPickupPriority = (transaction: Transaction): boolean => {
+  const tx = transaction as Transaction & {
+    dateloaded?: string;
+    estimatedpickup?: string;
+  };
+  const loaded = Boolean(transaction.dateLoaded || tx.dateloaded);
+  if (loaded) return false;
+  return isEstimatedPickupTomorrow(
+    transaction.estimatedPickup || tx.estimatedpickup,
+  );
+};
+
 const compareDefault = (a: Transaction, b: Transaction): number => {
   const aTx = a as Transaction & {
     datereceived?: string;
     dateloaded?: string;
-    estimatedpickup?: string;
   };
   const bTx = b as Transaction & {
     datereceived?: string;
     dateloaded?: string;
-    estimatedpickup?: string;
   };
 
-  const aEstimated = dayjs(a.estimatedPickup || aTx.estimatedpickup);
-  const bEstimated = dayjs(b.estimatedPickup || bTx.estimatedpickup);
-  const aLoaded = Boolean(a.dateLoaded || aTx.dateloaded);
-  const bLoaded = Boolean(b.dateLoaded || bTx.dateloaded);
-  const aPriority = !aLoaded && aEstimated.isValid();
-  const bPriority = !bLoaded && bEstimated.isValid();
+  const aEstimated = getEstimatedPickup(a);
+  const bEstimated = getEstimatedPickup(b);
+  const aPriority = hasTomorrowPickupPriority(a);
+  const bPriority = hasTomorrowPickupPriority(b);
 
   if (aPriority && !bPriority) return -1;
   if (!aPriority && bPriority) return 1;

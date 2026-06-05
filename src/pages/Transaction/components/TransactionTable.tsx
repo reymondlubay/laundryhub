@@ -60,7 +60,12 @@ import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../../services/addonsPricingService";
-import { EMPTY_STATES, FORM_ERRORS, UI_TEXT } from "../../../constants/messages";
+import {
+  CONFIRM_MESSAGES,
+  EMPTY_STATES,
+  FORM_ERRORS,
+  UI_TEXT,
+} from "../../../constants/messages";
 import { USER_ROLE_EMPLOYEE } from "../../../constants/roles";
 import { toBackendPaymentMode } from "../../../constants/payment";
 import TransactionDeleteDialog, {
@@ -69,6 +74,7 @@ import TransactionDeleteDialog, {
 import { getTransactionGrandTotal } from "../../../utils/pricing";
 import { pickTransactionNum } from "../../../utils/normalizeTransaction";
 import { getTransactionNoteDetailLines } from "../../../utils/transactionNoteDetails";
+import { formatEstimatedPickupTooltip } from "../utils/transactionListFilters";
 import "./TransactionTable.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -370,7 +376,7 @@ function flattenTransactionRows(
     addonsPricing,
   );
   const balance =
-    payments.length > 0 && totalPaid < totalPrice ? totalPrice - totalPaid : 0;
+    totalPaid > 0 && totalPaid < totalPrice ? totalPrice - totalPaid : 0;
 
   const datePaid =
     payments.length > 0 ? payments[payments.length - 1].paymentDate : null;
@@ -531,6 +537,9 @@ function TransactionTableInner({
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notLoadedDialogOpen, setNotLoadedDialogOpen] = useState(false);
+  const [pickupConfirmOpen, setPickupConfirmOpen] = useState(false);
+  const [pendingPickupTransaction, setPendingPickupTransaction] =
+    useState<Transaction | null>(null);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [releaseBy, setReleaseBy] = useState<string>("");
   const releaseByInputRef = useRef<HTMLInputElement | null>(null);
@@ -725,6 +734,56 @@ function TransactionTableInner({
     },
     [],
   );
+
+  const handlePickupClick = useCallback(
+    (transaction: Transaction) => {
+      if (!isTransactionLoaded(transaction)) {
+        setNotLoadedDialogOpen(true);
+        return;
+      }
+      const { totalPaid, balance, totalPrice } = getTransactionTotals(
+        transaction,
+        addonsPricing,
+      );
+      const notYetPaid = totalPrice > 0 && totalPaid === 0;
+      const hasBalance = balance > 0;
+      if (hasBalance || notYetPaid) {
+        setPendingPickupTransaction(transaction);
+        setPickupConfirmOpen(true);
+        return;
+      }
+      handleOpenMarkModal(transaction, "pickup");
+    },
+    [addonsPricing, handleOpenMarkModal],
+  );
+
+  const handlePickupConfirmYes = useCallback(() => {
+    if (pendingPickupTransaction) {
+      handleOpenMarkModal(pendingPickupTransaction, "pickup");
+    }
+    setPickupConfirmOpen(false);
+    setPendingPickupTransaction(null);
+  }, [handleOpenMarkModal, pendingPickupTransaction]);
+
+  const handlePickupConfirmNo = useCallback(() => {
+    setPickupConfirmOpen(false);
+    setPendingPickupTransaction(null);
+  }, []);
+
+  const pickupConfirmMessage = useMemo(() => {
+    if (!pendingPickupTransaction) return "";
+    const { totalPaid, balance, totalPrice } = getTransactionTotals(
+      pendingPickupTransaction,
+      addonsPricing,
+    );
+    if (totalPrice > 0 && totalPaid === 0) {
+      return CONFIRM_MESSAGES.PICKUP_NOT_YET_PAID;
+    }
+    if (balance > 0) {
+      return CONFIRM_MESSAGES.PICKUP_WITH_BALANCE;
+    }
+    return CONFIRM_MESSAGES.PICKUP_WITH_BALANCE;
+  }, [addonsPricing, pendingPickupTransaction]);
 
   const handleCloseMarkModal = useCallback(() => {
     setSelectedTransactionForMark(null);
@@ -1023,9 +1082,7 @@ function TransactionTableInner({
                   >
                     <span>Scheduled Pick Up</span>
                     <span>
-                      {dayjs(params.data.estimatedPickup).format(
-                        "MMMM D, YYYY hh:mm A",
-                      )}
+                      {formatEstimatedPickupTooltip(params.data.estimatedPickup)}
                     </span>
                   </Box>
                 }
@@ -1158,18 +1215,27 @@ function TransactionTableInner({
         suppressMovable: true,
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
           if (!params.data?.isFirstRow || params.value == null) return "";
+          const balanceAmount = Number(params.data.balance || 0);
+          const showBalanceLine = balanceAmount > 0;
           return (
             <Box
               sx={{
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
                 width: "100%",
                 height: "100%",
                 textAlign: "center",
+                lineHeight: 1.45,
               }}
             >
-              ₱{Number(params.value).toFixed(2)}
+              <span>₱{Number(params.value).toFixed(2)}</span>
+              {showBalanceLine ? (
+                <span style={{ color: "#f44336" }}>
+                  (₱{balanceAmount.toFixed(2)})
+                </span>
+              ) : null}
             </Box>
           );
         },
@@ -1209,15 +1275,21 @@ function TransactionTableInner({
         minWidth: 100,
         sortable: false,
         suppressMovable: true,
+        cellClass: "tx-date-paid-cell",
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
-          if (!params.data?.isFirstRow || !params.value) return "";
+          if (!params.data?.isFirstRow) return "";
 
           const totalPrice = Number(params.data.price || 0);
           const totalPaid = Number(params.data.totalPaid || 0);
-          const hasBalance = totalPaid > 0 && totalPaid < totalPrice;
-          const hasPaidOrOver = totalPaid >= totalPrice;
-          const balanceAmount = Math.max(totalPrice - totalPaid, 0);
+          const balanceAmount = Number(params.data.balance || 0);
+          const notYetPaid = totalPrice > 0 && totalPaid === 0;
+          const hasPartialBalance =
+            totalPaid > 0 && totalPaid < totalPrice && totalPrice > 0;
+          const hasPaidOrOver = totalPaid >= totalPrice && totalPrice > 0;
           const overAmount = Math.max(totalPaid - totalPrice, 0);
+          const showPaymentDate =
+            Boolean(params.value) && !notYetPaid && !hasPartialBalance;
+          const showWarningIcon = hasPartialBalance;
 
           const tooltipTitle = (
             <Box
@@ -1233,7 +1305,10 @@ function TransactionTableInner({
                   {paymentLine}
                 </span>
               ))}
-              {hasBalance ? (
+              {notYetPaid ? (
+                <span style={{ color: "#f44336", fontWeight: 600 }}>Unpaid</span>
+              ) : null}
+              {hasPartialBalance ? (
                 <span style={{ color: "#f44336", fontWeight: 600 }}>
                   Balance - {formatAmount(balanceAmount)}
                 </span>
@@ -1246,18 +1321,19 @@ function TransactionTableInner({
             </Box>
           );
 
-          const showIcons = hasBalance || hasPaidOrOver;
+          const showIcons = showWarningIcon || hasPaidOrOver;
 
           const iconCluster = showIcons ? (
             <Box
               sx={{
                 display: "inline-flex",
                 alignItems: "center",
+                justifyContent: "center",
                 gap: 0.25,
                 flexShrink: 0,
               }}
             >
-              {hasBalance ? (
+              {showWarningIcon ? (
                 <Tooltip
                   title={tooltipTitle}
                   arrow
@@ -1310,7 +1386,45 @@ function TransactionTableInner({
             </Box>
           ) : null;
 
-          const dateTimeStack = (
+          const statusLabel = notYetPaid
+            ? "UNPAID"
+            : hasPartialBalance
+              ? "BALANCE"
+              : null;
+
+          if (statusLabel) {
+            return (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 0.25,
+                  py: 0.25,
+                  px: 0,
+                  width: "100%",
+                  lineHeight: 1.45,
+                  textAlign: "center",
+                }}
+              >
+                <span
+                  style={{
+                    color: "#f44336",
+                    fontWeight: 700,
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  {statusLabel}
+                </span>
+                {showWarningIcon ? iconCluster : null}
+              </Box>
+            );
+          }
+
+          if (!showPaymentDate && !showIcons) return "";
+
+          const dateTimeStack = showPaymentDate ? (
             <Box
               sx={{
                 display: "flex",
@@ -1325,7 +1439,7 @@ function TransactionTableInner({
               <span>{dayjs(params.value).format("MM-DD-YY")}</span>
               <span>{dayjs(params.value).format("h:mm A")}</span>
             </Box>
-          );
+          ) : null;
 
           return (
             <Box
@@ -1550,7 +1664,7 @@ function TransactionTableInner({
                         (t) => t.id === params.data?.transactionId,
                       );
                       if (transaction) {
-                        handleOpenMarkModal(transaction, "pickup");
+                        handlePickupClick(transaction);
                       }
                     }}
                   >
@@ -1607,6 +1721,7 @@ function TransactionTableInner({
     ],
     [
       handleOpenMarkModal,
+      handlePickupClick,
       handleOpenPaymentModal,
       onEditTransaction,
       transactions,
@@ -1671,7 +1786,7 @@ function TransactionTableInner({
   return (
     <>
       <div
-        className="transaction-grouped-grid"
+        className={`transaction-grouped-grid ${darkMode ? "tx-grid-dark" : "tx-grid-light"}`}
         style={{
           height: "calc(100vh - 200px)",
           minHeight: 400,
@@ -1879,6 +1994,26 @@ function TransactionTableInner({
             }
           >
             {UI_TEXT.SAVE}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={pickupConfirmOpen}
+        onClose={ignoreBackdropClose(handlePickupConfirmNo)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Mark as Pickup</DialogTitle>
+        <DialogContent>
+          <Typography>{pickupConfirmMessage}</Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button variant="contained" onClick={handlePickupConfirmYes} autoFocus>
+            Yes
+          </Button>
+          <Button variant="outlined" onClick={handlePickupConfirmNo}>
+            No
           </Button>
         </DialogActions>
       </Dialog>

@@ -34,7 +34,7 @@ import AddCircleIcon from "@mui/icons-material/AddCircle";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ClearIcon from "@mui/icons-material/Clear";
-import { Formik, FieldArray, getIn } from "formik";
+import { Formik, FieldArray, getIn, type FormikErrors } from "formik";
 import * as Yup from "yup";
 import type {
   LaundryItem,
@@ -146,6 +146,80 @@ function yupCoerceNonNegative(_value: unknown, originalValue: unknown): number {
       : Number(originalValue);
   return Number.isFinite(n) ? n : 0;
 }
+
+const TX_FORM_FOCUS_ORDER = [
+  "customer",
+  "receiveDate",
+  "receiveBy",
+  "estimatedPickup",
+  "dateLoaded",
+  "datePickup",
+  "releaseBy",
+  "items",
+  "whitePrice",
+  "fabcon",
+  "detergent",
+  "cs",
+] as const;
+
+const getFirstTransactionFormErrorPath = (
+  errors: FormikErrors<TransactionFormValues>,
+): string | null => {
+  for (const field of TX_FORM_FOCUS_ORDER) {
+    if (field === "items") {
+      const items = errors.items;
+      if (!Array.isArray(items)) continue;
+      for (let i = 0; i < items.length; i++) {
+        const row = items[i];
+        if (!row || typeof row !== "object") continue;
+        for (const sub of ["type", "kg", "loads", "price"] as const) {
+          if ((row as Record<string, unknown>)[sub]) {
+            return `items.${i}.${sub}`;
+          }
+        }
+      }
+      continue;
+    }
+    if (getIn(errors, field)) return field;
+  }
+  return null;
+};
+
+const focusTransactionFormField = (path: string): void => {
+  const id = `tx-form-${path.replace(/\./g, "-")}`;
+  const el = document.getElementById(id);
+  if (!el) return;
+  const focusable =
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLSelectElement ||
+    el instanceof HTMLTextAreaElement
+      ? el
+      : el.querySelector<HTMLElement>(
+          "input, select, textarea, [role='combobox']",
+        );
+  (focusable ?? el).focus?.();
+  (focusable ?? el).scrollIntoView?.({ block: "center", behavior: "smooth" });
+};
+
+const buildTransactionFormTouched = (values: TransactionFormValues) => ({
+  customer: true,
+  receiveDate: true,
+  receiveBy: true,
+  dateLoaded: true,
+  estimatedPickup: true,
+  datePickup: true,
+  releaseBy: true,
+  whitePrice: true,
+  fabcon: true,
+  detergent: true,
+  cs: true,
+  items: values.items.map(() => ({
+    type: true,
+    kg: true,
+    loads: true,
+    price: true,
+  })),
+});
 
 const TransactionModal: React.FC<TransactionModalProps> = ({
   isOpen,
@@ -750,8 +824,26 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
           submitCount,
           setFieldValue,
           setFieldTouched,
+          setTouched,
+          validateForm,
           handleSubmit,
         }) => {
+          const handleSaveAttempt = async (
+            e?: React.FormEvent<HTMLFormElement>,
+          ) => {
+            e?.preventDefault();
+            const validationErrors = await validateForm();
+            if (Object.keys(validationErrors).length > 0) {
+              await setTouched(buildTransactionFormTouched(values), true);
+              const firstPath =
+                getFirstTransactionFormErrorPath(validationErrors);
+              if (firstPath) {
+                window.setTimeout(() => focusTransactionFormField(firstPath), 0);
+              }
+              return;
+            }
+            handleSubmit(e);
+          };
           //const totals = calculateTotals(values);
           //console.log("render:", values);
           const releaseFieldsDisabled =
@@ -802,6 +894,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     ],
                   },
                   textField: {
+                    id: `tx-form-${field}`,
                     size: "small",
                     fullWidth: true,
                     error: !!getIn(errors, field),
@@ -817,7 +910,12 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
           );
 
           return (
-            <form onSubmit={handleSubmit} noValidate>
+            <form
+              onSubmit={(e) => {
+                void handleSaveAttempt(e);
+              }}
+              noValidate
+            >
               <Grid container spacing={0}>
                 {/* LEFT */}
                 <Grid
@@ -864,6 +962,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                 <TextField
                                   {...params}
                                   label="Customer"
+                                  inputProps={{
+                                    ...params.inputProps,
+                                    id: "tx-form-customer",
+                                  }}
                                   error={
                                     !!errors.customer &&
                                     !!(touched.customer || submitCount > 0)
@@ -940,6 +1042,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                             Receive By
                           </InputLabel>
                           <Select
+                            id="tx-form-receiveBy"
                             labelId="tx-modal-receive-by-label"
                             label="Receive By"
                             displayEmpty
@@ -1114,6 +1217,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                       slotProps={kgTooltipSlotProps}
                                     >
                                       <TextField
+                                        id={`tx-form-items-${index}-kg`}
                                         label="KG"
                                         size="small"
                                         type="number"
@@ -1148,6 +1252,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
                                   <Grid size={{ xs: 4, sm: 2 }}>
                                     <TextField
+                                      id={`tx-form-items-${index}-loads`}
                                       label="Loads"
                                       size="small"
                                       type="number"
@@ -1178,6 +1283,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                     }}
                                   >
                                     <TextField
+                                      id={`tx-form-items-${index}-price`}
                                       label="Price"
                                       size="small"
                                       type="number"
@@ -1253,6 +1359,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
                         <TextField
+                          id="tx-form-whitePrice"
                           label="White Price"
                           size="small"
                           type="number"
@@ -1288,6 +1395,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
                         <NumberField
+                          id="tx-form-fabcon"
                           label="Fabcon"
                           min={0}
                           max={10}
@@ -1308,6 +1416,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
                         <NumberField
+                          id="tx-form-detergent"
                           label="Detergent"
                           min={0}
                           max={10}
@@ -1330,6 +1439,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
                         <NumberField
+                          id="tx-form-cs"
                           label="Color Safe"
                           min={0}
                           max={10}
@@ -1375,6 +1485,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                               Release By
                             </InputLabel>
                             <Select
+                              id="tx-form-releaseBy"
                               labelId="tx-modal-release-by-label"
                               label="Release By"
                               displayEmpty
@@ -1498,11 +1609,14 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                   {UI_TEXT.CANCEL}
                 </Button>
                 <Button
-                  type="submit"
+                  type="button"
                   variant="contained"
                   size="small"
                   sx={{ minWidth: 100 }}
                   disabled={loading}
+                  onClick={() => {
+                    void handleSaveAttempt();
+                  }}
                 >
                   {loading ? UI_TEXT.SAVING : UI_TEXT.SAVE}
                 </Button>

@@ -24,7 +24,11 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import {
+  DatePicker,
+  DateTimePicker,
+  LocalizationProvider,
+} from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { type Dayjs } from "dayjs";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog";
@@ -75,11 +79,40 @@ const ManageInventoryPage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
 
+  const [filterItem, setFilterItem] = useState<InventoryItem | null>(null);
+  const [filterFrom, setFilterFrom] = useState<Dayjs | null>(null);
+  const [filterTo, setFilterTo] = useState<Dayjs | null>(null);
+
   const itemById = useMemo(() => {
     const map = new Map<string, InventoryItem>();
     items.forEach((i) => map.set(i.id, i));
     return map;
   }, [items]);
+
+  const filteredRecords = useMemo(() => {
+    return records.filter((record) => {
+      if (filterItem && record.itemId !== filterItem.id) return false;
+
+      const recordDate = dayjs(record.date);
+      if (filterFrom && filterFrom.isValid()) {
+        if (
+          !recordDate.isValid() ||
+          recordDate.isBefore(filterFrom.startOf("day"))
+        ) {
+          return false;
+        }
+      }
+      if (filterTo && filterTo.isValid()) {
+        if (
+          !recordDate.isValid() ||
+          recordDate.isAfter(filterTo.endOf("day"))
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [records, filterItem, filterFrom, filterTo]);
 
   const load = useCallback(async () => {
     try {
@@ -110,9 +143,16 @@ const ManageInventoryPage: React.FC = () => {
     setPage(0);
   }, [records.length]);
 
+  useEffect(() => {
+    setPage(0);
+  }, [filterItem, filterFrom, filterTo]);
+
   const paged = useMemo(() => {
-    return records.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  }, [records, page, rowsPerPage]);
+    return filteredRecords.slice(
+      page * rowsPerPage,
+      page * rowsPerPage + rowsPerPage,
+    );
+  }, [filteredRecords, page, rowsPerPage]);
 
   const openCreate = () => {
     setEditing(null);
@@ -226,6 +266,67 @@ const ManageInventoryPage: React.FC = () => {
         </Alert>
       ) : null}
 
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            alignItems={{ xs: "stretch", sm: "center" }}
+            flexWrap="wrap"
+            useFlexGap
+          >
+            <Autocomplete
+              options={items}
+              value={filterItem}
+              onChange={(_, value) => setFilterItem(value)}
+              getOptionLabel={(option) => option.name || ""}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              sx={{ minWidth: 220 }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Filter Item"
+                  size="small"
+                  placeholder="All items"
+                />
+              )}
+            />
+            <DatePicker
+              label="From Date"
+              value={filterFrom}
+              onChange={(value) => setFilterFrom(value)}
+              slotProps={{
+                textField: { size: "small", sx: { width: { xs: "100%", sm: 180 } } },
+                field: { clearable: true, onClear: () => setFilterFrom(null) },
+              }}
+            />
+            <DatePicker
+              label="To Date"
+              value={filterTo}
+              onChange={(value) => setFilterTo(value)}
+              minDate={filterFrom ?? undefined}
+              slotProps={{
+                textField: { size: "small", sx: { width: { xs: "100%", sm: 180 } } },
+                field: { clearable: true, onClear: () => setFilterTo(null) },
+              }}
+            />
+            {filterItem || filterFrom || filterTo ? (
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => {
+                  setFilterItem(null);
+                  setFilterFrom(null);
+                  setFilterTo(null);
+                }}
+              >
+                {UI_TEXT.CLEAR}
+              </Button>
+            ) : null}
+          </Stack>
+        </LocalizationProvider>
+      </Paper>
+
       <Paper>
         {loading ? (
           <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
@@ -312,7 +413,7 @@ const ManageInventoryPage: React.FC = () => {
             <TablePagination
               rowsPerPageOptions={[25, 50, 100, 200]}
               component="div"
-              count={records.length}
+              count={filteredRecords.length}
               rowsPerPage={rowsPerPage}
               page={page}
               onPageChange={(_, newPage) => setPage(newPage)}

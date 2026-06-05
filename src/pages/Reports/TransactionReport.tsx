@@ -665,27 +665,24 @@ const TransactionReport: React.FC = () => {
       .filter((row): row is BackdatePaymentRow => row !== null);
   }, [dateFrom, dateTo, filteredByCustomer]);
 
+  const totalBackdatePayment = React.useMemo(
+    () =>
+      backdatePaymentRows.reduce(
+        (sum, row) =>
+          sum +
+          row.payments.reduce((paymentSum, payment) => paymentSum + payment.amountPaid, 0),
+        0,
+      ),
+    [backdatePaymentRows],
+  );
+
   const backdatePickupRows = React.useMemo(() => {
     const range = normalizeRange(dateFrom, dateTo);
-    console.log(
-      "Date range:",
-      range.from.format("YYYY-MM-DD"),
-      "to",
-      range.to.format("YYYY-MM-DD"),
-    );
 
     return filteredByCustomer
       .map<BackdatePickupRow | null>((transaction) => {
         const datePickup = getTransactionFieldDate(transaction, "datePickup");
         const datePickupModifiedAt = transaction.datePickupModifiedAt;
-
-        // console.log(`Transaction ${transaction.id}:`, {
-        //   datePickup,
-        //   datePickupModifiedAt,
-        //   hasBoth: !!(datePickup && datePickupModifiedAt),
-        //   datePickupType: typeof datePickup,
-        //   datePickupModifiedAtType: typeof datePickupModifiedAt,
-        // });
 
         // Check if date pickup modified date is within range
         const isInRange = isWithinRange(
@@ -693,21 +690,12 @@ const TransactionReport: React.FC = () => {
           range.from,
           range.to,
         );
-        console.log(
-          `Transaction ${transaction.id}: isWithinRange(${datePickupModifiedAt}, ${range.from.format("YYYY-MM-DD")}, ${range.to.format("YYYY-MM-DD")}) = ${isInRange}`,
-        );
         if (!isInRange) {
-          console.log(
-            `Transaction ${transaction.id}: datePickupModifiedAt not in range`,
-          );
           return null;
         }
 
         // Both datePickup and datePickupModifiedAt must exist
         if (!datePickup || !datePickupModifiedAt) {
-          console.log(
-            `Transaction ${transaction.id}: missing datePickup or datePickupModifiedAt`,
-          );
           return null;
         }
 
@@ -715,9 +703,6 @@ const TransactionReport: React.FC = () => {
         const pickupDate = dayjs(datePickup).startOf("day");
         const modifiedDate = dayjs(datePickupModifiedAt).startOf("day");
         const isBefore = pickupDate.isBefore(modifiedDate);
-        console.log(
-          `Transaction ${transaction.id}: pickupDate=${pickupDate.format("YYYY-MM-DD")}, modifiedDate=${modifiedDate.format("YYYY-MM-DD")}, isBefore=${isBefore}`,
-        );
 
         if (!isBefore) {
           return null;
@@ -1152,6 +1137,9 @@ const TransactionReport: React.FC = () => {
               </Typography>
               <Typography sx={{ fontWeight: 700 }}>
                 Total Payment - {formatCurrency(paymentSummary.totalPayment)}
+              </Typography>
+              <Typography sx={{ fontWeight: 700, color: "#f44336" }}>
+                Total Backdate Payment - {formatCurrency(totalBackdatePayment)}
               </Typography>
               <Divider sx={{ my: 1 }} />
               <Typography sx={{ fontWeight: 700 }}>

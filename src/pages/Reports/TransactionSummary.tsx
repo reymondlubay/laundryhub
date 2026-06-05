@@ -5,9 +5,17 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   FormControl,
+  FormControlLabel,
+  FormGroup,
+  FormHelperText,
   Grid,
   InputLabel,
   MenuItem,
@@ -21,6 +29,7 @@ import {
   TableHead,
   TablePagination,
   TableRow,
+  TableSortLabel,
   TextField,
   Tooltip,
   Typography,
@@ -77,18 +86,109 @@ const getTransactionFieldDate = (
   return transaction.datePickup || tx.datepickup;
 };
 
-type TransactionStatus =
+type RecordTypeFilter =
   | "all"
-  | "pending"
   | "with-balance"
-  | "unpaid"
-  | "paid"
-  | "not-picked"
-  | "pickup"
   | "withdrawn"
   | "wrong-record"
   | "backdate-payment"
   | "backdate-pickup";
+
+type StatusIncludeFilters = {
+  pending: boolean;
+  paid: boolean;
+  unpaid: boolean;
+  pickup: boolean;
+  notPickup: boolean;
+};
+
+const DEFAULT_STATUS_INCLUDES: StatusIncludeFilters = {
+  pending: true,
+  paid: true,
+  unpaid: true,
+  pickup: true,
+  notPickup: true,
+};
+
+type ExportColumnKey =
+  | "dateReceived"
+  | "customer"
+  | "kg"
+  | "load"
+  | "price"
+  | "dateLoaded"
+  | "datePaid"
+  | "datePickup";
+
+const EXPORT_COLUMNS: Array<{ key: ExportColumnKey; label: string }> = [
+  { key: "dateReceived", label: "Date Received" },
+  { key: "customer", label: "Customer" },
+  { key: "kg", label: "KG" },
+  { key: "load", label: "Load" },
+  { key: "price", label: "Price" },
+  { key: "dateLoaded", label: "Date Loaded" },
+  { key: "datePaid", label: "Date Paid (Latest)" },
+  { key: "datePickup", label: "Date Pickup" },
+];
+
+const DEFAULT_EXPORT_COLUMNS: Record<ExportColumnKey, boolean> =
+  EXPORT_COLUMNS.reduce(
+    (acc, col) => {
+      acc[col.key] = true;
+      return acc;
+    },
+    {} as Record<ExportColumnKey, boolean>,
+  );
+
+const getTotalPaidAmount = (transaction: Transaction): number =>
+  (transaction.paymentDetails ?? []).reduce(
+    (sum, p) => sum + Number(p.amount || 0),
+    0,
+  );
+
+const isPending = (transaction: Transaction): boolean =>
+  !getTransactionFieldDate(transaction, "dateLoaded");
+
+const isPickup = (transaction: Transaction): boolean =>
+  Boolean(getTransactionFieldDate(transaction, "datePickup"));
+
+const isNotPickup = (transaction: Transaction): boolean => !isPickup(transaction);
+
+const isUnpaid = (transaction: Transaction): boolean => {
+  const paymentRows = transaction.paymentDetails?.length ?? 0;
+  if (paymentRows === 0) return true;
+  return getTotalPaidAmount(transaction) === 0;
+};
+
+const isPaid = (
+  transaction: Transaction,
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): boolean => {
+  const totalPaid = getTotalPaidAmount(transaction);
+  const total = getTransactionGrandTotal(transaction, addonsPricing);
+  if (total <= 0) return totalPaid > 0;
+  return totalPaid >= total;
+};
+
+const matchesStatusIncludes = (
+  transaction: Transaction,
+  filters: StatusIncludeFilters,
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): boolean => {
+  if (isPending(transaction) && !filters.pending) return false;
+  if (isPaid(transaction, addonsPricing) && !filters.paid) return false;
+  if (isUnpaid(transaction) && !filters.unpaid) return false;
+  if (isPickup(transaction) && !filters.pickup) return false;
+  if (isNotPickup(transaction) && !filters.notPickup) return false;
+  return true;
+};
+
+const hasAnyStatusInclude = (filters: StatusIncludeFilters): boolean =>
+  filters.pending ||
+  filters.paid ||
+  filters.unpaid ||
+  filters.pickup ||
+  filters.notPickup;
 
 const parseAmountFilter = (value: string): number | null => {
   const trimmed = value.trim();
@@ -248,44 +348,21 @@ const hasBackdatePickup = (transaction: Transaction): boolean => {
   return pickupDate.isBefore(modifiedDate);
 };
 
-const matchesFilter = (
+const matchesRecordTypeFilter = (
   transaction: Transaction,
-  status: TransactionStatus,
+  recordType: RecordTypeFilter,
   addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
 ): boolean => {
-  if (status === "all") return true;
+  if (recordType === "all") return true;
 
-  const dateLoaded = getTransactionFieldDate(transaction, "dateLoaded");
-  const datePickup = getTransactionFieldDate(transaction, "datePickup");
-  const totalPaid =
-    transaction.paymentDetails?.reduce(
-      (sum, p) => sum + Number(p.amount || 0),
-      0,
-    ) || 0;
-
-  switch (status) {
-    case "pending":
-      return !dateLoaded;
+  switch (recordType) {
     case "with-balance": {
       const total = getTransactionGrandTotal(transaction, addonsPricing);
+      const totalPaid = getTotalPaidAmount(transaction);
       const paymentRows = transaction.paymentDetails?.length ?? 0;
       if (paymentRows < 1 || totalPaid <= 0) return false;
       return totalPaid < total;
     }
-    case "unpaid": {
-      const paymentRows = transaction.paymentDetails?.length ?? 0;
-      if (paymentRows === 0) return true;
-      return totalPaid === 0;
-    }
-    case "paid": {
-      const total = getTransactionGrandTotal(transaction, addonsPricing);
-      if (total <= 0) return totalPaid > 0;
-      return totalPaid >= total;
-    }
-    case "not-picked":
-      return !datePickup;
-    case "pickup":
-      return Boolean(datePickup);
     case "backdate-payment":
       return hasBackdatePayment(transaction);
     case "backdate-pickup":
@@ -315,12 +392,42 @@ const TransactionSummary = () => {
     dayjs().subtract(30, "days"),
   );
   const [dateTo, setDateTo] = React.useState<Dayjs>(dayjs());
-  const [statusFilter, setStatusFilter] =
-    React.useState<TransactionStatus>("all");
+  const [allTime, setAllTime] = React.useState(false);
+  const [recordTypeFilter, setRecordTypeFilter] =
+    React.useState<RecordTypeFilter>("all");
+  const [statusIncludes, setStatusIncludes] =
+    React.useState<StatusIncludeFilters>(DEFAULT_STATUS_INCLUDES);
   const [amountMin, setAmountMin] = React.useState("");
   const [amountMax, setAmountMax] = React.useState("");
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(20);
+  const [exportDialogOpen, setExportDialogOpen] = React.useState(false);
+  const [exportColumns, setExportColumns] = React.useState<
+    Record<ExportColumnKey, boolean>
+  >(DEFAULT_EXPORT_COLUMNS);
+  const [sortColumn, setSortColumn] = React.useState<ExportColumnKey | null>(
+    null,
+  );
+  const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">(
+    "asc",
+  );
+
+  const handleSort = React.useCallback((column: ExportColumnKey) => {
+    setSortColumn((prevColumn) => {
+      if (prevColumn === column) {
+        setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+        return prevColumn;
+      }
+      setSortDirection("asc");
+      return column;
+    });
+    setPage(0);
+  }, []);
+
+  const noExportColumnsSelected = React.useMemo(
+    () => EXPORT_COLUMNS.every((col) => !exportColumns[col.key]),
+    [exportColumns],
+  );
 
   const parsedAmountMin = React.useMemo(
     () => parseAmountFilter(amountMin),
@@ -338,10 +445,16 @@ const TransactionSummary = () => {
     selectedCustomer,
     dateFrom,
     dateTo,
-    statusFilter,
+    allTime,
+    recordTypeFilter,
+    statusIncludes,
     amountMin,
     amountMax,
   ]);
+
+  const statusIncludesActive = recordTypeFilter === "all";
+  const noStatusIncludesSelected =
+    statusIncludesActive && !hasAnyStatusInclude(statusIncludes);
 
   React.useEffect(() => {
     const loadData = async () => {
@@ -381,23 +494,32 @@ const TransactionSummary = () => {
       });
     }
 
-    // Date range filter
-    result = result.filter((transaction) => {
-      const dateReceived = getTransactionFieldDate(transaction, "dateReceived");
-      if (!dateReceived) return false;
-      const date = dayjs(dateReceived);
-      return (
-        !date.isBefore(dateFrom.startOf("day")) &&
-        !date.isAfter(dateTo.endOf("day"))
-      );
-    });
+    // Date range filter (skipped when All Time is enabled)
+    if (!allTime) {
+      result = result.filter((transaction) => {
+        const dateReceived = getTransactionFieldDate(
+          transaction,
+          "dateReceived",
+        );
+        if (!dateReceived) return false;
+        const date = dayjs(dateReceived);
+        return (
+          !date.isBefore(dateFrom.startOf("day")) &&
+          !date.isAfter(dateTo.endOf("day"))
+        );
+      });
+    }
 
     const amountRangeValid =
       parsedAmountMin == null ||
       parsedAmountMax == null ||
       parsedAmountMax >= parsedAmountMin;
 
-    // Status filter
+    if (noStatusIncludesSelected) {
+      return [];
+    }
+
+    // Record type + status include filters
     result = result.filter((transaction) => {
       const isDeleted =
         transaction.isDeleted ||
@@ -405,14 +527,14 @@ const TransactionSummary = () => {
           (transaction as Transaction & { isdeleted?: boolean }).isdeleted,
         );
 
-      if (statusFilter === "withdrawn") {
+      if (recordTypeFilter === "withdrawn") {
         return (
           isDeleted &&
           getDeleteReason(transaction).toLowerCase() === "withdrawn"
         );
       }
 
-      if (statusFilter === "wrong-record") {
+      if (recordTypeFilter === "wrong-record") {
         return (
           isDeleted &&
           getDeleteReason(transaction).toLowerCase() === "wrong record"
@@ -420,9 +542,23 @@ const TransactionSummary = () => {
       }
 
       if (isDeleted) return false;
-      if (!matchesFilter(transaction, statusFilter, addonsPricing)) {
+
+      if (recordTypeFilter !== "all") {
+        if (
+          !matchesRecordTypeFilter(
+            transaction,
+            recordTypeFilter,
+            addonsPricing,
+          )
+        ) {
+          return false;
+        }
+      } else if (
+        !matchesStatusIncludes(transaction, statusIncludes, addonsPricing)
+      ) {
         return false;
       }
+
       if (!amountRangeValid) return true;
       return matchesAmountRange(
         transaction,
@@ -438,18 +574,68 @@ const TransactionSummary = () => {
     selectedCustomer,
     dateFrom,
     dateTo,
-    statusFilter,
+    allTime,
+    recordTypeFilter,
+    statusIncludes,
+    noStatusIncludesSelected,
     parsedAmountMin,
     parsedAmountMax,
     addonsPricing,
   ]);
 
+  const getColumnSortValue = React.useCallback(
+    (transaction: Transaction, column: ExportColumnKey): number | string => {
+      const dateValue = (value?: string | null): number =>
+        value && dayjs(value).isValid() ? dayjs(value).valueOf() : 0;
+
+      switch (column) {
+        case "dateReceived":
+          return dateValue(
+            getTransactionFieldDate(transaction, "dateReceived"),
+          );
+        case "customer":
+          return toPascalCase(transaction.customer?.name || "").toLowerCase();
+        case "kg":
+          return getTotalKg(transaction);
+        case "load":
+          return getTotalLoads(transaction);
+        case "price":
+          return getTransactionGrandTotal(transaction, addonsPricing);
+        case "dateLoaded":
+          return dateValue(getTransactionFieldDate(transaction, "dateLoaded"));
+        case "datePaid":
+          return dateValue(getLatestPaymentDate(transaction));
+        case "datePickup":
+          return dateValue(getTransactionFieldDate(transaction, "datePickup"));
+        default:
+          return 0;
+      }
+    },
+    [addonsPricing],
+  );
+
+  const sortedTransactions = React.useMemo(() => {
+    if (!sortColumn) return filteredTransactions;
+    const sorted = [...filteredTransactions].sort((a, b) => {
+      const aValue = getColumnSortValue(a, sortColumn);
+      const bValue = getColumnSortValue(b, sortColumn);
+      let result = 0;
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        result = aValue - bValue;
+      } else {
+        result = String(aValue).localeCompare(String(bValue));
+      }
+      return sortDirection === "asc" ? result : -result;
+    });
+    return sorted;
+  }, [filteredTransactions, sortColumn, sortDirection, getColumnSortValue]);
+
   const paginatedTransactions = React.useMemo(() => {
-    return filteredTransactions.slice(
+    return sortedTransactions.slice(
       page * rowsPerPage,
       page * rowsPerPage + rowsPerPage,
     );
-  }, [filteredTransactions, page, rowsPerPage]);
+  }, [sortedTransactions, page, rowsPerPage]);
 
   const filterSummary = React.useMemo(() => {
     const list = filteredTransactions;
@@ -506,18 +692,14 @@ const TransactionSummary = () => {
   };
 
   const handleExportToExcel = React.useCallback(() => {
-    if (filteredTransactions.length === 0) return;
+    if (sortedTransactions.length === 0) return;
 
-    const headers = [
-      "Date Received",
-      "Customer",
-      "KG",
-      "Load",
-      "Price",
-      "Date Loaded",
-      "Date Paid (Latest)",
-      "Date Pickup",
-    ];
+    const selectedColumns = EXPORT_COLUMNS.filter(
+      (col) => exportColumns[col.key],
+    );
+    if (selectedColumns.length === 0) return;
+
+    const headers = selectedColumns.map((col) => col.label);
 
     const toCsvCell = (value: unknown): string => {
       const s = value == null ? "" : String(value);
@@ -526,33 +708,29 @@ const TransactionSummary = () => {
       return needsQuotes ? `"${escaped}"` : escaped;
     };
 
-    const rows = filteredTransactions.map((transaction) => {
+    const rows = sortedTransactions.map((transaction) => {
       const dateReceived = getTransactionFieldDate(
         transaction,
         "dateReceived",
       );
       const dateLoaded = getTransactionFieldDate(transaction, "dateLoaded");
       const datePickup = getTransactionFieldDate(transaction, "datePickup");
-
-      const customer = toPascalCase(transaction.customer?.name || "-");
-      const kg = getTotalKg(transaction).toFixed(2);
-      const loads = getTotalLoads(transaction);
-      const price = formatCurrency(
-        getTransactionGrandTotal(transaction, addonsPricing),
-      );
-
       const datePaid = getLatestPaymentDate(transaction);
 
-      return [
-        formatDateTime(dateReceived),
-        customer,
-        kg,
-        loads,
-        price,
-        formatDateTime(dateLoaded),
-        datePaid ? formatDateTime(datePaid) : "-",
-        formatDateTime(datePickup),
-      ];
+      const cellByKey: Record<ExportColumnKey, string | number> = {
+        dateReceived: formatDateTime(dateReceived),
+        customer: toPascalCase(transaction.customer?.name || "-"),
+        kg: getTotalKg(transaction).toFixed(2),
+        load: getTotalLoads(transaction),
+        price: formatCurrency(
+          getTransactionGrandTotal(transaction, addonsPricing),
+        ),
+        dateLoaded: formatDateTime(dateLoaded),
+        datePaid: datePaid ? formatDateTime(datePaid) : "-",
+        datePickup: formatDateTime(datePickup),
+      };
+
+      return selectedColumns.map((col) => cellByKey[col.key]);
     });
 
     const csvLines = [
@@ -567,9 +745,11 @@ const TransactionSummary = () => {
     });
     const url = URL.createObjectURL(blob);
 
-    const fileName = `TransactionSummary_${dateFrom.format(
-      "YYYY-MM-DD",
-    )}_to_${dateTo.format("YYYY-MM-DD")}.csv`;
+    const fileName = allTime
+      ? `TransactionSummary_AllTime.csv`
+      : `TransactionSummary_${dateFrom.format(
+          "YYYY-MM-DD",
+        )}_to_${dateTo.format("YYYY-MM-DD")}.csv`;
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", fileName);
@@ -577,7 +757,8 @@ const TransactionSummary = () => {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-  }, [filteredTransactions, dateFrom, dateTo, addonsPricing]);
+    setExportDialogOpen(false);
+  }, [sortedTransactions, dateFrom, dateTo, allTime, addonsPricing, exportColumns]);
 
   return (
     <Box sx={{ p: 3 }}>
@@ -615,6 +796,7 @@ const TransactionSummary = () => {
                 <DatePicker
                   label="From Date"
                   value={dateFrom}
+                  disabled={allTime}
                   onChange={(value) =>
                     setDateFrom((prev) => {
                       const next = value || prev;
@@ -633,55 +815,167 @@ const TransactionSummary = () => {
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DatePicker
-                  label="To Date"
-                  value={dateTo}
-                  onChange={(value) =>
-                    setDateTo(() => {
-                      const next = value || dayjs();
-                      const today = dayjs().endOf("day");
-                      if (next.isAfter(today)) return today;
-                      if (next.isBefore(dateFrom)) return dateFrom;
-                      return next;
-                    })
+              <Stack direction="row" spacing={1} alignItems="center">
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DatePicker
+                    label="To Date"
+                    value={dateTo}
+                    disabled={allTime}
+                    onChange={(value) =>
+                      setDateTo(() => {
+                        const next = value || dayjs();
+                        const today = dayjs().endOf("day");
+                        if (next.isAfter(today)) return today;
+                        if (next.isBefore(dateFrom)) return dateFrom;
+                        return next;
+                      })
+                    }
+                    minDate={dateFrom}
+                    maxDate={dayjs()}
+                    slotProps={{
+                      textField: { size: "small", fullWidth: true },
+                    }}
+                  />
+                </LocalizationProvider>
+                <FormControlLabel
+                  sx={{ whiteSpace: "nowrap", mr: 0 }}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={allTime}
+                      onChange={(e) => setAllTime(e.target.checked)}
+                    />
                   }
-                  minDate={dateFrom}
-                  maxDate={dayjs()}
-                  slotProps={{ textField: { size: "small", fullWidth: true } }}
+                  label="All Time"
                 />
-              </LocalizationProvider>
+              </Stack>
             </Grid>
           </Grid>
 
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={2}
-            alignItems="flex-start"
+            alignItems={{ xs: "flex-start", sm: "center" }}
             flexWrap="wrap"
             useFlexGap
           >
             <FormControl sx={{ minWidth: 200 }} size="small">
-              <InputLabel>Transaction Status</InputLabel>
+              <InputLabel>Record type</InputLabel>
               <Select
-                value={statusFilter}
-                label="Transaction Status"
+                value={recordTypeFilter}
+                label="Record type"
                 onChange={(e) =>
-                  setStatusFilter(e.target.value as TransactionStatus)
+                  setRecordTypeFilter(e.target.value as RecordTypeFilter)
                 }
               >
                 <MenuItem value="all">All Records</MenuItem>
-                <MenuItem value="pending">Pending</MenuItem>
                 <MenuItem value="with-balance">With balance</MenuItem>
-                <MenuItem value="unpaid">Unpaid</MenuItem>
-                <MenuItem value="paid">Paid</MenuItem>
-                <MenuItem value="not-picked">Not picked up</MenuItem>
-                <MenuItem value="pickup">Pickup</MenuItem>
                 <MenuItem value="backdate-payment">Backdate payment</MenuItem>
                 <MenuItem value="backdate-pickup">Backdate pickup</MenuItem>
                 <MenuItem value="withdrawn">Withdrawn</MenuItem>
                 <MenuItem value="wrong-record">Wrong Record</MenuItem>
               </Select>
+            </FormControl>
+
+            <FormControl
+              component="fieldset"
+              variant="standard"
+              disabled={!statusIncludesActive}
+              sx={{ minWidth: 0 }}
+            >
+              <Typography
+                component="legend"
+                variant="caption"
+                sx={{ fontWeight: 600, color: "text.secondary", mb: 0.5 }}
+              >
+                Include
+              </Typography>
+              <FormGroup row sx={{ gap: { xs: 0, sm: 1 } }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={statusIncludes.pending}
+                      onChange={(e) =>
+                        setStatusIncludes((prev) => ({
+                          ...prev,
+                          pending: e.target.checked,
+                        }))
+                      }
+                    />
+                  }
+                  label="Pending"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={statusIncludes.paid}
+                      onChange={(e) =>
+                        setStatusIncludes((prev) => ({
+                          ...prev,
+                          paid: e.target.checked,
+                        }))
+                      }
+                    />
+                  }
+                  label="Paid"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={statusIncludes.unpaid}
+                      onChange={(e) =>
+                        setStatusIncludes((prev) => ({
+                          ...prev,
+                          unpaid: e.target.checked,
+                        }))
+                      }
+                    />
+                  }
+                  label="Unpaid"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={statusIncludes.pickup}
+                      onChange={(e) =>
+                        setStatusIncludes((prev) => ({
+                          ...prev,
+                          pickup: e.target.checked,
+                        }))
+                      }
+                    />
+                  }
+                  label="Pickup"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={statusIncludes.notPickup}
+                      onChange={(e) =>
+                        setStatusIncludes((prev) => ({
+                          ...prev,
+                          notPickup: e.target.checked,
+                        }))
+                      }
+                    />
+                  }
+                  label="Not picked up"
+                />
+              </FormGroup>
+              {!statusIncludesActive ? (
+                <FormHelperText>
+                  Status checkboxes apply only for All Records.
+                </FormHelperText>
+              ) : noStatusIncludesSelected ? (
+                <FormHelperText error>
+                  Select at least one status to show transactions.
+                </FormHelperText>
+              ) : null}
             </FormControl>
 
             <TextField
@@ -723,6 +1017,10 @@ const TransactionSummary = () => {
         <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
           <CircularProgress />
         </Box>
+      ) : noStatusIncludesSelected ? (
+        <Alert severity="warning">
+          Select at least one status under Include to show transactions.
+        </Alert>
       ) : filteredTransactions.length === 0 ? (
         <Alert severity="info">No transactions found.</Alert>
       ) : (
@@ -739,7 +1037,7 @@ const TransactionSummary = () => {
             <Button
               variant="outlined"
               size="small"
-              onClick={handleExportToExcel}
+              onClick={() => setExportDialogOpen(true)}
             >
               Export to excel
             </Button>
@@ -748,29 +1046,136 @@ const TransactionSummary = () => {
           <Table stickyHeader>
             <TableHead>
               <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
-                <TableCell sx={{ fontWeight: 600 }}>Date Received</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>
-                  KG
+                <TableCell
+                  sx={{ fontWeight: 600 }}
+                  sortDirection={
+                    sortColumn === "dateReceived" ? sortDirection : false
+                  }
+                >
+                  <TableSortLabel
+                    active={sortColumn === "dateReceived"}
+                    direction={
+                      sortColumn === "dateReceived" ? sortDirection : "asc"
+                    }
+                    onClick={() => handleSort("dateReceived")}
+                  >
+                    Date Received
+                  </TableSortLabel>
                 </TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>
-                  Load
+                <TableCell
+                  sx={{ fontWeight: 600 }}
+                  sortDirection={
+                    sortColumn === "customer" ? sortDirection : false
+                  }
+                >
+                  <TableSortLabel
+                    active={sortColumn === "customer"}
+                    direction={
+                      sortColumn === "customer" ? sortDirection : "asc"
+                    }
+                    onClick={() => handleSort("customer")}
+                  >
+                    Customer
+                  </TableSortLabel>
                 </TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>
-                  Price
+                <TableCell
+                  align="right"
+                  sx={{ fontWeight: 600 }}
+                  sortDirection={sortColumn === "kg" ? sortDirection : false}
+                >
+                  <TableSortLabel
+                    active={sortColumn === "kg"}
+                    direction={sortColumn === "kg" ? sortDirection : "asc"}
+                    onClick={() => handleSort("kg")}
+                  >
+                    KG
+                  </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Date Loaded</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>
-                  <Tooltip title="Date Paid - Latest payment date">
-                    <Box
-                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                    >
-                      Date Paid
-                      <InfoOutlinedIcon sx={{ fontSize: "16px" }} />
-                    </Box>
-                  </Tooltip>
+                <TableCell
+                  align="right"
+                  sx={{ fontWeight: 600 }}
+                  sortDirection={sortColumn === "load" ? sortDirection : false}
+                >
+                  <TableSortLabel
+                    active={sortColumn === "load"}
+                    direction={sortColumn === "load" ? sortDirection : "asc"}
+                    onClick={() => handleSort("load")}
+                  >
+                    Load
+                  </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Date Pickup</TableCell>
+                <TableCell
+                  align="right"
+                  sx={{ fontWeight: 600 }}
+                  sortDirection={sortColumn === "price" ? sortDirection : false}
+                >
+                  <TableSortLabel
+                    active={sortColumn === "price"}
+                    direction={sortColumn === "price" ? sortDirection : "asc"}
+                    onClick={() => handleSort("price")}
+                  >
+                    Price
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell
+                  sx={{ fontWeight: 600 }}
+                  sortDirection={
+                    sortColumn === "dateLoaded" ? sortDirection : false
+                  }
+                >
+                  <TableSortLabel
+                    active={sortColumn === "dateLoaded"}
+                    direction={
+                      sortColumn === "dateLoaded" ? sortDirection : "asc"
+                    }
+                    onClick={() => handleSort("dateLoaded")}
+                  >
+                    Date Loaded
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell
+                  sx={{ fontWeight: 600 }}
+                  sortDirection={
+                    sortColumn === "datePaid" ? sortDirection : false
+                  }
+                >
+                  <TableSortLabel
+                    active={sortColumn === "datePaid"}
+                    direction={
+                      sortColumn === "datePaid" ? sortDirection : "asc"
+                    }
+                    onClick={() => handleSort("datePaid")}
+                  >
+                    <Tooltip title="Date Paid - Latest payment date">
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                        }}
+                      >
+                        Date Paid
+                        <InfoOutlinedIcon sx={{ fontSize: "16px" }} />
+                      </Box>
+                    </Tooltip>
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell
+                  sx={{ fontWeight: 600 }}
+                  sortDirection={
+                    sortColumn === "datePickup" ? sortDirection : false
+                  }
+                >
+                  <TableSortLabel
+                    active={sortColumn === "datePickup"}
+                    direction={
+                      sortColumn === "datePickup" ? sortDirection : "asc"
+                    }
+                    onClick={() => handleSort("datePickup")}
+                  >
+                    Date Pickup
+                  </TableSortLabel>
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -931,7 +1336,11 @@ const TransactionSummary = () => {
       {!loading ? (
         <Paper sx={{ p: 2.5, mt: 1 }} variant="outlined">
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            {dateFrom.format("MMM D, YYYY")} to {dateTo.format("MMM D, YYYY")}{" "}
+            {allTime
+              ? "All Time"
+              : `${dateFrom.format("MMM D, YYYY")} to ${dateTo.format(
+                  "MMM D, YYYY",
+                )}`}{" "}
             summary
           </Typography>
           <Typography
@@ -975,6 +1384,57 @@ const TransactionSummary = () => {
           </Grid>
         </Paper>
       ) : null}
+
+      <Dialog
+        open={exportDialogOpen}
+        onClose={() => setExportDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Select columns to export</DialogTitle>
+        <DialogContent>
+          <FormGroup>
+            {EXPORT_COLUMNS.map((col) => (
+              <FormControlLabel
+                key={col.key}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={exportColumns[col.key]}
+                    onChange={(e) =>
+                      setExportColumns((prev) => ({
+                        ...prev,
+                        [col.key]: e.target.checked,
+                      }))
+                    }
+                  />
+                }
+                label={col.label}
+              />
+            ))}
+          </FormGroup>
+          {noExportColumnsSelected ? (
+            <FormHelperText error>
+              Select at least one column to export.
+            </FormHelperText>
+          ) : null}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setExportDialogOpen(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleExportToExcel}
+            disabled={noExportColumnsSelected}
+          >
+            Export
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
