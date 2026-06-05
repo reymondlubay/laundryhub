@@ -58,6 +58,10 @@ export const CONFIRM_MESSAGES = {
   DELETE_TRANSACTION: "Are you sure you want to delete this transaction?",
   DELETE_PAYMENT:
     "Are you sure you want to delete this payment? This action cannot be undone.",
+  PICKUP_WITH_BALANCE:
+    "This transaction has a balance. Are you sure you want to release?",
+  PICKUP_NOT_YET_PAID:
+    "This transaction has not yet been paid. Are you sure you want to release?",
 } as const;
 
 export const EMPTY_STATES = {

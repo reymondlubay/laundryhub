@@ -92,3 +92,12 @@
 .transaction-grouped-grid .ag-row.tx-highlight-fade {
   animation: txRowHighlightFade 5s ease-out forwards;
 }
+
+/* Date Paid column highlight — orange at row-hover opacity */
+.transaction-grouped-grid.tx-grid-light .ag-cell.tx-date-paid-cell {
+  background-color: rgba(255, 152, 0, 0.09);
+}
+
+.transaction-grouped-grid.tx-grid-dark .ag-cell.tx-date-paid-cell {
+  background-color: rgba(255, 152, 0, 0.12);
+}

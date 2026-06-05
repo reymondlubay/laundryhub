@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
+  Button,
   Paper,
   Stack,
   Table,
@@ -12,6 +13,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import dayjs from "dayjs";
 import { API_ERRORS } from "../../constants/messages";
 import inventoryItemService, {
   type InventoryItem,
@@ -122,6 +124,41 @@ const InventorySummaryPage: React.FC = () => {
     );
   }, [summary]);
 
+  const handleExportToExcel = useCallback(() => {
+    if (summary.length === 0) return;
+
+    const headers = ["Item", "Total Pieces"];
+
+    const toCsvCell = (value: unknown): string => {
+      const s = value == null ? "" : String(value);
+      const needsQuotes = /[",\r\n]/.test(s);
+      const escaped = s.replace(/"/g, '""');
+      return needsQuotes ? `"${escaped}"` : escaped;
+    };
+
+    const rows = summary.map((row) => [row.itemName, row.totalPieces]);
+
+    const csvLines = [
+      headers.map(toCsvCell).join(","),
+      ...rows.map((r) => r.map(toCsvCell).join(",")),
+    ];
+    const csv = csvLines.join("\r\n");
+
+    const blob = new Blob([`\uFEFF${csv}`], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+
+    const fileName = `InventorySummary_${dayjs().format("YYYY-MM-DD")}.csv`;
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, [summary]);
+
   return (
     <Box>
       <Stack
@@ -146,6 +183,24 @@ const InventorySummaryPage: React.FC = () => {
       ) : null}
 
       <Paper>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            p: 1.5,
+            pb: 0,
+          }}
+        >
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleExportToExcel}
+            disabled={loading || summary.length === 0}
+          >
+            Export to excel
+          </Button>
+        </Box>
         <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
           <Table size="small" stickyHeader>
             <TableHead>
