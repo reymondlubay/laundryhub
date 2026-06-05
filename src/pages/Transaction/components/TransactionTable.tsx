@@ -189,7 +189,7 @@ const txMultiLoadMetricLineSx = {
 };
 
 /** ~chars per line in the customer text area (column minus icons). Used for row height. */
-const CUSTOMER_WRAP_CHARS = 24;
+const CUSTOMER_WRAP_CHARS = 18;
 
 function countWrappedLines(text: string, charsPerLine: number): number {
   const t = text || "";
@@ -203,23 +203,23 @@ function estimateCustomerContentLines(data: FlatTransactionRow): number {
   if (loads && loads.length > 1) {
     let sum = 0;
     for (const line of loads) {
-      const typeText = `(${line.loadType})${
-        line.nickname ? ` (${line.nickname})` : ""
-      }`;
-      sum +=
-        countWrappedLines(name, CUSTOMER_WRAP_CHARS) +
-        countWrappedLines(typeText, CUSTOMER_WRAP_CHARS);
+      sum += countWrappedLines(name, CUSTOMER_WRAP_CHARS);
+      if (line.nickname) {
+        sum += countWrappedLines(`(${line.nickname})`, CUSTOMER_WRAP_CHARS);
+      }
+      sum += countWrappedLines(`(${line.loadType})`, CUSTOMER_WRAP_CHARS);
     }
     return Math.max(sum, loads.length * 2);
   }
   const singleNickname = data.loadLines?.[0]?.nickname;
-  const typePart = data.loadType
-    ? `(${data.loadType})${singleNickname ? ` (${singleNickname})` : ""}`
-    : "";
-  return (
-    countWrappedLines(name, CUSTOMER_WRAP_CHARS) +
-    (typePart ? countWrappedLines(typePart, CUSTOMER_WRAP_CHARS) : 0)
-  );
+  let lines = countWrappedLines(name, CUSTOMER_WRAP_CHARS);
+  if (singleNickname) {
+    lines += countWrappedLines(`(${singleNickname})`, CUSTOMER_WRAP_CHARS);
+  }
+  if (data.loadType) {
+    lines += countWrappedLines(`(${data.loadType})`, CUSTOMER_WRAP_CHARS);
+  }
+  return lines;
 }
 
 const STATUS_CELL_STYLES = {
@@ -1027,8 +1027,8 @@ function TransactionTableInner({
       {
         headerName: "Customer",
         field: "customer",
-        width: 230,
-        minWidth: 200,
+        width: 172,
+        minWidth: 150,
         cellClass: "tx-customer-cell",
 
         filter: true,
@@ -1071,24 +1071,24 @@ function TransactionTableInner({
                       >
                         {params.data?.customer || "-"}
                       </Box>
+                      {line.nickname ? (
+                        <Box
+                          component="span"
+                          sx={{
+                            display: "block",
+                            color: "#f44336",
+                            fontWeight: "bold",
+                            ...TX_CUSTOMER_TEXT_WRAP_SX,
+                          }}
+                        >
+                          ({line.nickname})
+                        </Box>
+                      ) : null}
                       <Box
                         component="span"
                         sx={{ display: "block", opacity: 0.75, ...TX_CUSTOMER_TEXT_WRAP_SX }}
                       >
                         ({line.loadType})
-                        {line.nickname ? (
-                          <Box
-                            component="span"
-                            sx={{
-                              color: "#f44336",
-                              ml: 0.5,
-                              opacity: 1,
-                              fontWeight: "bold",
-                            }}
-                          >
-                            ({line.nickname})
-                          </Box>
-                        ) : null}
                       </Box>
                     </Box>
                   ))}
@@ -1098,6 +1098,19 @@ function TransactionTableInner({
                   <Box component="span" sx={{ display: "block", ...TX_CUSTOMER_TEXT_WRAP_SX }}>
                     {params.data?.customer || "-"}
                   </Box>
+                  {params.data?.loadLines?.[0]?.nickname ? (
+                    <Box
+                      component="span"
+                      sx={{
+                        display: "block",
+                        color: "#f44336",
+                        fontWeight: "bold",
+                        ...TX_CUSTOMER_TEXT_WRAP_SX,
+                      }}
+                    >
+                      ({params.data.loadLines[0].nickname})
+                    </Box>
+                  ) : null}
                   {params.data?.loadType ? (
                     <Box
                       component="span"
@@ -1108,19 +1121,6 @@ function TransactionTableInner({
                       }}
                     >
                       ({params.data.loadType})
-                      {params.data?.loadLines?.[0]?.nickname ? (
-                        <Box
-                          component="span"
-                          sx={{
-                            color: "#f44336",
-                            ml: 0.5,
-                            opacity: 1,
-                            fontWeight: "bold",
-                          }}
-                        >
-                          ({params.data.loadLines[0].nickname})
-                        </Box>
-                      ) : null}
                     </Box>
                   ) : null}
                 </>

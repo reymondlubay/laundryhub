@@ -1126,30 +1126,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       <Grid size={{ xs: 12, sm: 4 }}>
                         {renderDatePicker("dateLoaded", "Date Loaded", true)}
                       </Grid>
-                      <Grid
-                        size={{ xs: 12, sm: 4 }}
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                        }}
-                      >
-                        <FormControlLabel
-                          sx={{ m: 0, whiteSpace: "nowrap" }}
-                          control={
-                            <Checkbox
-                              size="small"
-                              checked={values.isDelivered}
-                              onChange={(e) =>
-                                setFieldValue(
-                                  "isDelivered",
-                                  e.target.checked,
-                                )
-                              }
-                            />
-                          }
-                          label="For Delivery"
-                        />
-                      </Grid>
                       <Grid size={{ xs: 12, sm: 4 }}>
                         <TextField
                           id="tx-form-discount"
@@ -1182,6 +1158,30 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                               </InputAdornment>
                             ),
                           }}
+                        />
+                      </Grid>
+                      <Grid
+                        size={{ xs: 12, sm: 4 }}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                      >
+                        <FormControlLabel
+                          sx={{ m: 0, whiteSpace: "nowrap" }}
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={values.isDelivered}
+                              onChange={(e) =>
+                                setFieldValue(
+                                  "isDelivered",
+                                  e.target.checked,
+                                )
+                              }
+                            />
+                          }
+                          label="For Delivery"
                         />
                       </Grid>
 
