@@ -117,7 +117,12 @@ interface FlatTransactionRow {
   releasedBy: string;
   action: string;
   /** One entry per load line; used to stack Customer / KG / Load in a single grid row. */
-  loadLines: Array<{ loadType: string; kg: number; loads: number }>;
+  loadLines: Array<{
+    loadType: string;
+    kg: number;
+    loads: number;
+    nickname?: string;
+  }>;
 }
 
 /** Shared layout so Customer, KG, and Load rows line up for multi-load cells. */
@@ -180,7 +185,7 @@ const txMultiLoadMetricLineSx = {
 };
 
 /** ~chars per line in the customer text area (column minus icons). Used for row height. */
-const CUSTOMER_WRAP_CHARS = 18;
+const CUSTOMER_WRAP_CHARS = 24;
 
 function countWrappedLines(text: string, charsPerLine: number): number {
   const t = text || "";
@@ -194,13 +199,19 @@ function estimateCustomerContentLines(data: FlatTransactionRow): number {
   if (loads && loads.length > 1) {
     let sum = 0;
     for (const line of loads) {
+      const typeText = `(${line.loadType})${
+        line.nickname ? ` (${line.nickname})` : ""
+      }`;
       sum +=
         countWrappedLines(name, CUSTOMER_WRAP_CHARS) +
-        countWrappedLines(`(${line.loadType})`, CUSTOMER_WRAP_CHARS);
+        countWrappedLines(typeText, CUSTOMER_WRAP_CHARS);
     }
     return Math.max(sum, loads.length * 2);
   }
-  const typePart = data.loadType ? `(${data.loadType})` : "";
+  const singleNickname = data.loadLines?.[0]?.nickname;
+  const typePart = data.loadType
+    ? `(${data.loadType})${singleNickname ? ` (${singleNickname})` : ""}`
+    : "";
   return (
     countWrappedLines(name, CUSTOMER_WRAP_CHARS) +
     (typePart ? countWrappedLines(typePart, CUSTOMER_WRAP_CHARS) : 0)
@@ -410,6 +421,7 @@ function flattenTransactionRows(
           loadType: load.type || "Load",
           kg: Number(load.kg || 0),
           loads: Number(load.loads || 0),
+          nickname: load.nickname || "",
         }));
 
   if (loadDetails.length === 0) {
@@ -955,6 +967,18 @@ function TransactionTableInner({
     [addonsPricing, transactions],
   );
 
+  // Row heights are cached by AG-Grid; recompute them when the data changes
+  // (e.g. editing a transaction so a nickname now wraps to a new line).
+  React.useEffect(() => {
+    const api = gridApiRef.current;
+    if (!api) return;
+    try {
+      api.resetRowHeights?.();
+    } catch {
+      // ignore
+    }
+  }, [rowData]);
+
   const themeDarkWarm = themeQuartz.withPart(
     darkMode ? colorSchemeDark : colorSchemeLightWarm,
   );
@@ -996,8 +1020,8 @@ function TransactionTableInner({
       {
         headerName: "Customer",
         field: "customer",
-        width: 172,
-        minWidth: 150,
+        width: 230,
+        minWidth: 200,
         cellClass: "tx-customer-cell",
 
         filter: true,
@@ -1045,6 +1069,19 @@ function TransactionTableInner({
                         sx={{ display: "block", opacity: 0.75, ...TX_CUSTOMER_TEXT_WRAP_SX }}
                       >
                         ({line.loadType})
+                        {line.nickname ? (
+                          <Box
+                            component="span"
+                            sx={{
+                              color: "#f44336",
+                              ml: 0.5,
+                              opacity: 1,
+                              fontWeight: "bold",
+                            }}
+                          >
+                            ({line.nickname})
+                          </Box>
+                        ) : null}
                       </Box>
                     </Box>
                   ))}
@@ -1064,90 +1101,117 @@ function TransactionTableInner({
                       }}
                     >
                       ({params.data.loadType})
+                      {params.data?.loadLines?.[0]?.nickname ? (
+                        <Box
+                          component="span"
+                          sx={{
+                            color: "#f44336",
+                            ml: 0.5,
+                            opacity: 1,
+                            fontWeight: "bold",
+                          }}
+                        >
+                          ({params.data.loadLines[0].nickname})
+                        </Box>
+                      ) : null}
                     </Box>
                   ) : null}
                 </>
               )}
             </Box>
-            {params.data?.isFirstRow && params.data?.estimatedPickup ? (
-              <Tooltip
-                title={
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                alignSelf: "stretch",
+                gap: 0.25,
+                flexShrink: 0,
+              }}
+            >
+              {params.data?.isFirstRow && params.data?.estimatedPickup ? (
+                <Tooltip
+                  title={
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 0.25,
+                        fontSize: "0.95rem",
+                      }}
+                    >
+                      <span>Scheduled Pick Up</span>
+                      <span>
+                        {formatEstimatedPickupTooltip(
+                          params.data.estimatedPickup,
+                        )}
+                      </span>
+                    </Box>
+                  }
+                  arrow
+                  placement="right"
+                  slotProps={TX_TABLE_TOOLTIP_SLOT_PROPS}
+                >
                   <Box
+                    component="span"
                     sx={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 0.25,
-                      fontSize: "0.95rem",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      color: "#f44336",
+                      flexShrink: 0,
                     }}
                   >
-                    <span>Scheduled Pick Up</span>
-                    <span>
-                      {formatEstimatedPickupTooltip(params.data.estimatedPickup)}
-                    </span>
+                    <AccessTimeIcon
+                      sx={{ fontSize: TX_TABLE_STATUS_ICON_SIZE }}
+                    />
                   </Box>
-                }
-                arrow
-                slotProps={TX_TABLE_TOOLTIP_SLOT_PROPS}
-              >
-                <Box
-                  component="span"
-                  sx={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    alignSelf: "flex-start",
-                    mt: 0.125,
-                    color: "#f44336",
-                    flexShrink: 0,
-                  }}
-                >
-                  <AccessTimeIcon sx={{ fontSize: TX_TABLE_STATUS_ICON_SIZE }} />
-                </Box>
-              </Tooltip>
-            ) : null}
-            {params.data?.isFirstRow
-              ? (() => {
-                  const details = getNoteDetails(params.data);
-                  if (details.length === 0) return null;
+                </Tooltip>
+              ) : null}
+              {params.data?.isFirstRow
+                ? (() => {
+                    const details = getNoteDetails(params.data);
+                    if (details.length === 0) return null;
 
-                  return (
-                    <Tooltip
-                      title={
+                    return (
+                      <Tooltip
+                        title={
+                          <Box
+                            sx={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 0.25,
+                              fontSize: "0.95rem",
+                            }}
+                          >
+                            {details.map((line) => (
+                              <span key={line}>{line}</span>
+                            ))}
+                          </Box>
+                        }
+                        arrow
+                        placement="right"
+                        slotProps={TX_TABLE_TOOLTIP_SLOT_PROPS}
+                      >
                         <Box
+                          component="span"
                           sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 0.25,
-                            fontSize: "0.95rem",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            color: "#f44336",
+                            cursor: "pointer",
+                            flexShrink: 0,
                           }}
                         >
-                          {details.map((line) => (
-                            <span key={line}>{line}</span>
-                          ))}
+                          <InfoOutlinedIcon
+                            sx={{ fontSize: TX_TABLE_STATUS_ICON_SIZE }}
+                          />
                         </Box>
-                      }
-                      arrow
-                      slotProps={TX_TABLE_TOOLTIP_SLOT_PROPS}
-                    >
-                      <Box
-                        component="span"
-                        sx={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          alignSelf: "flex-start",
-                          mt: 0.125,
-                          color: "#f44336",
-                          cursor: "pointer",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <InfoOutlinedIcon
-                          sx={{ fontSize: TX_TABLE_STATUS_ICON_SIZE }}
-                        />
-                      </Box>
-                    </Tooltip>
-                  );
-                })()
-              : null}
+                      </Tooltip>
+                    );
+                  })()
+                : null}
+            </Box>
           </Box>
         ),
       },

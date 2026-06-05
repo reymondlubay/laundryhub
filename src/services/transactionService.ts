@@ -11,6 +11,7 @@ export interface LoadDetail {
   kg: number;
   loads: number;
   price: number;
+  nickname?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -91,6 +92,7 @@ export interface CreateTransactionRequest {
     kg: number;
     loads: number;
     price: number;
+    nickname?: string;
   }>;
   paymentDetails?: Array<{
     paymentDate: string;
@@ -148,6 +150,10 @@ function normalizeLoadDetailRow(row: Record<string, unknown>): LoadDetail {
     kg: Number(pickField(row, "kg") ?? 0),
     loads: Number(pickField(row, "loads") ?? 0),
     price: Number(pickField(row, "price") ?? 0),
+    nickname:
+      pickField(row, "nickname") != null
+        ? String(pickField(row, "nickname"))
+        : "",
     createdAt: serializeApiDate(pickField(row, "createdAt", "createdat")),
     updatedAt: serializeApiDate(pickField(row, "updatedAt", "updatedat")),
   };
@@ -245,6 +251,7 @@ export interface UpdateTransactionRequest {
     kg: number;
     loads: number;
     price: number;
+    nickname?: string;
   }>;
   paymentDetails?: Array<{
     paymentDate: string;

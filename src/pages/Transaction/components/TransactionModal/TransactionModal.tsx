@@ -389,7 +389,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         estimatedPickup: null,
         datePickup: null,
         isDelivered: false,
-        items: [{ type: "Clothes", kg: 0, loads: 0, price: 0 }],
+        items: [{ type: "Clothes", kg: 0, loads: 0, price: 0, nickname: "" }],
         whitePrice: 0,
         fabcon: 0,
         detergent: 0,
@@ -407,6 +407,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         kg?: number;
         loads?: number;
         price?: number;
+        nickname?: string;
       }>;
       whitePrice?: number;
       fabconQty?: number;
@@ -452,8 +453,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               kg: Number(item.kg || 0),
               loads: Number(item.loads || 0),
               price: Number(item.price || 0),
+              nickname: item.nickname ? String(item.nickname) : "",
             }))
-          : [{ type: "Clothes", kg: 0, loads: 0, price: 0 }],
+          : [{ type: "Clothes", kg: 0, loads: 0, price: 0, nickname: "" }],
       whitePrice: pickTransactionNum(txRecord, "whiteprice", "whitePrice"),
       fabcon: pickTransactionNum(txRecord, "fabconqty", "fabconQty"),
       detergent: pickTransactionNum(txRecord, "detergentqty", "detergentQty"),
@@ -505,6 +507,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         price: Yup.number()
           .transform(yupCoerceNonNegative)
           .min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+        nickname: Yup.string().trim().max(255).optional(),
       }),
     ),
     whitePrice: Yup.number()
@@ -654,7 +657,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   return (
     <Dialog
       open={isOpen}
-      maxWidth="lg"
+      maxWidth="xl"
       fullWidth
       fullScreen={isMobile}
       onClose={ignoreBackdropClose(handleClose)}
@@ -709,6 +712,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 kg: Number(item.kg || 0),
                 loads: Number(item.loads || 0),
                 price: Number(item.price || 0),
+                nickname: item.nickname?.trim() || "",
               })),
               paymentDetails: payments.map((payment) => ({
                 paymentDate: toApiDateTimeString(
@@ -1172,6 +1176,14 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                 touched,
                                 `items[${index}].price`,
                               );
+                              const nicknameError = getIn(
+                                errors,
+                                `items[${index}].nickname`,
+                              );
+                              const nicknameTouched = getIn(
+                                touched,
+                                `items[${index}].nickname`,
+                              );
 
                               return (
                                 <Grid
@@ -1207,7 +1219,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                     </FormControl>
                                   </Grid>
 
-                                  <Grid size={{ xs: 4, sm: 3 }}>
+                                  <Grid size={{ xs: 4, sm: 2 }}>
                                     <Tooltip
                                       title={kgTooltipContent}
                                       placement="top"
@@ -1276,12 +1288,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                     />
                                   </Grid>
 
-                                  <Grid
-                                    size={{
-                                      xs: values.items.length > 1 ? 3 : 4,
-                                      sm: 3,
-                                    }}
-                                  >
+                                  <Grid size={{ xs: 4, sm: 2 }}>
                                     <TextField
                                       id={`tx-form-items-${index}-price`}
                                       label="Price"
@@ -1314,6 +1321,31 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                     />
                                   </Grid>
 
+                                  <Grid
+                                    size={{
+                                      xs: 12,
+                                      sm: values.items.length > 1 ? 2 : 3,
+                                    }}
+                                  >
+                                    <TextField
+                                      id={`tx-form-items-${index}-nickname`}
+                                      label="Nickname"
+                                      size="small"
+                                      fullWidth
+                                      value={item.nickname ?? ""}
+                                      onChange={(e) =>
+                                        setFieldValue(
+                                          `items[${index}].nickname`,
+                                          e.target.value,
+                                        )
+                                      }
+                                      error={nicknameTouched && !!nicknameError}
+                                      helperText={
+                                        nicknameTouched ? nicknameError : ""
+                                      }
+                                    />
+                                  </Grid>
+
                                   {values.items.length > 1 && (
                                     <Grid
                                       size={{ xs: 1, sm: 1 }}
@@ -1343,6 +1375,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                                       kg: 0,
                                       loads: 0,
                                       price: 0,
+                                      nickname: "",
                                     })
                                   }
                                 >

@@ -5,6 +5,7 @@ export type LaundryItem = {
   kg: number;
   loads: number;
   price: number;
+  nickname?: string;
 };
 
 import {
