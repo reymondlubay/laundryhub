@@ -34,7 +34,10 @@ import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../services/addonsPricingService";
-import { getTransactionGrandTotal } from "../../utils/pricing";
+import {
+  getTransactionAmountDue,
+  getTransactionDiscount,
+} from "../../utils/pricing";
 import { isEmployee } from "../../utils/roleAccess";
 
 type PaymentModeTotals = {
@@ -299,7 +302,7 @@ const getTransactionTotals = (
 
   return {
     ...totals,
-    price: getTransactionGrandTotal(
+    price: getTransactionAmountDue(
       {
         ...transaction,
         grandtotal: tx.grandtotal,
@@ -563,6 +566,7 @@ const TransactionReport: React.FC = () => {
     let totalPayments = 0;
     let totalBalance = 0;
     let totalOver = 0;
+    let totalDiscount = 0;
 
     paymentRowsWithRangePayments.forEach(
       ({ transaction, paymentsInRange, allPaymentsTotal }) => {
@@ -577,6 +581,8 @@ const TransactionReport: React.FC = () => {
         } else if (diffAllTime > 0) {
           totalOver += diffAllTime;
         }
+
+        totalDiscount += getTransactionDiscount(transaction);
 
         paymentsInRange.forEach((payment) => {
           const amount = Number(payment.amount || 0);
@@ -597,6 +603,7 @@ const TransactionReport: React.FC = () => {
       totalPayment: totalPayments,
       totalBalance,
       totalOver,
+      totalDiscount,
     };
   }, [addonsPricing, paymentRowsWithRangePayments]);
 
@@ -963,6 +970,8 @@ const TransactionReport: React.FC = () => {
                             transaction,
                             addonsPricing,
                           );
+                          const discountAmount =
+                            getTransactionDiscount(transaction);
 
                           const mismatchTooltipTitle = (
                             <Box
@@ -993,6 +1002,13 @@ const TransactionReport: React.FC = () => {
                               ) : (
                                 <span>No payment history</span>
                               )}
+                              {discountAmount > 0 ? (
+                                <span
+                                  style={{ color: "#f44336", fontWeight: 700 }}
+                                >
+                                  Discount - {formatCurrency(discountAmount)}
+                                </span>
+                              ) : null}
                               {!isFullyPaid ? (
                                 <span
                                   style={{ color: "#f44336", fontWeight: 700 }}
@@ -1140,6 +1156,9 @@ const TransactionReport: React.FC = () => {
               </Typography>
               <Typography sx={{ fontWeight: 700, color: "#f44336" }}>
                 Total Backdate Payment - {formatCurrency(totalBackdatePayment)}
+              </Typography>
+              <Typography sx={{ fontWeight: 700, color: "#f44336" }}>
+                Total Discount - {formatCurrency(paymentSummary.totalDiscount)}
               </Typography>
               <Divider sx={{ my: 1 }} />
               <Typography sx={{ fontWeight: 700 }}>

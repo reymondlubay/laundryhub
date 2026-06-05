@@ -71,7 +71,10 @@ import { toBackendPaymentMode } from "../../../constants/payment";
 import TransactionDeleteDialog, {
   type DeleteReason,
 } from "../../../components/TransactionDeleteDialog/TransactionDeleteDialog";
-import { getTransactionGrandTotal } from "../../../utils/pricing";
+import {
+  getTransactionAmountDue,
+  getTransactionDiscount,
+} from "../../../utils/pricing";
 import { pickTransactionNum } from "../../../utils/normalizeTransaction";
 import { getTransactionNoteDetailLines } from "../../../utils/transactionNoteDetails";
 import { formatEstimatedPickupTooltip } from "../utils/transactionListFilters";
@@ -112,6 +115,7 @@ interface FlatTransactionRow {
   fabconQty: number;
   detergentQty: number;
   colorSafeQty: number;
+  discount: number;
   isDelivered: boolean;
   receivedBy: string;
   releasedBy: string;
@@ -302,7 +306,7 @@ const getTransactionTotals = (
     0,
   );
 
-  const totalPrice = getTransactionGrandTotal(
+  const totalPrice = getTransactionAmountDue(
     { ...transaction, loadDetails },
     addonsPricing,
   );
@@ -382,7 +386,8 @@ function flattenTransactionRows(
     "colorsafeqty",
     "colorSafeQty",
   );
-  const totalPrice = getTransactionGrandTotal(
+  const discount = getTransactionDiscount(transaction);
+  const totalPrice = getTransactionAmountDue(
     { ...transaction, loadDetails },
     addonsPricing,
   );
@@ -452,6 +457,7 @@ function flattenTransactionRows(
         fabconQty,
         detergentQty,
         colorSafeQty,
+        discount,
         isDelivered,
         receivedBy,
         releasedBy,
@@ -490,6 +496,7 @@ function flattenTransactionRows(
       fabconQty,
       detergentQty,
       colorSafeQty,
+      discount,
       isDelivered,
       receivedBy,
       releasedBy,
@@ -1346,6 +1353,7 @@ function TransactionTableInner({
           const totalPrice = Number(params.data.price || 0);
           const totalPaid = Number(params.data.totalPaid || 0);
           const balanceAmount = Number(params.data.balance || 0);
+          const discountAmount = Number(params.data.discount || 0);
           const notYetPaid = totalPrice > 0 && totalPaid === 0;
           const hasPartialBalance =
             totalPaid > 0 && totalPaid < totalPrice && totalPrice > 0;
@@ -1369,6 +1377,11 @@ function TransactionTableInner({
                   {paymentLine}
                 </span>
               ))}
+              {discountAmount > 0 ? (
+                <span style={{ color: "#f44336", fontWeight: 600 }}>
+                  Discount - {formatAmount(discountAmount)}
+                </span>
+              ) : null}
               {notYetPaid ? (
                 <span style={{ color: "#f44336", fontWeight: 600 }}>Unpaid</span>
               ) : null}

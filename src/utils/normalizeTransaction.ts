@@ -43,6 +43,7 @@ export const normalizeTransactionRow = (
     fabconQty: pickTransactionNum(row, "fabconqty", "fabconQty"),
     detergentQty: pickTransactionNum(row, "detergentqty", "detergentQty"),
     colorSafeQty: pickTransactionNum(row, "colorsafeqty", "colorSafeQty"),
+    discount: pickTransactionNum(row, "discount", "discount"),
     loadSubtotal: pickTransactionNum(row, "loadsubtotal", "loadSubtotal"),
     addonsSubtotal: pickTransactionNum(row, "addonssubtotal", "addonsSubtotal"),
     grandTotal: pickTransactionNum(row, "grandtotal", "grandTotal"),

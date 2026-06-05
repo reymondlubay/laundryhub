@@ -47,7 +47,10 @@ import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../services/addonsPricingService";
-import { getTransactionGrandTotal as resolveTransactionGrandTotal } from "../../utils/pricing";
+import {
+  getTransactionAmountDue as resolveTransactionAmountDue,
+  getTransactionDiscount,
+} from "../../utils/pricing";
 
 type TransactionWithLegacyFields = Transaction & {
   customerid?: string;
@@ -277,12 +280,14 @@ const getTotalLoads = (transaction: Transaction): number => {
   );
 };
 
+// Returns the amount the customer owes after discount (net). Named
+// "grandTotal" for historical call sites; every consumer here wants net.
 const getTransactionGrandTotal = (
   transaction: Transaction,
   addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
 ): number => {
   const tx = transaction as TransactionWithLegacyFields;
-  return resolveTransactionGrandTotal(
+  return resolveTransactionAmountDue(
     {
       ...transaction,
       grandtotal: tx.grandtotal,
@@ -645,6 +650,7 @@ const TransactionSummary = () => {
     let totalPrice = 0;
     let totalPaid = 0;
     let totalUnpaidBalance = 0;
+    let totalDiscount = 0;
     let pickedUpCount = 0;
     let notPickedUpCount = 0;
 
@@ -658,6 +664,7 @@ const TransactionSummary = () => {
       totalPrice += getTransactionGrandTotal(t, addonsPricing);
       totalPaid += getTotalPaid(t);
       totalUnpaidBalance += getBalance(t, addonsPricing);
+      totalDiscount += getTransactionDiscount(t);
 
       const pickup = getTransactionFieldDate(t, "datePickup");
       if (pickup) pickedUpCount += 1;
@@ -672,6 +679,7 @@ const TransactionSummary = () => {
       totalPrice,
       totalPaid,
       totalUnpaidBalance,
+      totalDiscount,
       pickedUpCount,
       notPickedUpCount,
     };
@@ -1227,6 +1235,8 @@ const TransactionSummary = () => {
                       const hasPaidOrOver = totalPaid >= totalPrice;
                       const balanceAmount = Math.max(totalPrice - totalPaid, 0);
                       const overAmount = Math.max(totalPaid - totalPrice, 0);
+                      const discountAmount =
+                        getTransactionDiscount(transaction);
 
                       const tooltipTitle = (
                         <Box
@@ -1241,6 +1251,11 @@ const TransactionSummary = () => {
                               {paymentLine}
                             </span>
                           ))}
+                          {discountAmount > 0 ? (
+                            <span style={{ color: "#f44336", fontWeight: 600 }}>
+                              Discount - {formatAmount(discountAmount)}
+                            </span>
+                          ) : null}
                           {hasBalance ? (
                             <span style={{ color: "#f44336", fontWeight: 600 }}>
                               Balance - {formatAmount(balanceAmount)}
@@ -1362,6 +1377,7 @@ const TransactionSummary = () => {
               ["Total loads", formatAmount(filterSummary.totalLoads)],
               ["Total kg", filterSummary.totalKg.toFixed(2)],
               ["Total price", formatCurrency(filterSummary.totalPrice)],
+              ["Total discount", formatCurrency(filterSummary.totalDiscount)],
               ["Total amount paid", formatCurrency(filterSummary.totalPaid)],
               [
                 "Total unpaid (balances)",

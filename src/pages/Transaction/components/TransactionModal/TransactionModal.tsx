@@ -118,6 +118,7 @@ export type TransactionFormValues = {
   fabcon: number;
   detergent: number;
   cs: number;
+  discount: number;
   receiveBy: string;
   releaseBy: string;
   notes: string;
@@ -394,6 +395,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         fabcon: 0,
         detergent: 0,
         cs: 0,
+        discount: 0,
         receiveBy: "",
         releaseBy: "",
         notes: "",
@@ -460,6 +462,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       fabcon: pickTransactionNum(txRecord, "fabconqty", "fabconQty"),
       detergent: pickTransactionNum(txRecord, "detergentqty", "detergentQty"),
       cs: pickTransactionNum(txRecord, "colorsafeqty", "colorSafeQty"),
+      discount: pickTransactionNum(txRecord, "discount", "discount"),
       receiveBy: String(
         tx.receivedBy ||
           tx.receivedby ||
@@ -520,6 +523,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       .transform(yupCoerceNonNegative)
       .min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
     cs: Yup.number()
+      .transform(yupCoerceNonNegative)
+      .min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
+    discount: Yup.number()
       .transform(yupCoerceNonNegative)
       .min(0, FORM_ERRORS.NEGATIVE_NOT_ALLOWED),
     receiveBy: Yup.string()
@@ -701,6 +707,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               fabconQty: yupCoerceNonNegative(undefined, values.fabcon),
               detergentQty: yupCoerceNonNegative(undefined, values.detergent),
               colorSafeQty: yupCoerceNonNegative(undefined, values.cs),
+              discount: yupCoerceNonNegative(undefined, values.discount),
               receivedBy: values.receiveBy.trim(),
               releasedBy: hasValidPickup
                 ? values.releaseBy?.trim() || null
@@ -1116,11 +1123,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           true,
                         )}
                       </Grid>
-                      <Grid size={{ xs: 12, sm: 6 }}>
+                      <Grid size={{ xs: 12, sm: 4 }}>
                         {renderDatePicker("dateLoaded", "Date Loaded", true)}
                       </Grid>
                       <Grid
-                        size={{ xs: 12, sm: 6 }}
+                        size={{ xs: 12, sm: 4 }}
                         sx={{
                           display: "flex",
                           alignItems: "center",
@@ -1141,6 +1148,40 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                             />
                           }
                           label="For Delivery"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <TextField
+                          id="tx-form-discount"
+                          label="Discount"
+                          size="small"
+                          type="number"
+                          fullWidth
+                          value={values.discount === 0 ? "" : values.discount}
+                          onChange={(e) =>
+                            setFieldValue(
+                              "discount",
+                              sanitizeNumber(e.target.value),
+                            )
+                          }
+                          error={
+                            !!getIn(errors, "discount") &&
+                            !!getIn(touched, "discount")
+                          }
+                          helperText={
+                            getIn(touched, "discount")
+                              ? getIn(errors, "discount")
+                              : ""
+                          }
+                          sx={numberInputSx}
+                          inputProps={{ min: 0, onWheel: preventWheelStep }}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                ₱
+                              </InputAdornment>
+                            ),
+                          }}
                         />
                       </Grid>
 

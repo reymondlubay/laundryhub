@@ -5,7 +5,7 @@ import {
   type AddonsPricing,
 } from "../../../services/addonsPricingService";
 import type { Transaction } from "../../../services/transactionService";
-import { getTransactionGrandTotal } from "../../../utils/pricing";
+import { getTransactionAmountDue } from "../../../utils/pricing";
 
 export type TransactionSortBy = "default" | "kg" | "loads" | "price";
 export type TransactionSortDirection = "asc" | "desc";
@@ -69,7 +69,7 @@ export const transactionMatchesPriceRange = (
   addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
 ): boolean => {
   if (priceMin == null && priceMax == null) return true;
-  const total = getTransactionGrandTotal(transaction, addonsPricing);
+  const total = getTransactionAmountDue(transaction, addonsPricing);
   if (priceMin != null && total < priceMin) return false;
   if (priceMax != null && total > priceMax) return false;
   return true;
@@ -161,7 +161,7 @@ const compareDefault = (a: Transaction, b: Transaction): number => {
 export const getTransactionPrice = (
   transaction: Transaction,
   addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
-): number => getTransactionGrandTotal(transaction, addonsPricing);
+): number => getTransactionAmountDue(transaction, addonsPricing);
 
 export const sortTransactions = (
   transactions: Transaction[],

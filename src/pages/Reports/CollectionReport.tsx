@@ -24,6 +24,7 @@ import transactionService, {
   type Transaction,
 } from "../../services/transactionService";
 import { toPascalCase } from "../../utils/stringUtils";
+import { getTransactionDiscount } from "../../utils/pricing";
 import ReportBarChart from "../../components/ReportBarChart/ReportBarChart";
 
 type PaymentWithLegacy = PaymentDetail & {
@@ -126,10 +127,29 @@ const flattenPayments = (transactions: Transaction[]): CollectionPaymentRow[] =>
 const comparePaymentDateDesc = (a: CollectionPaymentRow, b: CollectionPaymentRow) =>
   dayjs(b.paymentDate).valueOf() - dayjs(a.paymentDate).valueOf();
 
-const TotalsBlock: React.FC<{ label: string; totals: ModeTotals }> = ({
-  label,
-  totals,
-}) => (
+/** Sum of discount across distinct transactions that have a payment within range. */
+const sumDiscountForRange = (
+  transactions: Transaction[],
+  from: Dayjs,
+  to: Dayjs,
+): number => {
+  const range = normalizeRange(from, to);
+  let sum = 0;
+  for (const transaction of transactions) {
+    if (transaction.isDeleted) continue;
+    const hasPaymentInRange = (transaction.paymentDetails || []).some((p) =>
+      isWithinRange(getPaymentDate(p), range.from, range.to),
+    );
+    if (hasPaymentInRange) sum += getTransactionDiscount(transaction);
+  }
+  return sum;
+};
+
+const TotalsBlock: React.FC<{
+  label: string;
+  totals: ModeTotals;
+  discount?: number;
+}> = ({ label, totals, discount }) => (
   <Box sx={{ mt: 2 }}>
     <Typography sx={{ fontWeight: 700, mb: 1 }}>{label}</Typography>
     <Typography>Total Payment Cash — {formatCurrency(totals.cash)}</Typography>
@@ -137,6 +157,11 @@ const TotalsBlock: React.FC<{ label: string; totals: ModeTotals }> = ({
     <Typography sx={{ fontWeight: 700 }}>
       Grand Total — {formatCurrency(totals.total)}
     </Typography>
+    {discount !== undefined ? (
+      <Typography sx={{ fontWeight: 700, color: "#f44336" }}>
+        Total Discount — {formatCurrency(discount)}
+      </Typography>
+    ) : null}
   </Box>
 );
 
@@ -194,6 +219,11 @@ const CollectionReport: React.FC = () => {
     [rangePayments],
   );
 
+  const rangeDiscount = React.useMemo(
+    () => sumDiscountForRange(transactions, dateFrom, dateTo),
+    [transactions, dateFrom, dateTo],
+  );
+
   const paginatedRangePayments = React.useMemo(
     () =>
       rangePayments.slice(
@@ -217,6 +247,11 @@ const CollectionReport: React.FC = () => {
   const monthTotals = React.useMemo(
     () => sumModeTotals(monthPayments),
     [monthPayments],
+  );
+
+  const monthDiscount = React.useMemo(
+    () => sumDiscountForRange(transactions, monthStart, monthEnd),
+    [transactions, monthStart, monthEnd],
   );
 
   const dailyRows = React.useMemo(() => {
@@ -412,6 +447,7 @@ const CollectionReport: React.FC = () => {
             <TotalsBlock
               label={`Total collections (${fromText} – ${toText})`}
               totals={rangeTotals}
+              discount={rangeDiscount}
             />
           </Paper>
 
@@ -487,6 +523,7 @@ const CollectionReport: React.FC = () => {
             <TotalsBlock
               label={`Daily collection total (${monthLabel})`}
               totals={monthTotals}
+              discount={monthDiscount}
             />
 
             <Box sx={{ mt: 3 }}>
@@ -552,6 +589,7 @@ const CollectionReport: React.FC = () => {
             <TotalsBlock
               label={`Monthly collection total (${monthLabel})`}
               totals={monthTotals}
+              discount={monthDiscount}
             />
 
             <Box sx={{ mt: 3 }}>

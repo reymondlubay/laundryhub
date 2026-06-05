@@ -55,6 +55,7 @@ export interface Transaction {
   fabconQty?: number;
   detergentQty?: number;
   colorSafeQty?: number;
+  discount?: number;
   loadSubtotal?: number;
   addonsSubtotal?: number;
   grandTotal?: number;
@@ -84,6 +85,7 @@ export interface CreateTransactionRequest {
   fabconQty?: number;
   detergentQty?: number;
   colorSafeQty?: number;
+  discount?: number;
   receivedBy: string;
   releasedBy?: string | null;
   notes?: string;
@@ -243,6 +245,7 @@ export interface UpdateTransactionRequest {
   fabconQty?: number;
   detergentQty?: number;
   colorSafeQty?: number;
+  discount?: number;
   receivedBy?: string;
   releasedBy?: string | null;
   notes?: string;

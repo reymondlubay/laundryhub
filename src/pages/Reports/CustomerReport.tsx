@@ -30,7 +30,10 @@ import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../services/addonsPricingService";
-import { getTransactionGrandTotal } from "../../utils/pricing";
+import {
+  getTransactionAmountDue,
+  getTransactionDiscount,
+} from "../../utils/pricing";
 import { toPascalCase } from "../../utils/stringUtils";
 
 type TransactionWithLegacyFields = Transaction & {
@@ -58,6 +61,7 @@ type CustomerReportRow = {
   customerName: string;
   totalLoads: number;
   totalPaid: number;
+  discount: number;
   balance: number;
 };
 
@@ -164,6 +168,7 @@ const CustomerReport: React.FC = () => {
     | "customerName"
     | "totalLoads"
     | "totalPaid"
+    | "discount"
     | "balance";
   type SortOrder = "asc" | "desc";
   const [sortColumn, setSortColumn] =
@@ -256,13 +261,14 @@ const CustomerReport: React.FC = () => {
         customerName,
         totalLoads: 0,
         totalPaid: 0,
+        discount: 0,
         balance: 0,
       };
 
       const loadRows = getLoadRows(transaction);
       const loads = loadRows.reduce((sum, row) => sum + toNumber(row.loads), 0);
       const tx = transaction as TransactionWithLegacyFields;
-      const totalPrice = getTransactionGrandTotal(
+      const totalPrice = getTransactionAmountDue(
         {
           ...transaction,
           grandtotal: tx.grandtotal,
@@ -285,6 +291,7 @@ const CustomerReport: React.FC = () => {
 
       current.totalLoads += loads;
       current.totalPaid += paidWithinRange;
+      current.discount += getTransactionDiscount(transaction);
       current.balance += Math.max(totalPrice - paidWithinRange, 0);
 
       rowsByCustomer.set(txCustomerId, current);
@@ -326,10 +333,17 @@ const CustomerReport: React.FC = () => {
         acc.totalCustomers += 1;
         acc.totalLoads += row.totalLoads;
         acc.totalPaid += row.totalPaid;
+        acc.totalDiscount += row.discount;
         acc.totalBalance += row.balance;
         return acc;
       },
-      { totalCustomers: 0, totalLoads: 0, totalPaid: 0, totalBalance: 0 },
+      {
+        totalCustomers: 0,
+        totalLoads: 0,
+        totalPaid: 0,
+        totalDiscount: 0,
+        totalBalance: 0,
+      },
     );
   }, [sortedReportRows]);
 
@@ -451,6 +465,18 @@ const CustomerReport: React.FC = () => {
                   </TableCell>
                   <TableCell
                     align="right"
+                    sortDirection={sortColumn === "discount" ? sortOrder : false}
+                  >
+                    <TableSortLabel
+                      active={sortColumn === "discount"}
+                      direction={sortColumn === "discount" ? sortOrder : "asc"}
+                      onClick={() => handleRequestSort("discount")}
+                    >
+                      Discount
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell
+                    align="right"
                     sortDirection={sortColumn === "balance" ? sortOrder : false}
                   >
                     <TableSortLabel
@@ -467,7 +493,7 @@ const CustomerReport: React.FC = () => {
               <TableBody>
                 {sortedReportRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} align="center">
+                    <TableCell colSpan={5} align="center">
                       No records found.
                     </TableCell>
                   </TableRow>
@@ -482,6 +508,9 @@ const CustomerReport: React.FC = () => {
                         </TableCell>
                         <TableCell align="right">
                           {formatCurrency(row.totalPaid)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatCurrency(row.discount)}
                         </TableCell>
                         <TableCell align="right">
                           {formatCurrency(row.balance)}
@@ -517,6 +546,9 @@ const CustomerReport: React.FC = () => {
             </Typography>
             <Typography>
               Total Paid: {formatCurrency(totals.totalPaid)}
+            </Typography>
+            <Typography>
+              Total Discount: {formatCurrency(totals.totalDiscount)}
             </Typography>
             <Typography>
               Total balance: {formatCurrency(totals.totalBalance)}
