@@ -35,6 +35,9 @@ const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
     "/settings/addons-pricing",
     "/settings/fixed-monthly-expenses",
     "/settings/activity-log",
+    "/settings/deleted-transactions",
+    "/archive/record",
+    "/archive/listing",
   ],
   [USER_ROLE_EMPLOYEE]: [
     "/dashboard",

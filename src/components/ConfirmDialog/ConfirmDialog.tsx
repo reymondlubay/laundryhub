@@ -16,6 +16,7 @@ type ConfirmDialogProps = {
   message: React.ReactNode;
   confirmText?: string;
   cancelText?: string;
+  confirmColor?: "primary" | "error" | "inherit";
   onClose: () => void;
   onConfirm: () => void;
 };
@@ -26,6 +27,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   message,
   confirmText = UI_TEXT.DELETE,
   cancelText = UI_TEXT.CANCEL,
+  confirmColor = "error",
   onClose,
   onConfirm,
 }) => {
@@ -43,7 +45,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <Button variant="outlined" onClick={onClose}>
           {cancelText}
         </Button>
-        <Button variant="contained" color="error" onClick={onConfirm}>
+        <Button variant="contained" color={confirmColor} onClick={onConfirm}>
           {confirmText}
         </Button>
       </DialogActions>

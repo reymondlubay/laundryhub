@@ -35,6 +35,11 @@ const SettingsFixedMonthlyExpensesPage = lazy(
 const SettingsActivityLogPage = lazy(
   () => import("./pages/Settings/ActivityLog"),
 );
+const SettingsDeletedTransactionsPage = lazy(
+  () => import("./pages/Settings/DeletedTransactions"),
+);
+const ArchiveRecordPage = lazy(() => import("./pages/Archive/ArchiveRecord"));
+const ArchiveListingPage = lazy(() => import("./pages/Archive/ArchiveListing"));
 const InventoryItemsPage = lazy(
   () => import("./pages/Inventory/InventoryItems"),
 );
@@ -363,6 +368,42 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <SettingsActivityLogPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.SETTINGS_DELETED_TRANSACTIONS}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <SettingsDeletedTransactionsPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.ARCHIVE_RECORD}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <ArchiveRecordPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.ARCHIVE_LISTING}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <ArchiveListingPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>

@@ -68,6 +68,7 @@ export interface Transaction {
   notes?: string;
   isDeleted: boolean;
   deleteReason?: string;
+  deletedDate?: string;
   createdAt: string;
   updatedAt: string;
   loadDetails: LoadDetail[];
@@ -397,6 +398,142 @@ const transactionService = {
           ? (error as { response?: { data?: { message?: string } } }).response
               ?.data?.message || API_ERRORS.DELETE_TRANSACTION_FAILED
           : API_ERRORS.DELETE_TRANSACTION_FAILED,
+      );
+    }
+  },
+
+  getDeleted: async (): Promise<Transaction[]> => {
+    try {
+      const response = await axiosClient.get(API_ROUTES.TRANSACTIONS_DELETED);
+      const { data } = response;
+      const rows = data.data?.transactions || data.transactions || [];
+      return Array.isArray(rows)
+        ? rows.map((row: Transaction) => normalizeTransactionRow(row))
+        : [];
+    } catch (error: unknown) {
+      throw new Error(
+        typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { data?: { message?: string } } })
+            .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.FETCH_TRANSACTIONS_FAILED
+          : API_ERRORS.FETCH_TRANSACTIONS_FAILED,
+      );
+    }
+  },
+
+  restore: async (id: string): Promise<void> => {
+    try {
+      await axiosClient.patch(`${API_ROUTES.TRANSACTIONS}/${id}/restore`);
+    } catch (error: unknown) {
+      throw new Error(
+        typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { data?: { message?: string } } })
+            .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.UPDATE_TRANSACTION_FAILED
+          : API_ERRORS.UPDATE_TRANSACTION_FAILED,
+      );
+    }
+  },
+
+  permanentDelete: async (id: string): Promise<void> => {
+    try {
+      await axiosClient.delete(`${API_ROUTES.TRANSACTIONS}/${id}/permanent`);
+    } catch (error: unknown) {
+      throw new Error(
+        typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { data?: { message?: string } } })
+            .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.DELETE_TRANSACTION_FAILED
+          : API_ERRORS.DELETE_TRANSACTION_FAILED,
+      );
+    }
+  },
+
+  getArchiveCandidates: async (year: number): Promise<Transaction[]> => {
+    try {
+      const response = await axiosClient.get(
+        API_ROUTES.TRANSACTIONS_ARCHIVE_CANDIDATES,
+        { params: { year } },
+      );
+      const { data } = response;
+      const rows = data.data?.transactions || data.transactions || [];
+      return Array.isArray(rows)
+        ? rows.map((row: Transaction) => normalizeTransactionRow(row))
+        : [];
+    } catch (error: unknown) {
+      throw new Error(
+        typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { data?: { message?: string } } })
+            .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.FETCH_TRANSACTIONS_FAILED
+          : API_ERRORS.FETCH_TRANSACTIONS_FAILED,
+      );
+    }
+  },
+
+  archiveByYear: async (
+    year: number,
+  ): Promise<{ archivedCount: number }> => {
+    try {
+      const { data } = await axiosClient.post(API_ROUTES.TRANSACTIONS_ARCHIVE, {
+        year,
+      });
+      const payload = data.data || data;
+      return {
+        archivedCount: Number(payload.archivedCount ?? 0),
+      };
+    } catch (error: unknown) {
+      throw new Error(
+        typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { data?: { message?: string } } })
+            .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.UPDATE_TRANSACTION_FAILED
+          : API_ERRORS.UPDATE_TRANSACTION_FAILED,
+      );
+    }
+  },
+
+  getArchived: async (
+    year: number,
+    customer?: string,
+  ): Promise<Transaction[]> => {
+    try {
+      const response = await axiosClient.get(API_ROUTES.ARCHIVED_TRANSACTIONS, {
+        params: {
+          year,
+          customer: customer?.trim() || undefined,
+        },
+      });
+      const { data } = response;
+      const rows = data.data?.transactions || data.transactions || [];
+      return Array.isArray(rows)
+        ? rows.map((row: Transaction) => normalizeTransactionRow(row))
+        : [];
+    } catch (error: unknown) {
+      throw new Error(
+        typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { data?: { message?: string } } })
+            .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.FETCH_TRANSACTIONS_FAILED
+          : API_ERRORS.FETCH_TRANSACTIONS_FAILED,
       );
     }
   },

@@ -56,6 +56,12 @@ export const CONFIRM_MESSAGES = {
   DELETE_USER: "Delete this user?",
   DELETE_CUSTOMER: "Delete this customer?",
   DELETE_TRANSACTION: "Are you sure you want to delete this transaction?",
+  PERMANENT_DELETE_TRANSACTION:
+    "Permanently delete this transaction? This cannot be undone.",
+  RESTORE_TRANSACTION:
+    "Restore this transaction? It will appear again in the active transaction list.",
+  ARCHIVE_TRANSACTIONS: (year: number, count: number) =>
+    `Archive ${count} completed transaction(s) from ${year}? They will be moved to the archive and removed from active records.`,
   DELETE_PAYMENT:
     "Are you sure you want to delete this payment? This action cannot be undone.",
   PICKUP_WITH_BALANCE:

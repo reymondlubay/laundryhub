@@ -25,6 +25,9 @@ const route = {
   SETTINGS_ADDONS_PRICING: "/settings/addons-pricing",
   SETTINGS_FIXED_MONTHLY_EXPENSES: "/settings/fixed-monthly-expenses",
   SETTINGS_ACTIVITY_LOG: "/settings/activity-log",
+  SETTINGS_DELETED_TRANSACTIONS: "/settings/deleted-transactions",
+  ARCHIVE_RECORD: "/archive/record",
+  ARCHIVE_LISTING: "/archive/listing",
 };
 
 export default route;
