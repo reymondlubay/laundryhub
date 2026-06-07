@@ -84,7 +84,6 @@ import {
   getLoadsPickedUp,
   getRemainingLoads,
   getTotalLoads,
-  isFullyPickedUp,
 } from "../../../../utils/transactionPickup";
 import type { TransactionPickup } from "../../../../services/transactionService";
 
