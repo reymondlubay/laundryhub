@@ -41,6 +41,13 @@ import transactionService, {
 import { toPascalCase } from "../../utils/stringUtils";
 import { getLoadsThresholdColor } from "../../utils/loadsThresholdColor";
 import { getTransactionNoteDetailLines } from "../../utils/transactionNoteDetails";
+import {
+  getLatestPickupDateOnDate,
+  getPickupLoadsOnDate,
+  getRemainingLoads,
+  isFullyPickedUp,
+  transactionHadPickupOnDate,
+} from "../../utils/transactionPickup";
 
 const DASHBOARD_AUTO_REFRESH_KEY = "laundryhub.dashboard.autoRefresh";
 const DASHBOARD_REFRESH_INTERVAL_MS = 30_000;
@@ -272,7 +279,7 @@ const Dashboard = () => {
       .reduce((sum, transaction) => sum + getTransactionLoads(transaction), 0);
 
     const todaysPickup = activeTransactions.filter((transaction) =>
-      isSameDay(getTransactionDate(transaction, "datePickup")),
+      transactionHadPickupOnDate(transaction, isSameDay),
     ).length;
 
     const todaysPending = activeTransactions
@@ -295,10 +302,7 @@ const Dashboard = () => {
       const hasLoadedDate = Boolean(
         getTransactionDate(transaction, "dateLoaded"),
       );
-      const hasPickupDate = Boolean(
-        getTransactionDate(transaction, "datePickup"),
-      );
-      return hasLoadedDate && !hasPickupDate;
+      return hasLoadedDate && !isFullyPickedUp(transaction);
     }).length;
 
     return {
@@ -405,10 +409,7 @@ const Dashboard = () => {
         const hasLoadedDate = Boolean(
           getTransactionDate(transaction, "dateLoaded"),
         );
-        const hasPickupDate = Boolean(
-          getTransactionDate(transaction, "datePickup"),
-        );
-        return hasLoadedDate && !hasPickupDate;
+        return hasLoadedDate && !isFullyPickedUp(transaction);
       })
       .sort((a, b) => {
         const aDate = dayjs(getTransactionDate(a, "dateLoaded"));
@@ -423,11 +424,11 @@ const Dashboard = () => {
   const pickupTodayTransactions = React.useMemo(() => {
     return activeTransactions
       .filter((transaction) =>
-        isSameDay(getTransactionDate(transaction, "datePickup")),
+        transactionHadPickupOnDate(transaction, isSameDay),
       )
       .sort((a, b) => {
-        const aDate = dayjs(getTransactionDate(a, "datePickup"));
-        const bDate = dayjs(getTransactionDate(b, "datePickup"));
+        const aDate = dayjs(getLatestPickupDateOnDate(a, isSameDay));
+        const bDate = dayjs(getLatestPickupDateOnDate(b, isSameDay));
         if (!aDate.isValid() && !bDate.isValid()) return 0;
         if (!aDate.isValid()) return 1;
         if (!bDate.isValid()) return -1;
@@ -438,7 +439,7 @@ const Dashboard = () => {
   const pickupTodayTotalLoads = React.useMemo(
     () =>
       pickupTodayTransactions.reduce(
-        (sum, transaction) => sum + getTransactionLoads(transaction),
+        (sum, transaction) => sum + getPickupLoadsOnDate(transaction, isSameDay),
         0,
       ),
     [pickupTodayTransactions],
@@ -447,7 +448,7 @@ const Dashboard = () => {
   const readyForPickupTotalLoads = React.useMemo(
     () =>
       readyForPickupTransactions.reduce(
-        (sum, transaction) => sum + getTransactionLoads(transaction),
+        (sum, transaction) => sum + getRemainingLoads(transaction),
         0,
       ),
     [readyForPickupTransactions],
@@ -1510,7 +1511,7 @@ const Dashboard = () => {
                                 align="right"
                                 sx={{ color: tableCellColor }}
                               >
-                                {formatCount(getTransactionLoads(transaction))}
+                                {formatCount(getRemainingLoads(transaction))}
                               </TableCell>
                             </TableRow>
                           );
@@ -1634,22 +1635,23 @@ const Dashboard = () => {
                               {toPascalCase(transaction.customer?.name || "-")}
                             </TableCell>
                             <TableCell sx={{ color: tableCellColor }}>
-                              {dayjs(
-                                getTransactionDate(transaction, "datePickup"),
-                              ).isValid()
-                                ? dayjs(
-                                    getTransactionDate(
-                                      transaction,
-                                      "datePickup",
-                                    ),
-                                  ).format("MM-DD-YY h:mm A")
-                                : "-"}
+                              {(() => {
+                                const pickupDate = getLatestPickupDateOnDate(
+                                  transaction,
+                                  isSameDay,
+                                );
+                                return pickupDate && dayjs(pickupDate).isValid()
+                                  ? dayjs(pickupDate).format("MM-DD-YY h:mm A")
+                                  : "-";
+                              })()}
                             </TableCell>
                             <TableCell
                               align="right"
                               sx={{ color: tableCellColor }}
                             >
-                              {formatCount(getTransactionLoads(transaction))}
+                              {formatCount(
+                                getPickupLoadsOnDate(transaction, isSameDay),
+                              )}
                             </TableCell>
                           </TableRow>
                         ))

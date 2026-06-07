@@ -7,7 +7,9 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Checkbox,
   FormControl,
+  FormControlLabel,
   Grid,
   IconButton,
   InputLabel,
@@ -68,6 +70,7 @@ type UserFormState = {
   password: string;
   role: UserRole;
   status: UserStatus;
+  displayInOptions: boolean;
   dateHired: string;
 };
 
@@ -79,6 +82,7 @@ const emptyForm: UserFormState = {
   password: "",
   role: USER_ROLE_EMPLOYEE,
   status: USER_STATUS_ACTIVE,
+  displayInOptions: true,
   dateHired: dayjs().format("YYYY-MM-DD"),
 };
 
@@ -145,6 +149,7 @@ const Users: React.FC = () => {
       password: "",
       role: user.role,
       status: user.status,
+      displayInOptions: user.displayInOptions !== false,
       dateHired: dayjs(user.dateHired).format("YYYY-MM-DD"),
     });
     setDialogOpen(true);
@@ -196,6 +201,10 @@ const Users: React.FC = () => {
           dateHired: dateHiredISO,
         };
 
+        if (form.role === USER_ROLE_EMPLOYEE) {
+          payload.displayInOptions = form.displayInOptions;
+        }
+
         if (form.password.trim()) {
           payload.password = form.password.trim();
         }
@@ -212,6 +221,8 @@ const Users: React.FC = () => {
           password: form.password.trim(),
           role: form.role,
           status: form.status,
+          displayInOptions:
+            form.role === USER_ROLE_EMPLOYEE ? form.displayInOptions : true,
           dateHired: dateHiredISO,
         };
 
@@ -509,6 +520,24 @@ const Users: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
+            {form.role === USER_ROLE_EMPLOYEE ? (
+              <Grid size={12}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={form.displayInOptions}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          displayInOptions: e.target.checked,
+                        }))
+                      }
+                    />
+                  }
+                  label="Display in options"
+                />
+              </Grid>
+            ) : null}
           </Grid>
         </DialogContent>
         <DialogActions>

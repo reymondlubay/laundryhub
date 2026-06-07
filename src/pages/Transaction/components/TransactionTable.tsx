@@ -16,6 +16,7 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  TextField,
   Typography,
 } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
@@ -78,6 +79,15 @@ import {
 import { pickTransactionNum } from "../../../utils/normalizeTransaction";
 import { getTransactionNoteDetailLines } from "../../../utils/transactionNoteDetails";
 import { formatEstimatedPickupTooltip } from "../utils/transactionListFilters";
+import {
+  clampPickupLoadsValue,
+  getPickupHistoryLines,
+  getLoadsPickedUp,
+  getRemainingLoads,
+  getTotalLoads,
+  hasPartialPickup,
+  isFullyPickedUp,
+} from "../../../utils/transactionPickup";
 import "./TransactionTable.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -96,6 +106,14 @@ interface FlatTransactionRow {
   isLastRow: boolean;
   hasDateLoaded: boolean;
   hasDatePickup: boolean;
+  isFullyPickedUp: boolean;
+  hasPartialPickup: boolean;
+  totalLoads: number;
+  loadsPickedUp: number;
+  remainingLoads: number;
+  pickupEventCount: number;
+  latestPickupLoads: number;
+  pickupHistoryLines: string[];
   hasEstimatedPickup: boolean;
   dateReceived: string | null;
   dateLoaded: string | null;
@@ -145,6 +163,20 @@ const TX_ACTION_ICON_BUTTON_SX = {
   width: 30,
   height: 30,
   "& .MuiSvgIcon-root": { fontSize: 20 },
+} as const;
+
+const numberInputSx = {
+  "& input[type=number]::-webkit-outer-spin-button": {
+    WebkitAppearance: "none",
+    margin: 0,
+  },
+  "& input[type=number]::-webkit-inner-spin-button": {
+    WebkitAppearance: "none",
+    margin: 0,
+  },
+  "& input[type=number]": {
+    MozAppearance: "textfield",
+  },
 } as const;
 
 const TX_TABLE_STATUS_ICON_SIZE = 22;
@@ -235,7 +267,7 @@ const STATUS_CELL_STYLES = {
 
 const getStatusCellStyle = (row?: FlatTransactionRow) => {
   if (!row) return undefined;
-  if (row.hasDatePickup) return STATUS_CELL_STYLES.picked;
+  if (row.isFullyPickedUp) return STATUS_CELL_STYLES.picked;
   if (row.hasDateLoaded) return STATUS_CELL_STYLES.loaded;
   return undefined;
 };
@@ -354,6 +386,16 @@ function flattenTransactionRows(
   const hasDateLoaded = Boolean(dateLoaded);
   const hasEstimatedPickup = Boolean(estimatedPickup);
   const hasDatePickup = Boolean(datePickup);
+  const totalLoadsCount = getTotalLoads(transaction);
+  const loadsPickedUpCount = getLoadsPickedUp(transaction);
+  const remainingLoadsCount = getRemainingLoads(transaction);
+  const fullyPickedUp = isFullyPickedUp(transaction);
+  const partialPickup = hasPartialPickup(transaction);
+  const pickupEventCount = transaction.pickupDetails?.length ?? 0;
+  const latestPickupLoads =
+    transaction.pickupDetails?.[transaction.pickupDetails.length - 1]
+      ?.loadsCount ?? 0;
+  const pickupHistoryLines = getPickupHistoryLines(transaction);
   const customerName = toPascalCase(transaction.customer?.name || "Unknown");
 
   const loadDetails = transaction.loadDetails || [];
@@ -439,6 +481,14 @@ function flattenTransactionRows(
         hasDateLoaded,
         hasEstimatedPickup,
         hasDatePickup,
+        isFullyPickedUp: fullyPickedUp,
+        hasPartialPickup: partialPickup,
+        totalLoads: totalLoadsCount,
+        loadsPickedUp: loadsPickedUpCount,
+        remainingLoads: remainingLoadsCount,
+        pickupEventCount,
+        latestPickupLoads,
+        pickupHistoryLines,
         dateReceived,
         dateLoaded,
         estimatedPickup,
@@ -478,13 +528,21 @@ function flattenTransactionRows(
       hasDateLoaded,
       hasEstimatedPickup,
       hasDatePickup,
+      isFullyPickedUp: fullyPickedUp,
+      hasPartialPickup: partialPickup,
+      totalLoads: totalLoadsCount,
+      loadsPickedUp: loadsPickedUpCount,
+      remainingLoads: remainingLoadsCount,
+      pickupEventCount,
+      latestPickupLoads,
+      pickupHistoryLines,
       dateReceived,
       dateLoaded,
       estimatedPickup,
       customer: customerName,
       loadType: first.loadType,
       kg: first.kg,
-      loads: first.loads,
+      loads: totalLoadsCount,
       price: totalPrice,
       totalPaid,
       balance,
@@ -561,6 +619,8 @@ function TransactionTableInner({
     useState<Transaction | null>(null);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [releaseBy, setReleaseBy] = useState<string>("");
+  const [pickupLoads, setPickupLoads] = useState<number>(1);
+  const [pickupLoadsInput, setPickupLoadsInput] = useState("1");
   const releaseByInputRef = useRef<HTMLInputElement | null>(null);
   const gridApiRef = useRef<any>(null);
   const highlightTimerRef = useRef<number | null>(null);
@@ -749,6 +809,9 @@ function TransactionTableInner({
       setMarkDateTime(dayjs());
       setActionError(null);
       setReleaseBy("");
+      const remaining = getRemainingLoads(transaction) || 1;
+      setPickupLoads(remaining);
+      setPickupLoadsInput(String(remaining));
       setMarkModalOpen(true);
     },
     [],
@@ -893,8 +956,20 @@ function TransactionTableInner({
           setActionError("Release By is required.");
           return;
         }
+        const maxPickupLoads = getRemainingLoads(selectedTransactionForMark);
+        const loadsToPick = clampPickupLoadsValue(
+          pickupLoadsInput,
+          maxPickupLoads,
+        );
+        if (loadsToPick < 1 || loadsToPick > maxPickupLoads) {
+          setActionError(`Enter between 1 and ${maxPickupLoads} load(s).`);
+          return;
+        }
+        setPickupLoads(loadsToPick);
+        setPickupLoadsInput(String(loadsToPick));
         transactionUpdate.datePickup = toApiDateTimeString(markDateTime);
         transactionUpdate.releasedBy = releaseBy;
+        transactionUpdate.pickupLoads = loadsToPick;
       }
 
       const updated = await transactionService.update(
@@ -919,11 +994,17 @@ function TransactionTableInner({
       onTransactionSynced?.(updated);
       flashTransactionHighlight(updated.id);
       if (markModalType === "pickup") {
+        const remainingBefore = getRemainingLoads(selectedTransactionForMark);
+        const pickedCount = Number(transactionUpdate.pickupLoads ?? pickupLoads);
         onToast?.({
           severity: "success",
           message: `${toPascalCase(
             selectedTransactionForMark.customer?.name || "Customer",
-          )} record has been picked up.`,
+          )} — ${pickedCount} load(s) picked up${
+            pickedCount < remainingBefore
+              ? ` (${remainingBefore - pickedCount} remaining)`
+              : ""
+          }.`,
         });
       } else {
         onToast?.({
@@ -949,6 +1030,8 @@ function TransactionTableInner({
     markModalType,
     onToast,
     onTransactionSynced,
+    pickupLoads,
+    pickupLoadsInput,
     releaseBy,
     selectedTransactionForMark,
   ]);
@@ -1259,6 +1342,7 @@ function TransactionTableInner({
         suppressMovable: true,
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
           const lines = params.data?.loadLines;
+
           if (lines && lines.length > 1) {
             return (
               <Box sx={TX_MULTI_LOAD_STACK_SX}>
@@ -1273,6 +1357,7 @@ function TransactionTableInner({
               </Box>
             );
           }
+
           return params.value ?? "";
         },
       },
@@ -1545,26 +1630,105 @@ function TransactionTableInner({
         width: 130,
         cellClass: "tx-cell-center",
         suppressMovable: true,
-        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) =>
-          params.data?.isFirstRow && params.value ? (
+        cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
+          if (!params.data?.isFirstRow) return "";
+          if (!params.value && !params.data.hasPartialPickup) return "";
+
+          const showHistory =
+            params.data.hasPartialPickup ||
+            (params.data.isFullyPickedUp && params.data.pickupEventCount > 1);
+
+          const pickupHistoryTooltip = (
             <Box
               sx={{
                 display: "flex",
                 flexDirection: "column",
+                gap: 0.25,
+                fontSize: "0.95rem",
+              }}
+            >
+              {params.data.pickupHistoryLines.map((line, index) => (
+                <span key={`${params.data?.transactionId}-pickup-${index}`}>
+                  {line}
+                </span>
+              ))}
+            </Box>
+          );
+
+          const pickupHistoryIcon = (
+            <Tooltip
+              title={pickupHistoryTooltip}
+              arrow
+              slotProps={TX_TABLE_TOOLTIP_SLOT_PROPS}
+            >
+              <Box
+                component="span"
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: TX_TABLE_STATUS_ICON_SIZE + 4,
+                }}
+              >
+                <HistoryIcon
+                  sx={{
+                    color: "#4caf50",
+                    fontSize: TX_TABLE_STATUS_ICON_SIZE,
+                    display: "block",
+                  }}
+                />
+              </Box>
+            </Tooltip>
+          );
+
+          if (params.data.hasPartialPickup) {
+            return (
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 0.5,
+                  width: "100%",
+                  padding: 0.5,
+                  lineHeight: 1.5,
+                  textAlign: "center",
+                }}
+              >
+                <Box sx={{ display: "flex", flexDirection: "column" }}>
+                  <span style={{ color: "#4caf50", fontWeight: 600 }}>
+                    IN - {params.data.remainingLoads}
+                  </span>
+                  <span style={{ color: "#f44336", fontWeight: 600 }}>
+                    OUT - {params.data.loadsPickedUp}
+                  </span>
+                </Box>
+                {pickupHistoryIcon}
+              </Box>
+            );
+          }
+
+          return (
+            <Box
+              sx={{
+                display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                gap: 0.5,
                 width: "100%",
                 padding: 0.5,
                 lineHeight: 1.5,
                 textAlign: "center",
               }}
             >
-              <span>{dayjs(params.value).format("MM-DD-YY")}</span>
-              <span>{dayjs(params.value).format("h:mm A")}</span>
+              <Box sx={{ display: "flex", flexDirection: "column" }}>
+                <span>{dayjs(params.value).format("MM-DD-YY")}</span>
+                <span>{dayjs(params.value).format("h:mm A")}</span>
+              </Box>
+              {showHistory ? pickupHistoryIcon : null}
             </Box>
-          ) : (
-            ""
-          ),
+          );
+        },
       },
       {
         headerName: "Notes",
@@ -1660,7 +1824,7 @@ function TransactionTableInner({
 
           const payDisabled = isAddPaymentDisabled(params.data);
           const loadDisabled = Boolean(params.data?.hasDateLoaded);
-          const pickupDisabled = Boolean(params.data?.hasDatePickup);
+          const pickupDisabled = Boolean(params.data?.isFullyPickedUp);
 
           return (
             <Stack
@@ -2020,19 +2184,67 @@ function TransactionTableInner({
           </LocalizationProvider>
 
           {markModalType === "pickup" ? (
+            <>
+              <TextField
+                fullWidth
+                size="small"
+                type="number"
+                label="Number of loads"
+                value={pickupLoadsInput}
+                sx={numberInputSx}
+                inputProps={{
+                  min: 1,
+                  max: selectedTransactionForMark
+                    ? getRemainingLoads(selectedTransactionForMark)
+                    : 1,
+                  inputMode: "numeric",
+                }}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "" || /^\d+$/.test(raw)) {
+                    setPickupLoadsInput(raw);
+                  }
+                }}
+                onBlur={() => {
+                  const max = selectedTransactionForMark
+                    ? getRemainingLoads(selectedTransactionForMark)
+                    : 1;
+                  const clamped = clampPickupLoadsValue(pickupLoadsInput, max);
+                  setPickupLoads(clamped);
+                  setPickupLoadsInput(String(clamped));
+                }}
+                helperText={
+                  selectedTransactionForMark
+                    ? `Enter 1 to ${getRemainingLoads(selectedTransactionForMark)} load(s)`
+                    : undefined
+                }
+              />
             <Stack direction="row" spacing={0.5} alignItems="flex-start">
               <FormControl fullWidth size="small" required>
-                <InputLabel>Release By</InputLabel>
+                <InputLabel id="mark-pickup-release-by-label" shrink>
+                  Release By
+                </InputLabel>
                 <Select
+                  labelId="mark-pickup-release-by-label"
                   label="Release By"
                   displayEmpty
                   value={releaseBy}
                   onChange={(e) => setReleaseBy(String(e.target.value))}
                   inputRef={releaseByInputRef}
+                  renderValue={(selected) => {
+                    if (!selected) {
+                      return (
+                        <Typography variant="body2" color="text.secondary">
+                          Select employee
+                        </Typography>
+                      );
+                    }
+                    const emp = employees.find(
+                      (e) => String(e.id) === String(selected),
+                    );
+                    return emp?.name ?? "";
+                  }}
                 >
-                  <MenuItem value="">
-                    <em>Select employee</em>
-                  </MenuItem>
                   {employees.map((employee) => (
                     <MenuItem key={employee.id} value={employee.id}>
                       {employee.name}
@@ -2053,6 +2265,7 @@ function TransactionTableInner({
                 </Tooltip>
               ) : null}
             </Stack>
+            </>
           ) : null}
 
           {actionError ? <Alert severity="error">{actionError}</Alert> : null}
@@ -2067,7 +2280,15 @@ function TransactionTableInner({
             disabled={
               actionLoading ||
               (markModalType === "pickup" &&
-                (!markDateTime?.isValid() || !releaseBy))
+                (!markDateTime?.isValid() ||
+                  !releaseBy ||
+                  !pickupLoadsInput.trim() ||
+                  clampPickupLoadsValue(
+                    pickupLoadsInput,
+                    selectedTransactionForMark
+                      ? getRemainingLoads(selectedTransactionForMark)
+                      : 1,
+                  ) < 1))
             }
           >
             {UI_TEXT.SAVE}

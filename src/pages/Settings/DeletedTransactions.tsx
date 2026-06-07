@@ -4,7 +4,6 @@ import {
   Box,
   Paper,
   Snackbar,
-  Stack,
   Typography,
 } from "@mui/material";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog";

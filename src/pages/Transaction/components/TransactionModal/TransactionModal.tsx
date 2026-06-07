@@ -78,6 +78,15 @@ import {
   mergeEmployeeOptions,
   type EmployeeOption,
 } from "../../../../utils/employeeOptions";
+import ConfirmDialog from "../../../../components/ConfirmDialog/ConfirmDialog.tsx";
+import {
+  clampPickupLoadsValue,
+  getLoadsPickedUp,
+  getRemainingLoads,
+  getTotalLoads,
+  isFullyPickedUp,
+} from "../../../../utils/transactionPickup";
+import type { TransactionPickup } from "../../../../services/transactionService";
 
 type TransactionModalProps = {
   isOpen: boolean;
@@ -88,6 +97,7 @@ type TransactionModalProps = {
     customerName: string;
     transaction?: Transaction;
   }) => void;
+  onTransactionSynced?: (transaction: Transaction) => void;
   onError?: (message: string) => void;
 };
 
@@ -227,6 +237,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   handleClose,
   transaction,
   onSaved,
+  onTransactionSynced,
   onError,
 }) => {
   const theme = useTheme();
@@ -263,8 +274,34 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const [payments, setPayments] = React.useState<Payment[]>([]);
   const [customerInputValue, setCustomerInputValue] = React.useState<string>("");
   const customerInputValueRef = React.useRef<string>("");
+  const [syncedTransaction, setSyncedTransaction] =
+    React.useState<Transaction | null>(null);
+  const [recordPickupDate, setRecordPickupDate] = React.useState<Dayjs | null>(
+    dayjs(),
+  );
+  const [recordReleaseBy, setRecordReleaseBy] = React.useState("");
+  const [recordPickupLoadsInput, setRecordPickupLoadsInput] =
+    React.useState("1");
+  const [pickupActionLoading, setPickupActionLoading] = React.useState(false);
+  const [pickupActionError, setPickupActionError] = React.useState<
+    string | null
+  >(null);
+  const [deletePickupId, setDeletePickupId] = React.useState<string | null>(
+    null,
+  );
 
-  const isEditing = !!transaction;
+  const activeTransaction = syncedTransaction ?? transaction ?? null;
+  const isEditing = !!activeTransaction;
+
+  React.useEffect(() => {
+    setSyncedTransaction(null);
+    setPickupActionError(null);
+    if (activeTransaction) {
+      setRecordPickupLoadsInput(
+        String(getRemainingLoads(activeTransaction) || 1),
+      );
+    }
+  }, [transaction?.id]);
 
   const resolveEmployeeLabel = React.useCallback(
     (id: string): string => {
@@ -277,15 +314,105 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         return buildEmployeeDisplayName(receiveUser);
       }
 
-      const releaseUser = transaction?.releasedByUser;
+      const releaseUser = activeTransaction?.releasedByUser;
       if (releaseUser && String(releaseUser.id) === String(id)) {
         return buildEmployeeDisplayName(releaseUser);
       }
 
       return "";
     },
-    [employees, transaction],
+    [activeTransaction, employees, transaction],
   );
+
+  const handleRecordPickup = React.useCallback(async () => {
+    if (!activeTransaction) return;
+    if (!recordPickupDate?.isValid()) {
+      setPickupActionError("Pickup date is required.");
+      return;
+    }
+    if (!recordReleaseBy) {
+      setPickupActionError("Release By is required.");
+      return;
+    }
+
+    const maxPickupLoads = getRemainingLoads(activeTransaction);
+    const loadsToPick = clampPickupLoadsValue(
+      recordPickupLoadsInput,
+      maxPickupLoads,
+    );
+    if (loadsToPick < 1 || loadsToPick > maxPickupLoads) {
+      setPickupActionError(`Enter between 1 and ${maxPickupLoads} load(s).`);
+      return;
+    }
+
+    try {
+      setPickupActionLoading(true);
+      setPickupActionError(null);
+      const updated = await transactionService.update(
+        activeTransaction.id,
+        {
+          datePickup: toApiDateTimeString(recordPickupDate)!,
+          releasedBy: recordReleaseBy,
+          pickupLoads: loadsToPick,
+        },
+        activeTransaction,
+      );
+      setSyncedTransaction(updated);
+      setRecordPickupLoadsInput(
+        String(getRemainingLoads(updated) || 1),
+      );
+      setRecordReleaseBy("");
+      setRecordPickupDate(dayjs());
+      onTransactionSynced?.(updated);
+    } catch (err: unknown) {
+      setPickupActionError(
+        err instanceof Error ? err.message : "Failed to record pickup",
+      );
+    } finally {
+      setPickupActionLoading(false);
+    }
+  }, [
+    activeTransaction,
+    onTransactionSynced,
+    recordPickupDate,
+    recordPickupLoadsInput,
+    recordReleaseBy,
+  ]);
+
+  const handleDeletePickupConfirm = React.useCallback(async () => {
+    if (!activeTransaction || !deletePickupId) return;
+    try {
+      setPickupActionLoading(true);
+      setPickupActionError(null);
+      const updated = await transactionService.deletePickup(
+        activeTransaction.id,
+        deletePickupId,
+        activeTransaction,
+      );
+      setSyncedTransaction(updated);
+      setRecordPickupLoadsInput(
+        String(getRemainingLoads(updated) || 1),
+      );
+      setDeletePickupId(null);
+      onTransactionSynced?.(updated);
+    } catch (err: unknown) {
+      setPickupActionError(
+        err instanceof Error ? err.message : "Failed to remove pickup",
+      );
+    } finally {
+      setPickupActionLoading(false);
+    }
+  }, [activeTransaction, deletePickupId, onTransactionSynced]);
+
+  const formatPickupEmployee = (pickup: TransactionPickup): string => {
+    const user = pickup.releasedByUser;
+    if (!user) return "—";
+    return (
+      [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
+      user.userName ||
+      "—"
+    );
+  };
 
   const fetchCustomers = React.useCallback(async (): Promise<Customer[]> => {
     const customerData = await customerService.getAll();
@@ -382,7 +509,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   }, [isOpen, transaction]);
 
   const initialValues: TransactionFormValues = React.useMemo(() => {
-    if (!transaction) {
+    if (!activeTransaction) {
       return {
         customer: "",
         receiveDate: dayjs(),
@@ -402,7 +529,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       };
     }
 
-    const tx = transaction as Transaction & {
+    const tx = activeTransaction as Transaction & {
       customerid?: string;
       loaddetails?: Array<{
         type?: string;
@@ -433,7 +560,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     const txRecord = tx as unknown as Record<string, unknown>;
 
     return {
-      customer: transaction.customerId || tx.customerid || "",
+      customer: activeTransaction.customerId || tx.customerid || "",
       receiveDate: dayjs(tx.dateReceived || tx.datereceived || dayjs()),
       dateLoaded:
         tx.dateLoaded || tx.dateloaded
@@ -447,10 +574,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         tx.datePickup || tx.datepickup
           ? dayjs(tx.datePickup || tx.datepickup)
           : null,
-      isDelivered: Boolean(transaction.isDelivered ?? tx.isdelivered),
+      isDelivered: Boolean(activeTransaction.isDelivered ?? tx.isdelivered),
       items:
-        transaction.loadDetails?.length || tx.loaddetails?.length
-          ? (transaction.loadDetails || tx.loaddetails || []).map((item) => ({
+        activeTransaction.loadDetails?.length || tx.loaddetails?.length
+          ? (activeTransaction.loadDetails || tx.loaddetails || []).map((item) => ({
               type: (item.type || "Clothes") as LaundryType,
               kg: Number(item.kg || 0),
               loads: Number(item.loads || 0),
@@ -466,13 +593,13 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       receiveBy: String(
         tx.receivedBy ||
           tx.receivedby ||
-          transaction.receivedByUser?.id ||
+          activeTransaction.receivedByUser?.id ||
           "",
       ),
       releaseBy: tx.releasedBy || tx.releasedby || "",
-      notes: transaction.notes || "",
+      notes: activeTransaction.notes || "",
     };
-  }, [isOpen, transaction]);
+  }, [activeTransaction, isOpen, transaction]);
 
   const today = dayjs().endOf("day").toDate();
   const validationSchema = Yup.object().shape({
@@ -693,15 +820,23 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             setLoading(true);
 
             const trimmedNotes = values.notes.trim();
-            const hasValidPickup = isPickupFilled(values.datePickup);
+            const hasValidPickup =
+              !isEditing && isPickupFilled(values.datePickup);
             const payload = {
               customerId: values.customer,
               dateReceived: toApiDateTimeString(values.receiveDate)!,
               dateLoaded: toApiDateTimeString(values.dateLoaded),
               estimatedPickup: toApiDateTimeString(values.estimatedPickup),
-              datePickup: hasValidPickup
-                ? toApiDateTimeString(values.datePickup)
-                : null,
+              ...(isEditing
+                ? {}
+                : {
+                    datePickup: hasValidPickup
+                      ? toApiDateTimeString(values.datePickup)
+                      : null,
+                    releasedBy: hasValidPickup
+                      ? values.releaseBy?.trim() || null
+                      : null,
+                  }),
               isDelivered: values.isDelivered,
               whitePrice: yupCoerceNonNegative(undefined, values.whitePrice),
               fabconQty: yupCoerceNonNegative(undefined, values.fabcon),
@@ -709,9 +844,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               colorSafeQty: yupCoerceNonNegative(undefined, values.cs),
               discount: yupCoerceNonNegative(undefined, values.discount),
               receivedBy: values.receiveBy.trim(),
-              releasedBy: hasValidPickup
-                ? values.releaseBy?.trim() || null
-                : null,
               // Always send `notes` so the API persists updates and can clear the field (JSON omits `undefined`).
               notes: trimmedNotes,
               loadDetails: values.items.map((item) => ({
@@ -741,16 +873,17 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               mobileNumber: customerRow?.mobileNumber || "",
             };
 
-            if (isEditing && transaction) {
+            if (isEditing && activeTransaction) {
               const updated = await transactionService.update(
-                transaction.id,
+                activeTransaction.id,
                 {
                   ...payload,
                   replacePaymentDetails: true,
                 },
-                transaction,
+                activeTransaction,
               );
               updated.customer = customerForList;
+              setSyncedTransaction(updated);
               if (values.receiveBy) {
                 const emp = employees.find((e) => e.id === values.receiveBy);
                 if (emp) {
@@ -1535,6 +1668,183 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         <Divider>Release Details</Divider>
                       </Grid>
 
+                      {isEditing && activeTransaction ? (
+                        <>
+                          <Grid size={12}>
+                            <Typography variant="body2" color="text.secondary">
+                              {getTotalLoads(activeTransaction)} loads ·{" "}
+                              {getLoadsPickedUp(activeTransaction)} picked ·{" "}
+                              {getRemainingLoads(activeTransaction)} remaining
+                            </Typography>
+                          </Grid>
+                          {(activeTransaction.pickupDetails ?? []).length >
+                          0 ? (
+                            <Grid size={12}>
+                              <Stack spacing={1}>
+                                {(activeTransaction.pickupDetails ?? []).map(
+                                  (pickup) => (
+                                    <Stack
+                                      key={pickup.id}
+                                      direction="row"
+                                      alignItems="center"
+                                      justifyContent="space-between"
+                                      spacing={1}
+                                    >
+                                      <Typography variant="body2">
+                                        {dayjs(pickup.pickupDate).format(
+                                          "MM-DD-YY h:mm A",
+                                        )}{" "}
+                                        — {pickup.loadsCount} load(s) —{" "}
+                                        {formatPickupEmployee(pickup)}
+                                      </Typography>
+                                      <Tooltip title="Remove this pickup record. Those loads will be available to pick up again.">
+                                        <span>
+                                          <IconButton
+                                            size="small"
+                                            aria-label="delete pickup"
+                                            onClick={() =>
+                                              setDeletePickupId(pickup.id)
+                                            }
+                                            disabled={pickupActionLoading}
+                                            sx={{ color: "error.main" }}
+                                          >
+                                            <DeleteIcon fontSize="small" />
+                                          </IconButton>
+                                        </span>
+                                      </Tooltip>
+                                    </Stack>
+                                  ),
+                                )}
+                              </Stack>
+                            </Grid>
+                          ) : null}
+                          {releaseFieldsDisabled ? (
+                            <Grid size={12}>
+                              <Typography variant="body2" color="text.secondary">
+                                {FORM_ERRORS.RELEASE_AFTER_LOADED_HINT}
+                              </Typography>
+                            </Grid>
+                          ) : getRemainingLoads(activeTransaction) > 0 ? (
+                            <>
+                              <Grid size={{ xs: 12, sm: 6 }}>
+                                <LocalizationProvider
+                                  dateAdapter={AdapterDayjs}
+                                >
+                                  <DateTimePicker
+                                    label="Pickup Date"
+                                    value={recordPickupDate}
+                                    onChange={(val) =>
+                                      setRecordPickupDate(val)
+                                    }
+                                    maxDate={dayjs()}
+                                    timeSteps={{ minutes: 1 }}
+                                    slotProps={{
+                                      textField: { size: "small", fullWidth: true },
+                                      actionBar: {
+                                        actions: ["today", "cancel", "accept"],
+                                      },
+                                    }}
+                                  />
+                                </LocalizationProvider>
+                              </Grid>
+                              <Grid size={{ xs: 12, sm: 6 }}>
+                                <TextField
+                                  fullWidth
+                                  size="small"
+                                  type="number"
+                                  label="Number of loads"
+                                  value={recordPickupLoadsInput}
+                                  sx={numberInputSx}
+                                  inputProps={{
+                                    min: 1,
+                                    max: getRemainingLoads(activeTransaction),
+                                    inputMode: "numeric",
+                                  }}
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
+                                    if (raw === "" || /^\d+$/.test(raw)) {
+                                      setRecordPickupLoadsInput(raw);
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    const max = getRemainingLoads(
+                                      activeTransaction,
+                                    );
+                                    const clamped = clampPickupLoadsValue(
+                                      recordPickupLoadsInput,
+                                      max,
+                                    );
+                                    setRecordPickupLoadsInput(String(clamped));
+                                  }}
+                                  helperText={`Enter 1 to ${getRemainingLoads(activeTransaction)} load(s)`}
+                                />
+                              </Grid>
+                              <Grid size={12}>
+                                <FormControl fullWidth size="small" required>
+                                  <InputLabel
+                                    id="tx-modal-record-release-by-label"
+                                    shrink
+                                  >
+                                    Release By
+                                  </InputLabel>
+                                  <Select
+                                    labelId="tx-modal-record-release-by-label"
+                                    label="Release By"
+                                    displayEmpty
+                                    value={recordReleaseBy}
+                                    onChange={(e) =>
+                                      setRecordReleaseBy(
+                                        String(e.target.value),
+                                      )
+                                    }
+                                    renderValue={(selected) => {
+                                      if (!selected) {
+                                        return (
+                                          <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                          >
+                                            Select employee
+                                          </Typography>
+                                        );
+                                      }
+                                      return resolveEmployeeLabel(
+                                        String(selected),
+                                      );
+                                    }}
+                                  >
+                                    {employees.map((employee) => (
+                                      <MUIMenuItem
+                                        key={employee.id}
+                                        value={employee.id}
+                                      >
+                                        {employee.name}
+                                      </MUIMenuItem>
+                                    ))}
+                                  </Select>
+                                </FormControl>
+                              </Grid>
+                              <Grid size={12}>
+                                <Button
+                                  variant="contained"
+                                  onClick={() => void handleRecordPickup()}
+                                  disabled={pickupActionLoading}
+                                >
+                                  Record Pickup
+                                </Button>
+                              </Grid>
+                            </>
+                          ) : null}
+                          {pickupActionError ? (
+                            <Grid size={12}>
+                              <Typography variant="body2" color="error">
+                                {pickupActionError}
+                              </Typography>
+                            </Grid>
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
                       <Grid size={{ xs: 12, sm: 6 }}>
                         {renderDatePicker(
                           "datePickup",
@@ -1636,6 +1946,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           ) : null}
                         </Stack>
                       </Grid>
+                        </>
+                      )}
                       <Grid size={12}>
                         <TextField
                           id="outlined-multiline-flexible"
@@ -1812,6 +2124,23 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
           );
         }}
       </Formik>
+
+      <ConfirmDialog
+        open={Boolean(deletePickupId)}
+        title="Remove pickup record"
+        message={
+          deletePickupId && activeTransaction
+            ? `Remove this pickup record? ${
+                activeTransaction.pickupDetails?.find(
+                  (p) => p.id === deletePickupId,
+                )?.loadsCount ?? 0
+              } load(s) will be available for pickup again.`
+            : "Remove this pickup record?"
+        }
+        confirmText={UI_TEXT.DELETE}
+        onClose={() => setDeletePickupId(null)}
+        onConfirm={() => void handleDeletePickupConfirm()}
+      />
     </Dialog>
   );
 };

@@ -5,6 +5,7 @@ import {
   type AddonsPricing,
 } from "../../../services/addonsPricingService";
 import type { Transaction } from "../../../services/transactionService";
+import { isFullyPickedUp } from "../../../utils/transactionPickup";
 import { getTransactionAmountDue } from "../../../utils/pricing";
 
 export type TransactionSortBy = "default" | "kg" | "loads" | "price";
@@ -221,10 +222,12 @@ export const filterAndSortTransactions = (
         datepickup?: string | null;
       };
       const loadedDate = transaction.dateLoaded || tx.dateloaded || null;
-      const pickupDate = transaction.datePickup || tx.datepickup || null;
 
       if (options.showPendingOnly && loadedDate) return false;
-      if (options.showReadyForPickupOnly && (!loadedDate || pickupDate)) {
+      if (
+        options.showReadyForPickupOnly &&
+        (!loadedDate || isFullyPickedUp(transaction))
+      ) {
         return false;
       }
 

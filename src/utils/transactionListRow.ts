@@ -2,10 +2,7 @@ import dayjs from "dayjs";
 import type { Transaction } from "../services/transactionService";
 import type { AddonsPricing } from "../services/addonsPricingService";
 import { toPascalCase } from "./stringUtils";
-import {
-  getTransactionAmountDue,
-  getTransactionDiscount,
-} from "./pricing";
+import { getTransactionAmountDue } from "./pricing";
 
 export interface TransactionListRow {
   id: string;

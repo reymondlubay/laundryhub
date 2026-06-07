@@ -59,6 +59,7 @@ type BackdatePickupRow = {
   transaction: Transaction;
   datePickup: string | undefined;
   datePickupModifiedAt: string | undefined;
+  pickupLoads: number;
 };
 
 type LoadLike = {
@@ -687,42 +688,49 @@ const TransactionReport: React.FC = () => {
     const range = normalizeRange(dateFrom, dateTo);
 
     return filteredByCustomer
-      .map<BackdatePickupRow | null>((transaction) => {
-        const datePickup = getTransactionFieldDate(transaction, "datePickup");
-        const datePickupModifiedAt = transaction.datePickupModifiedAt;
+      .flatMap<BackdatePickupRow | null>((transaction) => {
+        const pickupEvents =
+          transaction.pickupDetails && transaction.pickupDetails.length > 0
+            ? transaction.pickupDetails.map((pickup) => ({
+                datePickup: pickup.pickupDate,
+                datePickupModifiedAt: pickup.datePickupModifiedAt,
+                pickupLoads: toNumber(pickup.loadsCount),
+              }))
+            : [
+                {
+                  datePickup: getTransactionFieldDate(transaction, "datePickup"),
+                  datePickupModifiedAt: transaction.datePickupModifiedAt,
+                  pickupLoads: getTransactionTotals(transaction, addonsPricing).loads,
+                },
+              ];
 
-        // Check if date pickup modified date is within range
-        const isInRange = isWithinRange(
-          datePickupModifiedAt,
-          range.from,
-          range.to,
-        );
-        if (!isInRange) {
-          return null;
-        }
+        return pickupEvents.map((event) => {
+          const { datePickup, datePickupModifiedAt, pickupLoads } = event;
+          const isInRange = isWithinRange(
+            datePickupModifiedAt,
+            range.from,
+            range.to,
+          );
+          if (!isInRange || !datePickup || !datePickupModifiedAt) {
+            return null;
+          }
 
-        // Both datePickup and datePickupModifiedAt must exist
-        if (!datePickup || !datePickupModifiedAt) {
-          return null;
-        }
+          const pickupDate = dayjs(datePickup).startOf("day");
+          const modifiedDate = dayjs(datePickupModifiedAt).startOf("day");
+          if (!pickupDate.isBefore(modifiedDate)) {
+            return null;
+          }
 
-        // Check if pickup date is before the modified date (comparing dates only)
-        const pickupDate = dayjs(datePickup).startOf("day");
-        const modifiedDate = dayjs(datePickupModifiedAt).startOf("day");
-        const isBefore = pickupDate.isBefore(modifiedDate);
-
-        if (!isBefore) {
-          return null;
-        }
-
-        return {
-          transaction,
-          datePickup,
-          datePickupModifiedAt,
-        };
+          return {
+            transaction,
+            datePickup,
+            datePickupModifiedAt,
+            pickupLoads,
+          };
+        });
       })
       .filter((row): row is BackdatePickupRow => row !== null);
-  }, [dateFrom, dateTo, filteredByCustomer]);
+  }, [addonsPricing, dateFrom, dateTo, filteredByCustomer]);
 
   const normalizedRange = normalizeRange(dateFrom, dateTo);
   const fromText = normalizedRange.from.format("MM-DD-YYYY");
@@ -1002,13 +1010,6 @@ const TransactionReport: React.FC = () => {
                               ) : (
                                 <span>No payment history</span>
                               )}
-                              {discountAmount > 0 ? (
-                                <span
-                                  style={{ color: "#f44336", fontWeight: 700 }}
-                                >
-                                  Discount - {formatCurrency(discountAmount)}
-                                </span>
-                              ) : null}
                               {!isFullyPaid ? (
                                 <span
                                   style={{ color: "#f44336", fontWeight: 700 }}
@@ -1115,6 +1116,33 @@ const TransactionReport: React.FC = () => {
                                       )}
                                     </Box>
                                   </Tooltip>
+                                  {discountAmount > 0 ? (
+                                    <Tooltip
+                                      title={`Discount - ${formatCurrency(discountAmount)}`}
+                                      arrow
+                                    >
+                                      <Box
+                                        component="span"
+                                        sx={{
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          width: 18,
+                                          height: 18,
+                                          borderRadius: "50%",
+                                          border: "1.5px solid",
+                                          borderColor: "#f44336",
+                                          color: "#f44336",
+                                          fontSize: 11,
+                                          fontWeight: 700,
+                                          lineHeight: 1,
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        D
+                                      </Box>
+                                    </Tooltip>
+                                  ) : null}
                                 </Stack>
                               </TableCell>
                             </TableRow>
@@ -1348,7 +1376,12 @@ const TransactionReport: React.FC = () => {
                           backdatePickupRowsPerPage,
                       )
                       .map(
-                        ({ transaction, datePickup, datePickupModifiedAt }) => {
+                        ({
+                          transaction,
+                          datePickup,
+                          datePickupModifiedAt,
+                          pickupLoads,
+                        }) => {
                           const totals = getTransactionTotals(
                             transaction,
                             addonsPricing,
@@ -1356,7 +1389,7 @@ const TransactionReport: React.FC = () => {
 
                           return (
                             <TableRow
-                              key={`backdate-pickup-${transaction.id}`}
+                              key={`backdate-pickup-${transaction.id}-${datePickup}-${datePickupModifiedAt}`}
                               sx={{ backgroundColor: "#fff3e0" }}
                             >
                               <TableCell>
@@ -1373,7 +1406,7 @@ const TransactionReport: React.FC = () => {
                                 )}
                               </TableCell>
                               <TableCell>{formatCount(totals.kg)}</TableCell>
-                              <TableCell>{formatCount(totals.loads)}</TableCell>
+                              <TableCell>{formatCount(pickupLoads)}</TableCell>
                               <TableCell>
                                 {formatCurrency(totals.price)}
                               </TableCell>
