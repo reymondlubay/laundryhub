@@ -1,5 +1,6 @@
 import { Sidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
 import {
+  FaArchive,
   FaChartBar,
   FaFileAlt,
   FaMoneyBillWave,
@@ -330,6 +331,31 @@ export default function SidebarMenu() {
             Users
           </MenuItem>
         ) : null}
+        {isAdminUser ? (
+          <SubMenu
+            label="Archive"
+            icon={<FaArchive />}
+            defaultOpen={activePath.startsWith("/archive")}
+            rootStyles={{
+              color: activePath.startsWith("/archive")
+                ? primary.main
+                : text.primary,
+            }}
+          >
+            <MenuItem
+              component={<Link to={route.ARCHIVE_RECORD} />}
+              active={activePath === route.ARCHIVE_RECORD}
+            >
+              Archive record
+            </MenuItem>
+            <MenuItem
+              component={<Link to={route.ARCHIVE_LISTING} />}
+              active={activePath === route.ARCHIVE_LISTING}
+            >
+              Archive listing
+            </MenuItem>
+          </SubMenu>
+        ) : null}
         <SubMenu
           label="Settings"
           icon={<FaWarehouse />}
@@ -368,6 +394,14 @@ export default function SidebarMenu() {
               active={activePath === route.SETTINGS_ACTIVITY_LOG}
             >
               Activity log
+            </MenuItem>
+          )}
+          {isAdminUser && (
+            <MenuItem
+              component={<Link to={route.SETTINGS_DELETED_TRANSACTIONS} />}
+              active={activePath === route.SETTINGS_DELETED_TRANSACTIONS}
+            >
+              Deleted transactions
             </MenuItem>
           )}
         </SubMenu>

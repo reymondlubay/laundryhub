@@ -47,7 +47,17 @@ import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../services/addonsPricingService";
-import { getTransactionGrandTotal as resolveTransactionGrandTotal } from "../../utils/pricing";
+import {
+  getTransactionAmountDue as resolveTransactionAmountDue,
+  getTransactionDiscount,
+} from "../../utils/pricing";
+import {
+  getLoadsPickedUp,
+  getRemainingLoads,
+  hasAnyPickup,
+  hasPartialPickup,
+  isFullyPickedUp,
+} from "../../utils/transactionPickup";
 
 type TransactionWithLegacyFields = Transaction & {
   customerid?: string;
@@ -150,9 +160,11 @@ const isPending = (transaction: Transaction): boolean =>
   !getTransactionFieldDate(transaction, "dateLoaded");
 
 const isPickup = (transaction: Transaction): boolean =>
-  Boolean(getTransactionFieldDate(transaction, "datePickup"));
+  hasAnyPickup(transaction);
 
-const isNotPickup = (transaction: Transaction): boolean => !isPickup(transaction);
+/** Still has loads waiting to be picked up (includes partial pickup). */
+const isNotPickup = (transaction: Transaction): boolean =>
+  !isFullyPickedUp(transaction);
 
 const isUnpaid = (transaction: Transaction): boolean => {
   const paymentRows = transaction.paymentDetails?.length ?? 0;
@@ -178,8 +190,14 @@ const matchesStatusIncludes = (
   if (isPending(transaction) && !filters.pending) return false;
   if (isPaid(transaction, addonsPricing) && !filters.paid) return false;
   if (isUnpaid(transaction) && !filters.unpaid) return false;
-  if (isPickup(transaction) && !filters.pickup) return false;
-  if (isNotPickup(transaction) && !filters.notPickup) return false;
+
+  if (filters.pickup || filters.notPickup) {
+    const matchesPickupFilter =
+      (isPickup(transaction) && filters.pickup) ||
+      (isNotPickup(transaction) && filters.notPickup);
+    if (!matchesPickupFilter) return false;
+  }
+
   return true;
 };
 
@@ -277,12 +295,35 @@ const getTotalLoads = (transaction: Transaction): number => {
   );
 };
 
+const formatSummaryLoadDisplay = (transaction: Transaction): string => {
+  if (hasPartialPickup(transaction)) {
+    return `${getRemainingLoads(transaction)} (${getLoadsPickedUp(transaction)})`;
+  }
+  return String(getTotalLoads(transaction));
+};
+
+const renderSummaryLoadCell = (transaction: Transaction): React.ReactNode => {
+  if (hasPartialPickup(transaction)) {
+    return (
+      <>
+        {getRemainingLoads(transaction)}{" "}
+        <Box component="span" sx={{ color: "#f44336" }}>
+          ({getLoadsPickedUp(transaction)})
+        </Box>
+      </>
+    );
+  }
+  return getTotalLoads(transaction);
+};
+
+// Returns the amount the customer owes after discount (net). Named
+// "grandTotal" for historical call sites; every consumer here wants net.
 const getTransactionGrandTotal = (
   transaction: Transaction,
   addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
 ): number => {
   const tx = transaction as TransactionWithLegacyFields;
-  return resolveTransactionGrandTotal(
+  return resolveTransactionAmountDue(
     {
       ...transaction,
       grandtotal: tx.grandtotal,
@@ -340,12 +381,26 @@ const hasBackdatePayment = (transaction: Transaction): boolean => {
 };
 
 const hasBackdatePickup = (transaction: Transaction): boolean => {
-  const datePickup = getTransactionFieldDate(transaction, "datePickup");
-  const modifiedAt = transaction.datePickupModifiedAt;
-  if (!datePickup || !modifiedAt) return false;
-  const pickupDate = dayjs(datePickup).startOf("day");
-  const modifiedDate = dayjs(modifiedAt).startOf("day");
-  return pickupDate.isBefore(modifiedDate);
+  const pickupEvents =
+    transaction.pickupDetails && transaction.pickupDetails.length > 0
+      ? transaction.pickupDetails.map((pickup) => ({
+          datePickup: pickup.pickupDate,
+          datePickupModifiedAt: pickup.datePickupModifiedAt,
+        }))
+      : [
+          {
+            datePickup: getTransactionFieldDate(transaction, "datePickup"),
+            datePickupModifiedAt: transaction.datePickupModifiedAt,
+          },
+        ];
+
+  return pickupEvents.some((event) => {
+    const { datePickup, datePickupModifiedAt } = event;
+    if (!datePickup || !datePickupModifiedAt) return false;
+    const pickupDate = dayjs(datePickup).startOf("day");
+    const modifiedDate = dayjs(datePickupModifiedAt).startOf("day");
+    return pickupDate.isBefore(modifiedDate);
+  });
 };
 
 const matchesRecordTypeFilter = (
@@ -645,6 +700,7 @@ const TransactionSummary = () => {
     let totalPrice = 0;
     let totalPaid = 0;
     let totalUnpaidBalance = 0;
+    let totalDiscount = 0;
     let pickedUpCount = 0;
     let notPickedUpCount = 0;
 
@@ -658,9 +714,9 @@ const TransactionSummary = () => {
       totalPrice += getTransactionGrandTotal(t, addonsPricing);
       totalPaid += getTotalPaid(t);
       totalUnpaidBalance += getBalance(t, addonsPricing);
+      totalDiscount += getTransactionDiscount(t);
 
-      const pickup = getTransactionFieldDate(t, "datePickup");
-      if (pickup) pickedUpCount += 1;
+      if (isFullyPickedUp(t)) pickedUpCount += 1;
       else notPickedUpCount += 1;
     }
 
@@ -672,6 +728,7 @@ const TransactionSummary = () => {
       totalPrice,
       totalPaid,
       totalUnpaidBalance,
+      totalDiscount,
       pickedUpCount,
       notPickedUpCount,
     };
@@ -721,7 +778,7 @@ const TransactionSummary = () => {
         dateReceived: formatDateTime(dateReceived),
         customer: toPascalCase(transaction.customer?.name || "-"),
         kg: getTotalKg(transaction).toFixed(2),
-        load: getTotalLoads(transaction),
+        load: formatSummaryLoadDisplay(transaction),
         price: formatCurrency(
           getTransactionGrandTotal(transaction, addonsPricing),
         ),
@@ -1199,7 +1256,7 @@ const TransactionSummary = () => {
                     {getTotalKg(transaction).toFixed(2)}
                   </TableCell>
                   <TableCell align="right">
-                    {getTotalLoads(transaction)}
+                    {renderSummaryLoadCell(transaction)}
                   </TableCell>
                   <TableCell align="right">
                     {formatCurrency(
@@ -1227,6 +1284,8 @@ const TransactionSummary = () => {
                       const hasPaidOrOver = totalPaid >= totalPrice;
                       const balanceAmount = Math.max(totalPrice - totalPaid, 0);
                       const overAmount = Math.max(totalPaid - totalPrice, 0);
+                      const discountAmount =
+                        getTransactionDiscount(transaction);
 
                       const tooltipTitle = (
                         <Box
@@ -1241,6 +1300,11 @@ const TransactionSummary = () => {
                               {paymentLine}
                             </span>
                           ))}
+                          {discountAmount > 0 ? (
+                            <span style={{ color: "#f44336", fontWeight: 600 }}>
+                              Discount - {formatAmount(discountAmount)}
+                            </span>
+                          ) : null}
                           {hasBalance ? (
                             <span style={{ color: "#f44336", fontWeight: 600 }}>
                               Balance - {formatAmount(balanceAmount)}
@@ -1362,6 +1426,7 @@ const TransactionSummary = () => {
               ["Total loads", formatAmount(filterSummary.totalLoads)],
               ["Total kg", filterSummary.totalKg.toFixed(2)],
               ["Total price", formatCurrency(filterSummary.totalPrice)],
+              ["Total discount", formatCurrency(filterSummary.totalDiscount)],
               ["Total amount paid", formatCurrency(filterSummary.totalPaid)],
               [
                 "Total unpaid (balances)",

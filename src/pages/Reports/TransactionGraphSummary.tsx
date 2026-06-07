@@ -22,7 +22,7 @@ import transactionService, {
 import ColoredLoadCount from "../../components/LoadsThresholdLegend/ColoredLoadCount";
 import LoadsThresholdLegend from "../../components/LoadsThresholdLegend/LoadsThresholdLegend";
 import { DOW_WEEKEND_TEXT_COLOR } from "../../utils/loadsThresholdColor";
-import { getTransactionGrandTotal } from "../../utils/pricing";
+import { getTransactionAmountDue } from "../../utils/pricing";
 
 type TransactionWithLegacyFields = Transaction & {
   datereceived?: string;
@@ -68,7 +68,7 @@ const getTotalLoads = (t: Transaction): number =>
 
 const getTransactionAmount = (t: Transaction): number => {
   const tx = t as TransactionWithLegacyFields;
-  return getTransactionGrandTotal({
+  return getTransactionAmountDue({
     ...t,
     grandtotal: tx.grandtotal,
     loadsubtotal: tx.loadsubtotal,

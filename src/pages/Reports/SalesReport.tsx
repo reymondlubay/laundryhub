@@ -41,7 +41,10 @@ import fixedMonthlyExpenseService, {
   type FixedMonthlyExpense,
 } from "../../services/fixedMonthlyExpenseService";
 import { toPascalCase } from "../../utils/stringUtils";
-import { getTransactionGrandTotal } from "../../utils/pricing";
+import {
+  getTransactionAmountDue,
+  getTransactionDiscount,
+} from "../../utils/pricing";
 
 type TransactionLegacy = Transaction & {
   customerid?: string;
@@ -88,7 +91,7 @@ const getTransactionPrice = (
   addonsPricing: AddonsPricing,
 ): number => {
   const tx = transaction as TransactionLegacy;
-  return getTransactionGrandTotal(
+  return getTransactionAmountDue(
     {
       ...transaction,
       grandtotal: tx.grandtotal,
@@ -292,6 +295,13 @@ const SalesReport: React.FC = () => {
     }, 0);
   }, [selectedMonth, transactions]);
 
+  const totalDiscount = React.useMemo(() => {
+    const inMonth = transactions.filter((t) =>
+      isInMonth(getDateReceived(t), selectedMonth),
+    );
+    return inMonth.reduce((s, t) => s + getTransactionDiscount(t), 0);
+  }, [selectedMonth, transactions]);
+
   const totals = React.useMemo(() => {
     const totalSales = salesRows.reduce((s, r) => s + r.price, 0);
     const recordedInternalExpenses = expenseRows.reduce((s, r) => s + r.amount, 0);
@@ -309,6 +319,7 @@ const SalesReport: React.FC = () => {
 
     return {
       totalSales,
+      totalDiscount,
       recordedInternalExpenses,
       fixedMonthlyTotal,
       totalExpenses,
@@ -323,6 +334,7 @@ const SalesReport: React.FC = () => {
     salesRows,
     selectedMonth,
     totalPaidInMonth,
+    totalDiscount,
   ]);
 
   const monthText = selectedMonth.isValid()
@@ -493,7 +505,11 @@ const SalesReport: React.FC = () => {
             </Typography>
             <Divider sx={{ my: 1 }} />
             <Typography>
-              Total Sales (Gross) - {formatCurrency(totals.totalSales)}
+              Total Sales (Net of Discount) -{" "}
+              {formatCurrency(totals.totalSales)}
+            </Typography>
+            <Typography sx={{ color: "#f44336" }}>
+              Total Discount - {formatCurrency(totals.totalDiscount)}
             </Typography>
             <Typography>
               Internal expenses (recorded) -{" "}

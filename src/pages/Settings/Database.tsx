@@ -65,6 +65,7 @@ const DatabaseSettings: React.FC = () => {
   );
 
   const [restoreId, setRestoreId] = React.useState<string | null>(null);
+  const [restoreConfirmText, setRestoreConfirmText] = React.useState("");
   const [restoreLoading, setRestoreLoading] = React.useState(false);
 
   const [deleteId, setDeleteId] = React.useState<string | null>(null);
@@ -302,13 +303,14 @@ const DatabaseSettings: React.FC = () => {
   };
 
   const handleConfirmRestore = async () => {
-    if (!restoreId) return;
+    if (!restoreId || restoreConfirmText !== "RESTORE") return;
 
     try {
       setRestoreLoading(true);
       setError(null);
       await backupService.restoreBackup(restoreId);
       setRestoreId(null);
+      setRestoreConfirmText("");
       await fetchBackups();
     } catch (err: unknown) {
       const message =
@@ -987,26 +989,52 @@ const DatabaseSettings: React.FC = () => {
 
       <Dialog
         open={Boolean(restoreId)}
-        onClose={ignoreBackdropClose(() => setRestoreId(null))}
+        onClose={ignoreBackdropClose(() => {
+          if (restoreLoading) return;
+          setRestoreId(null);
+          setRestoreConfirmText("");
+        })}
         maxWidth="xs"
         fullWidth
         PaperProps={{ sx: { bgcolor: paperDialogBg, color: cellColor } }}
       >
         <DialogTitle>Confirm Restore</DialogTitle>
         <DialogContent>
-          <Alert severity="warning" sx={{ mt: 1 }}>
+          <Alert severity="warning" sx={{ mt: 1, mb: 1.5 }}>
             This will overwrite the current database.
           </Alert>
+          <Typography sx={{ mb: 1.5 }}>
+            Type RESTORE to confirm.
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            value={restoreConfirmText}
+            onChange={(e) => setRestoreConfirmText(e.target.value)}
+            placeholder="RESTORE"
+            disabled={restoreLoading}
+            sx={{
+              "& .MuiInputBase-input": {
+                color: cellColor,
+              },
+            }}
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setRestoreId(null)} disabled={restoreLoading}>
+          <Button
+            onClick={() => {
+              setRestoreId(null);
+              setRestoreConfirmText("");
+            }}
+            disabled={restoreLoading}
+          >
             Cancel
           </Button>
           <Button
             variant="contained"
             color="warning"
             onClick={handleConfirmRestore}
-            disabled={restoreLoading}
+            disabled={restoreLoading || restoreConfirmText !== "RESTORE"}
           >
             {restoreLoading ? "Starting..." : "Confirm Restore"}
           </Button>

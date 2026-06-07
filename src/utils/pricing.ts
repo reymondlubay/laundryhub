@@ -264,6 +264,29 @@ export const getTransactionGrandTotal = (
   return loadTotal + getAddonsTotal(transaction, effectivePricing);
 };
 
+/** Per-transaction discount (money), floored at 0. Handles lowercase PG key. */
+export const getTransactionDiscount = (transaction: object): number => {
+  const discount = pickTransactionNum(
+    asRecord(transaction),
+    "discount",
+    "discount",
+  );
+  return discount > 0 ? discount : 0;
+};
+
+/**
+ * Amount the customer owes after discount: max(0, grandTotal - discount).
+ * Use this anywhere "price / amount owed / balance / net sales" is meant.
+ */
+export const getTransactionAmountDue = (
+  transaction: Parameters<typeof getTransactionGrandTotal>[0],
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): number => {
+  const gross = getTransactionGrandTotal(transaction, addonsPricing);
+  const discount = getTransactionDiscount(transaction as object);
+  return Math.max(0, gross - discount);
+};
+
 /** Grand total stored on the row (for edit UI), ignoring live addon settings. */
 export const getFrozenTransactionGrandTotal = (
   transaction: Record<string, unknown>,

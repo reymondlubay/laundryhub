@@ -121,6 +121,53 @@ const getReleaseDate = (tx: TransactionRow): string | undefined => {
   return value;
 };
 
+type PickupReleaseEvent = {
+  releaseDate: string;
+  releasedById?: string;
+  releasedByUser?: TransactionRow["releasedByUser"];
+  loadsCount?: number | string | null;
+};
+
+const getPickupReleaseEvents = (tx: TransactionRow): PickupReleaseEvent[] => {
+  const details = tx.pickupDetails ?? [];
+  if (details.length > 0) {
+    return details
+      .filter((pickup) => pickup.pickupDate && dayjs(pickup.pickupDate).isValid())
+      .map((pickup) => ({
+        releaseDate: pickup.pickupDate,
+        releasedById: pickup.releasedBy,
+        releasedByUser: pickup.releasedByUser ?? tx.releasedByUser,
+        loadsCount: pickup.loadsCount,
+      }));
+  }
+
+  const releaseDate = getReleaseDate(tx);
+  if (!releaseDate) return [];
+
+  return [
+    {
+      releaseDate,
+      releasedById: getReleasedById(tx),
+      releasedByUser: tx.releasedByUser,
+    },
+  ];
+};
+
+const formatReleaseLoads = (
+  transaction: Transaction,
+  loadsCount?: number | string | null,
+): string => {
+  const picked = Number(loadsCount ?? 0);
+  if (picked > 0) return `${picked}L`;
+  return formatLoads(transaction);
+};
+
+type ReportDisplayRow = {
+  key: string;
+  transaction: TransactionRow;
+  releaseEvent: PickupReleaseEvent | null;
+};
+
 type ReportFilterParams = {
   customerId?: string;
   selectedEmployee: string;
@@ -134,9 +181,8 @@ const transactionMatchesReportFilters = (
   filters: ReportFilterParams,
 ): boolean => {
   const receiveDate = getReceiveDate(tx);
-  const releaseDate = getReleaseDate(tx);
   const receivedById = getReceivedById(tx);
-  const releasedById = getReleasedById(tx);
+  const releaseEvents = getPickupReleaseEvents(tx);
 
   if (filters.customerId && tx.customerId !== filters.customerId) {
     return false;
@@ -145,9 +191,12 @@ const transactionMatchesReportFilters = (
   const receiveInRange = receiveDate
     ? inCalendarRange(receiveDate, filters.dateFrom, filters.dateTo)
     : false;
-  const releaseInRange = releaseDate
-    ? inCalendarRange(releaseDate, filters.dateFrom, filters.dateTo)
-    : false;
+  const releaseMatch = releaseEvents.some(
+    (event) =>
+      inCalendarRange(event.releaseDate, filters.dateFrom, filters.dateTo) &&
+      (!filters.selectedEmployee ||
+        event.releasedById === filters.selectedEmployee),
+  );
 
   if (filters.activityFilter === "receive") {
     if (!receiveDate || !receiveInRange) return false;
@@ -158,21 +207,13 @@ const transactionMatchesReportFilters = (
   }
 
   if (filters.activityFilter === "release") {
-    if (!releaseDate || !releaseInRange) return false;
-    if (filters.selectedEmployee && releasedById !== filters.selectedEmployee) {
-      return false;
-    }
-    return true;
+    return releaseMatch;
   }
 
   const receiveMatch =
     Boolean(receiveDate) &&
     receiveInRange &&
     (!filters.selectedEmployee || receivedById === filters.selectedEmployee);
-  const releaseMatch =
-    Boolean(releaseDate) &&
-    releaseInRange &&
-    (!filters.selectedEmployee || releasedById === filters.selectedEmployee);
 
   return receiveMatch || releaseMatch;
 };
@@ -269,36 +310,73 @@ const ReceiveReleaseReport: React.FC = () => {
     ],
   );
 
-  const filteredRows = React.useMemo(() => {
-    return transactions
-      .filter((raw) =>
-        transactionMatchesReportFilters(raw as TransactionRow, reportFilters),
-      )
-      .sort((a, b) => {
-        const aReceive = getReceiveDate(a as TransactionRow);
-        const bReceive = getReceiveDate(b as TransactionRow);
-        const aRelease = getReleaseDate(a as TransactionRow);
-        const bRelease = getReleaseDate(b as TransactionRow);
+  const displayRows = React.useMemo((): ReportDisplayRow[] => {
+    const rows: ReportDisplayRow[] = [];
 
-        const aSort = dayjs(
-          activityFilter === "release"
-            ? aRelease || aReceive
-            : aReceive || aRelease,
-        ).valueOf();
-        const bSort = dayjs(
-          activityFilter === "release"
-            ? bRelease || bReceive
-            : bReceive || bRelease,
-        ).valueOf();
+    for (const raw of transactions) {
+      const tx = raw as TransactionRow;
+      if (!transactionMatchesReportFilters(tx, reportFilters)) continue;
 
-        return bSort - aSort;
+      if (activityFilter === "release") {
+        for (const [index, event] of getPickupReleaseEvents(tx).entries()) {
+          if (
+            !event.releasedById ||
+            !inCalendarRange(event.releaseDate, dateFrom, dateTo) ||
+            (selectedEmployee && event.releasedById !== selectedEmployee)
+          ) {
+            continue;
+          }
+
+          rows.push({
+            key: `${tx.id}-release-${index}`,
+            transaction: tx,
+            releaseEvent: event,
+          });
+        }
+        continue;
+      }
+
+      rows.push({
+        key: String(tx.id),
+        transaction: tx,
+        releaseEvent: null,
       });
-  }, [transactions, reportFilters, activityFilter]);
+    }
+
+    return rows.sort((a, b) => {
+      const aReceive = getReceiveDate(a.transaction);
+      const bReceive = getReceiveDate(b.transaction);
+      const aRelease =
+        a.releaseEvent?.releaseDate || getReleaseDate(a.transaction);
+      const bRelease =
+        b.releaseEvent?.releaseDate || getReleaseDate(b.transaction);
+
+      const aSort = dayjs(
+        activityFilter === "release"
+          ? aRelease || aReceive
+          : aReceive || aRelease,
+      ).valueOf();
+      const bSort = dayjs(
+        activityFilter === "release"
+          ? bRelease || bReceive
+          : bReceive || bRelease,
+      ).valueOf();
+
+      return bSort - aSort;
+    });
+  }, [
+    transactions,
+    reportFilters,
+    activityFilter,
+    dateFrom,
+    dateTo,
+    selectedEmployee,
+  ]);
 
   const pagedRows = React.useMemo(() => {
     const start = page * rowsPerPage;
-    return filteredRows.slice(start, start + rowsPerPage);
-  }, [filteredRows, page, rowsPerPage]);
+    return displayRows.slice(start, start + rowsPerPage);
+  }, [displayRows, page, rowsPerPage]);
 
   const employeeTotals = React.useMemo((): EmployeeTotalsRow[] => {
     const counts = new Map<
@@ -341,9 +419,8 @@ const ReceiveReleaseReport: React.FC = () => {
       if (!transactionMatchesReportFilters(tx, reportFilters)) continue;
 
       const receiveDate = getReceiveDate(tx);
-      const releaseDate = getReleaseDate(tx);
       const receivedById = getReceivedById(tx);
-      const releasedById = getReleasedById(tx);
+      const releaseEvents = getPickupReleaseEvents(tx);
 
       if (
         activityFilter !== "release" &&
@@ -359,18 +436,23 @@ const ReceiveReleaseReport: React.FC = () => {
         );
       }
 
-      if (
-        activityFilter !== "receive" &&
-        releasedById &&
-        releaseDate &&
-        inCalendarRange(releaseDate, dateFrom, dateTo) &&
-        (!selectedEmployee || releasedById === selectedEmployee)
-      ) {
-        bump(
-          releasedById,
-          resolveName(tx, releasedById, "release"),
-          "releaseCount",
-        );
+      if (activityFilter !== "receive") {
+        for (const event of releaseEvents) {
+          if (
+            !event.releasedById ||
+            !inCalendarRange(event.releaseDate, dateFrom, dateTo) ||
+            (selectedEmployee && event.releasedById !== selectedEmployee)
+          ) {
+            continue;
+          }
+          bump(
+            event.releasedById,
+            event.releasedByUser
+              ? formatEmployeeName(event.releasedByUser)
+              : resolveName(tx, event.releasedById, "release"),
+            "releaseCount",
+          );
+        }
       }
     }
 
@@ -535,12 +617,14 @@ const ReceiveReleaseReport: React.FC = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    pagedRows.map((tx) => (
-                      <TableRow key={tx.id} hover>
+                    pagedRows.map(({ key, transaction: tx, releaseEvent }) => (
+                      <TableRow key={key} hover>
                         <TableCell sx={bodyCellSx}>
                           {tx.customer?.name || "—"}
                         </TableCell>
-                        <TableCell sx={bodyCellSx}>{formatLoads(tx)}</TableCell>
+                        <TableCell sx={bodyCellSx}>
+                          {formatReleaseLoads(tx, releaseEvent?.loadsCount)}
+                        </TableCell>
                         <TableCell sx={bodyCellSx}>
                           {formatEmployeeName(tx.receivedByUser)}
                         </TableCell>
@@ -548,10 +632,14 @@ const ReceiveReleaseReport: React.FC = () => {
                           {formatDateTime(tx.dateReceived)}
                         </TableCell>
                         <TableCell sx={bodyCellSx}>
-                          {formatEmployeeName(tx.releasedByUser)}
+                          {formatEmployeeName(
+                            releaseEvent?.releasedByUser ?? tx.releasedByUser,
+                          )}
                         </TableCell>
                         <TableCell sx={bodyCellSx}>
-                          {formatDateTime(tx.datePickup)}
+                          {formatDateTime(
+                            releaseEvent?.releaseDate || tx.datePickup,
+                          )}
                         </TableCell>
                       </TableRow>
                     ))
@@ -562,7 +650,7 @@ const ReceiveReleaseReport: React.FC = () => {
 
             <TablePagination
               component="div"
-              count={filteredRows.length}
+              count={displayRows.length}
               page={page}
               onPageChange={(_e, next) => setPage(next)}
               rowsPerPage={rowsPerPage}

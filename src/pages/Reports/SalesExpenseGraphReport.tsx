@@ -26,7 +26,10 @@ import fixedMonthlyExpenseService, {
   getFixedMonthlyTotalForMonth,
   type FixedMonthlyExpense,
 } from "../../services/fixedMonthlyExpenseService";
-import { getTransactionGrandTotal } from "../../utils/pricing";
+import {
+  getTransactionAmountDue,
+  getTransactionDiscount,
+} from "../../utils/pricing";
 
 const MONTHS_WINDOW = 24;
 
@@ -59,7 +62,7 @@ const getTransactionPrice = (
   addonsPricing: AddonsPricing,
 ): number => {
   const tx = transaction as TransactionLegacy;
-  return getTransactionGrandTotal(
+  return getTransactionAmountDue(
     {
       ...transaction,
       grandtotal: tx.grandtotal,
@@ -506,6 +509,19 @@ const SalesExpenseGraphReport: React.FC = () => {
     [monthlyPoints],
   );
 
+  const totalDiscountPeriod = React.useMemo(() => {
+    let sum = 0;
+    for (const t of transactions) {
+      const dateRaw = getDateReceived(t);
+      if (!dateRaw) continue;
+      const d = dayjs(dateRaw);
+      if (!d.isValid()) continue;
+      if (d.isBefore(rangeStart, "day") || d.isAfter(rangeEnd, "day")) continue;
+      sum += getTransactionDiscount(t);
+    }
+    return sum;
+  }, [rangeEnd, rangeStart, transactions]);
+
   return (
     <Box>
       <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
@@ -556,7 +572,9 @@ const SalesExpenseGraphReport: React.FC = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell>Month</TableCell>
-                    <TableCell align="right">Total Sales (Gross)</TableCell>
+                    <TableCell align="right">
+                      Total Sales (Net of Discount)
+                    </TableCell>
                     <TableCell align="right">Total Internal Expenses</TableCell>
                     <TableCell align="right">Sales (Net)</TableCell>
                   </TableRow>
@@ -591,6 +609,9 @@ const SalesExpenseGraphReport: React.FC = () => {
                 </TableBody>
               </Table>
             </TableContainer>
+            <Typography sx={{ mt: 1.5, fontWeight: 700, color: "#f44336" }}>
+              Total Discount (period) - {formatCurrency(totalDiscountPeriod)}
+            </Typography>
           </Paper>
         </Stack>
       )}

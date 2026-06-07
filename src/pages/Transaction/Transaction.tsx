@@ -454,6 +454,7 @@ const Transaction = () => {
         handleClose={handleCloseTransaction}
         transaction={selectedTransaction}
         onSaved={handleTransactionSaved}
+        onTransactionSynced={upsertTransaction}
         onError={handleTransactionError}
       />
 

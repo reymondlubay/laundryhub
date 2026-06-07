@@ -41,7 +41,10 @@ export const buildEmployeeDisplayName = (user: EmployeeUserLike): string =>
 export const mapUsersToEmployeeOptions = (users: UserItem[]): EmployeeOption[] =>
   sortEmployeeOptions(
     users
-      .filter((user) => user.role === USER_ROLE_EMPLOYEE)
+      .filter(
+        (user) =>
+          user.role === USER_ROLE_EMPLOYEE && user.displayInOptions !== false,
+      )
       .map((user) => ({
         id: user.id,
         name: buildEmployeeDisplayName(user),

@@ -15,6 +15,7 @@ export interface UserItem {
   mobileNumber: string;
   role: UserRole;
   status: UserStatus;
+  displayInOptions?: boolean;
   dateHired: string;
   createdAt: string;
   updatedAt: string;
@@ -28,6 +29,7 @@ export interface CreateUserPayload {
   password: string;
   role: UserRole;
   status: UserStatus;
+  displayInOptions?: boolean;
   dateHired: string;
 }
 
@@ -39,6 +41,7 @@ export interface UpdateUserPayload {
   password?: string;
   role?: UserRole;
   status?: UserStatus;
+  displayInOptions?: boolean;
   dateHired?: string;
 }
 
@@ -53,6 +56,9 @@ const normalizeUser = (raw: unknown): UserItem => {
     mobileNumber: String(item.mobileNumber ?? item.mobilenumber ?? ""),
     role: String(item.role ?? USER_ROLE_EMPLOYEE) as UserRole,
     status: String(item.status ?? USER_STATUS_ACTIVE) as UserStatus,
+    displayInOptions: !(
+      item.displayInOptions === false || item.displayinoptions === false
+    ),
     dateHired: String(item.dateHired ?? item.datehired ?? ""),
     createdAt: String(item.createdAt ?? item.createdat ?? ""),
     updatedAt: String(item.updatedAt ?? item.updatedat ?? ""),

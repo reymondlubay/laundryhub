@@ -65,8 +65,10 @@ const BillSummary = ({
     setTotal(calculateTotals(transactionFormValues).grandTotal);
   }, [addonsPricing, transactionFormValues]);
 
+  const discount = Math.max(Number(transactionFormValues.discount) || 0, 0);
+  const amountDue = Math.max(total - discount, 0);
   const paidTotal = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-  const balance = Math.max(total - paidTotal, 0);
+  const balance = Math.max(amountDue - paidTotal, 0);
 
   return (
     <Paper elevation={1} sx={{ p: 2 }}>
@@ -132,6 +134,16 @@ const BillSummary = ({
       <Typography fontWeight="bold" align="right">
         Grand Total: ₱{total}
       </Typography>
+      {discount > 0 && (
+        <>
+          <Typography align="right" sx={{ color: "#f44336" }}>
+            Discount: -₱{discount}
+          </Typography>
+          <Typography fontWeight="bold" align="right">
+            Amount Due: ₱{amountDue}
+          </Typography>
+        </>
+      )}
 
       {/* Payment Manager */}
       <PaymentManager
