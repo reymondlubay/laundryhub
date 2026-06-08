@@ -42,6 +42,10 @@ import transactionService, {
   type Transaction,
 } from "../../services/transactionService";
 import customerService, { type Customer } from "../../services/customerService";
+import {
+  buildExportFileName,
+  formatExportDateLabel,
+} from "../../utils/exportFileName";
 import { toPascalCase } from "../../utils/stringUtils";
 import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
@@ -827,10 +831,13 @@ const TransactionSummary = () => {
     const url = URL.createObjectURL(blob);
 
     const fileName = allTime
-      ? `TransactionSummary_AllTime.csv`
-      : `TransactionSummary_${dateFrom.format(
-          "YYYY-MM-DD",
-        )}_to_${dateTo.format("YYYY-MM-DD")}.csv`;
+      ? buildExportFileName("Transaction_Summary", "AllTime")
+      : buildExportFileName(
+          "Transaction_Summary",
+          formatExportDateLabel(dateFrom),
+          "to",
+          formatExportDateLabel(dateTo),
+        );
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", fileName);

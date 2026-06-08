@@ -36,6 +36,10 @@ import {
   getTransactionDiscount,
 } from "../../utils/pricing";
 import { buildCsv, downloadCsv } from "../../utils/csvExport";
+import {
+  buildExportFileName,
+  formatExportMonthLabel,
+} from "../../utils/exportFileName";
 import { toPascalCase } from "../../utils/stringUtils";
 
 type TransactionWithLegacyFields = Transaction & {
@@ -367,7 +371,12 @@ const CustomerReport: React.FC = () => {
       formatCurrency(row.balance),
     ]);
     const csv = buildCsv(headers, rows);
-    const fileName = `CustomerReport_${monthFrom.format("YYYY-MM")}_to_${monthTo.format("YYYY-MM")}.csv`;
+    const fileName = buildExportFileName(
+      "Customer_Report",
+      formatExportMonthLabel(monthFrom),
+      "to",
+      formatExportMonthLabel(monthTo),
+    );
     downloadCsv(fileName, csv);
   }, [sortedReportRows, monthValidationError, monthFrom, monthTo]);
 

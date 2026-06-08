@@ -13,7 +13,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import dayjs from "dayjs";
+import { buildExportFileName } from "../../utils/exportFileName";
 import { API_ERRORS } from "../../constants/messages";
 import inventoryItemService, {
   type InventoryItem,
@@ -149,7 +149,7 @@ const InventorySummaryPage: React.FC = () => {
     });
     const url = URL.createObjectURL(blob);
 
-    const fileName = `InventorySummary_${dayjs().format("YYYY-MM-DD")}.csv`;
+    const fileName = buildExportFileName("Inventory_Summary");
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", fileName);
