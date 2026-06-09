@@ -4,6 +4,7 @@ import {
   Autocomplete,
   Alert,
   Box,
+  Button,
   CircularProgress,
   Divider,
   Grid,
@@ -34,6 +35,11 @@ import {
   getTransactionAmountDue,
   getTransactionDiscount,
 } from "../../utils/pricing";
+import { buildCsv, downloadCsv } from "../../utils/csvExport";
+import {
+  buildExportFileName,
+  formatExportMonthLabel,
+} from "../../utils/exportFileName";
 import { toPascalCase } from "../../utils/stringUtils";
 
 type TransactionWithLegacyFields = Transaction & {
@@ -347,6 +353,33 @@ const CustomerReport: React.FC = () => {
     );
   }, [sortedReportRows]);
 
+  const handleExportToExcel = React.useCallback(() => {
+    if (sortedReportRows.length === 0 || monthValidationError) return;
+
+    const headers = [
+      "Customer",
+      "Total Loads",
+      "Total Paid",
+      "Discount",
+      "Balance",
+    ];
+    const rows = sortedReportRows.map((row) => [
+      row.customerName,
+      formatCount(row.totalLoads),
+      formatCurrency(row.totalPaid),
+      formatCurrency(row.discount),
+      formatCurrency(row.balance),
+    ]);
+    const csv = buildCsv(headers, rows);
+    const fileName = buildExportFileName(
+      "Customer_Report",
+      formatExportMonthLabel(monthFrom),
+      "to",
+      formatExportMonthLabel(monthTo),
+    );
+    downloadCsv(fileName, csv);
+  }, [sortedReportRows, monthValidationError, monthFrom, monthTo]);
+
   return (
     <Box>
       <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
@@ -426,6 +459,23 @@ const CustomerReport: React.FC = () => {
         </Box>
       ) : (
         <Paper sx={{ p: 2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              mb: 1,
+            }}
+          >
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleExportToExcel}
+              disabled={sortedReportRows.length === 0 || !!monthValidationError}
+            >
+              Export to excel
+            </Button>
+          </Box>
           <TableContainer sx={{ maxHeight: 520 }}>
             <Table size="small" stickyHeader>
               <TableHead>

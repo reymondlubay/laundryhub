@@ -1,5 +1,5 @@
 // src/components/ThemeContext/ThemeContext.tsx
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ThemeProvider, createTheme, CssBaseline } from "@mui/material";
 
@@ -56,6 +56,26 @@ export const CustomThemeProvider = ({ children }: { children: ReactNode }) => {
       return newMode;
     });
   };
+
+  useEffect(() => {
+    const faviconHref = darkMode ? "/favicon-light.png" : "/favicon.png";
+    const touchHref = darkMode
+      ? "/apple-touch-icon-light.png"
+      : "/apple-touch-icon.png";
+
+    const setLink = (rel: string, href: string) => {
+      let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = href;
+    };
+
+    setLink("icon", faviconHref);
+    setLink("apple-touch-icon", touchHref);
+  }, [darkMode]);
 
   const theme = useMemo(
     () =>

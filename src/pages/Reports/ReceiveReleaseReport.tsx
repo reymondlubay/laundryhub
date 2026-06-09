@@ -38,6 +38,7 @@ type EmployeeTotalsRow = {
   name: string;
   receiveCount: number;
   releaseCount: number;
+  totalCount: number;
 };
 
 type TransactionRow = Transaction & {
@@ -462,6 +463,7 @@ const ReceiveReleaseReport: React.FC = () => {
         name: row.name,
         receiveCount: row.receiveCount,
         releaseCount: row.releaseCount,
+        totalCount: row.receiveCount + row.releaseCount,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [
@@ -480,8 +482,9 @@ const ReceiveReleaseReport: React.FC = () => {
         (acc, row) => ({
           receiveCount: acc.receiveCount + row.receiveCount,
           releaseCount: acc.releaseCount + row.releaseCount,
+          totalCount: acc.totalCount + row.totalCount,
         }),
-        { receiveCount: 0, releaseCount: 0 },
+        { receiveCount: 0, releaseCount: 0, totalCount: 0 },
       ),
     [employeeTotals],
   );
@@ -688,6 +691,9 @@ const ReceiveReleaseReport: React.FC = () => {
                           Total Release
                         </TableCell>
                       ) : null}
+                      <TableCell align="right" sx={headCellSx}>
+                        Total
+                      </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -695,7 +701,7 @@ const ReceiveReleaseReport: React.FC = () => {
                       <TableRow>
                         <TableCell
                           colSpan={
-                            1 +
+                            2 +
                             (showReceiveTotals ? 1 : 0) +
                             (showReleaseTotals ? 1 : 0)
                           }
@@ -722,6 +728,9 @@ const ReceiveReleaseReport: React.FC = () => {
                                 {row.releaseCount}
                               </TableCell>
                             ) : null}
+                            <TableCell align="right" sx={bodyCellSx}>
+                              {row.totalCount}
+                            </TableCell>
                           </TableRow>
                         ))}
                         <TableRow>
@@ -746,6 +755,12 @@ const ReceiveReleaseReport: React.FC = () => {
                               {summaryGrandTotals.releaseCount}
                             </TableCell>
                           ) : null}
+                          <TableCell
+                            align="right"
+                            sx={{ ...bodyCellSx, fontWeight: 600 }}
+                          >
+                            {summaryGrandTotals.totalCount}
+                          </TableCell>
                         </TableRow>
                       </>
                     )}

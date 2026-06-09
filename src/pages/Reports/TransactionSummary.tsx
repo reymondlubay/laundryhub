@@ -42,6 +42,10 @@ import transactionService, {
   type Transaction,
 } from "../../services/transactionService";
 import customerService, { type Customer } from "../../services/customerService";
+import {
+  buildExportFileName,
+  formatExportDateLabel,
+} from "../../utils/exportFileName";
 import { toPascalCase } from "../../utils/stringUtils";
 import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
@@ -182,14 +186,38 @@ const isPaid = (
   return totalPaid >= total;
 };
 
+const matchesPrimaryStatusIncludes = (
+  transaction: Transaction,
+  filters: StatusIncludeFilters,
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): boolean => {
+  if (isPending(transaction) && filters.pending) return true;
+  if (isUnpaid(transaction) && filters.unpaid) return true;
+  if (isPaid(transaction, addonsPricing) && filters.paid) return true;
+  if (
+    !isPending(transaction) &&
+    !isPaid(transaction, addonsPricing) &&
+    !isUnpaid(transaction) &&
+    (filters.paid || filters.unpaid)
+  ) {
+    return true;
+  }
+  return false;
+};
+
 const matchesStatusIncludes = (
   transaction: Transaction,
   filters: StatusIncludeFilters,
   addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
 ): boolean => {
-  if (isPending(transaction) && !filters.pending) return false;
-  if (isPaid(transaction, addonsPricing) && !filters.paid) return false;
-  if (isUnpaid(transaction) && !filters.unpaid) return false;
+  const primaryActive =
+    filters.pending || filters.paid || filters.unpaid;
+  if (
+    primaryActive &&
+    !matchesPrimaryStatusIncludes(transaction, filters, addonsPricing)
+  ) {
+    return false;
+  }
 
   if (filters.pickup || filters.notPickup) {
     const matchesPickupFilter =
@@ -803,10 +831,13 @@ const TransactionSummary = () => {
     const url = URL.createObjectURL(blob);
 
     const fileName = allTime
-      ? `TransactionSummary_AllTime.csv`
-      : `TransactionSummary_${dateFrom.format(
-          "YYYY-MM-DD",
-        )}_to_${dateTo.format("YYYY-MM-DD")}.csv`;
+      ? buildExportFileName("Transaction_Summary", "AllTime")
+      : buildExportFileName(
+          "Transaction_Summary",
+          formatExportDateLabel(dateFrom),
+          "to",
+          formatExportDateLabel(dateTo),
+        );
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", fileName);
