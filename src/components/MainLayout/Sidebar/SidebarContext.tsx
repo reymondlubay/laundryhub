@@ -1,5 +1,11 @@
-// src/contexts/SidebarContext.tsx
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 
 const SIDEBAR_COLLAPSED_KEY = "laundryhub.sidebar.collapsed";
@@ -15,14 +21,18 @@ function readStoredCollapsed(): boolean {
 
 interface SidebarContextType {
   collapsed: boolean;
+  mobileOpen: boolean;
   toggleSidebar: () => void;
   setCollapsed: (value: boolean) => void;
+  setMobileOpen: (value: boolean) => void;
+  closeMobileSidebar: () => void;
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export const SidebarProvider = ({ children }: { children: ReactNode }) => {
   const [collapsed, setCollapsed] = useState<boolean>(readStoredCollapsed);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -35,14 +45,29 @@ export const SidebarProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [collapsed]);
 
-  const toggleSidebar = () => setCollapsed((prev) => !prev);
+  const toggleSidebar = useCallback(
+    () => setCollapsed((prev) => !prev),
+    [],
+  );
+  const closeMobileSidebar = useCallback(() => setMobileOpen(false), []);
+
+  const value = useMemo(
+    () => ({
+      collapsed,
+      mobileOpen,
+      toggleSidebar,
+      setCollapsed,
+      setMobileOpen,
+      closeMobileSidebar,
+    }),
+    [collapsed, mobileOpen, toggleSidebar, closeMobileSidebar],
+  );
 
   return (
-    <SidebarContext.Provider value={{ collapsed, toggleSidebar, setCollapsed }}>
-      {children}
-    </SidebarContext.Provider>
+    <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>
   );
 };
+
 /* eslint-disable react-refresh/only-export-components */
 export const useSidebar = (): SidebarContextType => {
   const context = useContext(SidebarContext);

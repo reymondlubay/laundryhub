@@ -12,12 +12,13 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   Typography,
   Skeleton,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
@@ -632,12 +633,12 @@ const Dashboard = () => {
                   width="40%"
                   sx={{ mb: 2 }}
                 />
-                <TableContainer sx={{ maxHeight: "25vh" }}>
+                <ResponsiveTableContainer sx={{ maxHeight: "25vh" }}>
                   <Table size="small" stickyHeader>
                     <TableHeaderSkeleton columns={3} />
                     <TableSkeleton columns={3} rows={5} />
                   </Table>
-                </TableContainer>
+                </ResponsiveTableContainer>
               </Paper>
             </Grid>
 
@@ -657,12 +658,12 @@ const Dashboard = () => {
                   width="40%"
                   sx={{ mb: 2 }}
                 />
-                <TableContainer sx={{ maxHeight: "25vh" }}>
+                <ResponsiveTableContainer sx={{ maxHeight: "25vh" }}>
                   <Table size="small" stickyHeader>
                     <TableHeaderSkeleton columns={3} />
                     <TableSkeleton columns={3} rows={5} />
                   </Table>
-                </TableContainer>
+                </ResponsiveTableContainer>
               </Paper>
             </Grid>
           </Grid>
@@ -684,12 +685,12 @@ const Dashboard = () => {
                   width="40%"
                   sx={{ mb: 2 }}
                 />
-                <TableContainer sx={{ maxHeight: "35vh" }}>
+                <ResponsiveTableContainer sx={{ maxHeight: "35vh" }}>
                   <Table size="small" stickyHeader>
                     <TableHeaderSkeleton columns={5} />
                     <TableSkeleton columns={5} rows={5} />
                   </Table>
-                </TableContainer>
+                </ResponsiveTableContainer>
               </Paper>
             </Grid>
 
@@ -709,12 +710,12 @@ const Dashboard = () => {
                   width="40%"
                   sx={{ mb: 2 }}
                 />
-                <TableContainer sx={{ maxHeight: "35vh" }}>
+                <ResponsiveTableContainer sx={{ maxHeight: "35vh" }}>
                   <Table size="small" stickyHeader>
                     <TableHeaderSkeleton columns={4} />
                     <TableSkeleton columns={4} rows={5} />
                   </Table>
-                </TableContainer>
+                </ResponsiveTableContainer>
               </Paper>
             </Grid>
           </Grid>
@@ -967,7 +968,7 @@ const Dashboard = () => {
                     Total Pending: {tableTotalNum(pendingTotalLoads)}
                   </Typography>
                 </Stack>
-                <TableContainer sx={{ maxHeight: "25vh" }}>
+                <ResponsiveTableContainer sx={{ maxHeight: "25vh" }}>
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
@@ -1138,7 +1139,7 @@ const Dashboard = () => {
                       )}
                     </TableBody>
                   </Table>
-                </TableContainer>
+                </ResponsiveTableContainer>
               </Paper>
             </Grid>
 
@@ -1177,7 +1178,7 @@ const Dashboard = () => {
                     Total Loads: {tableTotalNum(loadedTodayTotalLoads)}
                   </Typography>
                 </Stack>
-                <TableContainer sx={{ maxHeight: "25vh" }}>
+                <ResponsiveTableContainer sx={{ maxHeight: "25vh" }}>
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
@@ -1276,7 +1277,7 @@ const Dashboard = () => {
                       )}
                     </TableBody>
                   </Table>
-                </TableContainer>
+                </ResponsiveTableContainer>
               </Paper>
             </Grid>
           </Grid>
@@ -1319,7 +1320,7 @@ const Dashboard = () => {
                     {tableTotalNum(readyForPickupTotalLoads)}
                   </Typography>
                 </Stack>
-                <TableContainer sx={{ maxHeight: "35vh" }}>
+                <ResponsiveTableContainer sx={{ maxHeight: "35vh" }}>
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
@@ -1519,7 +1520,7 @@ const Dashboard = () => {
                       )}
                     </TableBody>
                   </Table>
-                </TableContainer>
+                </ResponsiveTableContainer>
               </Paper>
             </Grid>
 
@@ -1558,7 +1559,7 @@ const Dashboard = () => {
                     Total Loads: {tableTotalNum(pickupTodayTotalLoads)}
                   </Typography>
                 </Stack>
-                <TableContainer sx={{ maxHeight: "35vh" }}>
+                <ResponsiveTableContainer sx={{ maxHeight: "35vh" }}>
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
@@ -1658,7 +1659,7 @@ const Dashboard = () => {
                       )}
                     </TableBody>
                   </Table>
-                </TableContainer>
+                </ResponsiveTableContainer>
               </Paper>
             </Grid>
           </Grid>

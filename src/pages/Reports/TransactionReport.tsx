@@ -12,7 +12,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
@@ -20,6 +19,8 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
@@ -804,7 +805,7 @@ const TransactionReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Load Report
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -879,7 +880,7 @@ const TransactionReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
             <TablePagination
               rowsPerPageOptions={[25, 50, 100, 200]}
               component="div"
@@ -935,7 +936,7 @@ const TransactionReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Payment Report
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -1152,7 +1153,7 @@ const TransactionReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
             <TablePagination
               rowsPerPageOptions={[25, 50, 100, 200]}
               component="div"
@@ -1237,7 +1238,7 @@ const TransactionReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Backdate Payment Report
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -1328,7 +1329,7 @@ const TransactionReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
             <TablePagination
               rowsPerPageOptions={[25, 50, 100, 200]}
               component="div"
@@ -1347,7 +1348,7 @@ const TransactionReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Backdate Date Pickup Report
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -1435,7 +1436,7 @@ const TransactionReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
             <TablePagination
               rowsPerPageOptions={[25, 50, 100, 200]}
               component="div"

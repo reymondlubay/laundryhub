@@ -20,13 +20,14 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
   TextField,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Navigate } from "react-router-dom";
@@ -286,15 +287,15 @@ const Users: React.FC = () => {
 
       <Paper>
         {loading ? (
-          <TableContainer sx={{ maxHeight: 560 }}>
+          <ResponsiveTableContainer sx={{ maxHeight: 560 }}>
             <Table size="small" stickyHeader>
               <TableHeaderSkeleton columns={7} />
               <TableSkeleton columns={7} rows={8} />
             </Table>
-          </TableContainer>
+          </ResponsiveTableContainer>
         ) : (
           <>
-            <TableContainer sx={{ maxHeight: 560 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 560 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -359,7 +360,7 @@ const Users: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <TablePagination
               rowsPerPageOptions={[25, 50, 100, 200]}

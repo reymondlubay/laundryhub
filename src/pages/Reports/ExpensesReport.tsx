@@ -15,12 +15,13 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   TextField,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import inventoryItemService, {
@@ -399,7 +400,7 @@ const ExpensesReport: React.FC = () => {
       ) : (
         <Stack spacing={3}>
           <Paper sx={{ p: 2 }}>
-            <TableContainer sx={{ maxHeight: 600 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 600 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -438,7 +439,7 @@ const ExpensesReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <Box
               sx={{
@@ -459,7 +460,7 @@ const ExpensesReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Consolidated Expenses
             </Typography>
-            <TableContainer sx={{ maxHeight: 400 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 400 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -503,7 +504,7 @@ const ExpensesReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
           </Paper>
 
           <Paper sx={{ p: 2 }}>
@@ -517,7 +518,7 @@ const ExpensesReport: React.FC = () => {
               instead. Item Filter still applies. Type (internal/external) does not
               filter this list.
             </Typography>
-            <TableContainer sx={{ maxHeight: 400 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 400 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -558,7 +559,7 @@ const ExpensesReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
           </Paper>
         </Stack>
       )}

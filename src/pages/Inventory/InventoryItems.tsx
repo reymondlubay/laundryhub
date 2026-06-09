@@ -14,13 +14,14 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
   TextField,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog";
@@ -215,15 +216,15 @@ const InventoryItemsPage: React.FC = () => {
 
       <Paper>
         {loading ? (
-            <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+            <ResponsiveTableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
             <Table size="small" stickyHeader>
               <TableHeaderSkeleton columns={4} />
               <TableSkeleton columns={4} rows={8} />
             </Table>
-          </TableContainer>
+          </ResponsiveTableContainer>
         ) : (
           <>
-            <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+            <ResponsiveTableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -270,7 +271,7 @@ const InventoryItemsPage: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <TablePagination
               rowsPerPageOptions={[25, 50, 100, 200]}

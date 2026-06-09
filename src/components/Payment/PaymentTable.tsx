@@ -2,7 +2,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   Paper,
@@ -18,6 +17,7 @@ import type { Payment } from "../../services/apiTypes";
 import dayjs from "dayjs";
 import { CONFIRM_MESSAGES, UI_TEXT } from "../../constants/messages";
 import ConfirmDialog from "../ConfirmDialog/ConfirmDialog.tsx";
+import ResponsiveTableContainer from "../ResponsiveTableContainer/ResponsiveTableContainer";
 
 type PaymentTableProps = {
   payments: Payment[];
@@ -64,7 +64,7 @@ export const PaymentTable: React.FC<PaymentTableProps> = ({
 
   return (
     <>
-      <TableContainer component={Paper} sx={{ mt: 2 }}>
+      <ResponsiveTableContainer component={Paper} sx={{ mt: 2 }}>
         <Table size="small">
           <TableHead
             sx={{
@@ -159,7 +159,7 @@ export const PaymentTable: React.FC<PaymentTableProps> = ({
             ))}
           </TableBody>
         </Table>
-      </TableContainer>
+      </ResponsiveTableContainer>
 
       <ConfirmDialog
         open={Boolean(selectedPaymentId)}

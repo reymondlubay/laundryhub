@@ -5,7 +5,14 @@ import AppHeader from "./AppHeader/AppHeader";
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+    <Box
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        bgcolor: "background.default",
+        position: "relative",
+      }}
+    >
       <SidebarMenu />
       <Container
         maxWidth="xl"

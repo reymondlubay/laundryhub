@@ -2,6 +2,10 @@
   height: 100vh;
   transition: background-color 0.2s ease, color 0.2s ease;
 
+  @media (max-width: 899px) {
+    z-index: 1400;
+  }
+
   &.light {
     background-color: rgba(232, 238, 245, 0.98);
     color: #1a2430;

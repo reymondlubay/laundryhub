@@ -8,8 +8,9 @@ import {
   FaWarehouse,
   FaUsers,
 } from "react-icons/fa";
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, useMediaQuery } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { useEffect, useRef } from "react";
 import { useThemeContext } from "../../ThemeContext/ThemeContext";
 import { Link, useLocation } from "react-router-dom";
 import CompanyLogo from "../../CompanyLogo/CompanyLogo";
@@ -22,16 +23,29 @@ import { useSidebar } from "./SidebarContext";
 export default function SidebarMenu() {
   const { darkMode } = useThemeContext();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const { primary, text, background } = theme.palette;
-  const { collapsed } = useSidebar();
+  const { collapsed, mobileOpen, closeMobileSidebar } = useSidebar();
   const location = useLocation();
   const isAdminUser = isAdmin();
+  const prevPathRef = useRef(location.pathname);
 
   const activePath = location.pathname;
 
+  useEffect(() => {
+    if (prevPathRef.current !== location.pathname) {
+      prevPathRef.current = location.pathname;
+      closeMobileSidebar();
+    }
+  }, [location.pathname, closeMobileSidebar]);
+
   return (
     <Sidebar
-      collapsed={collapsed}
+      collapsed={isMobile ? false : collapsed}
+      breakPoint="md"
+      customBreakPoint="899px"
+      toggled={mobileOpen}
+      onBackdropClick={closeMobileSidebar}
       backgroundColor={alpha(background.paper, darkMode ? 0.98 : 0.97)}
       className={`sidebar-container ${darkMode ? "dark" : "light"}`}
       rootStyles={{

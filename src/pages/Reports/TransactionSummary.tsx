@@ -25,7 +25,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
@@ -34,6 +33,8 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
@@ -1112,7 +1113,7 @@ const TransactionSummary = () => {
       ) : filteredTransactions.length === 0 ? (
         <Alert severity="info">No transactions found.</Alert>
       ) : (
-        <TableContainer component={Paper} sx={{ mb: 2 }}>
+        <ResponsiveTableContainer component={Paper} sx={{ mb: 2 }}>
           <Box
             sx={{
               display: "flex",
@@ -1425,7 +1426,7 @@ const TransactionSummary = () => {
             onPageChange={handlePageChange}
             onRowsPerPageChange={handleRowsPerPageChange}
           />
-        </TableContainer>
+        </ResponsiveTableContainer>
       )}
 
       {!loading ? (

@@ -9,11 +9,12 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import transactionService, { type Transaction } from "../../services/transactionService";
 import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
@@ -567,7 +568,7 @@ const SalesExpenseGraphReport: React.FC = () => {
               Monthly totals ({monthlyPoints.length} month
               {monthlyPoints.length === 1 ? "" : "s"} with transactions)
             </Typography>
-            <TableContainer>
+            <ResponsiveTableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -608,7 +609,7 @@ const SalesExpenseGraphReport: React.FC = () => {
                   </TableRow>
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
             <Typography sx={{ mt: 1.5, fontWeight: 700, color: "#f44336" }}>
               Total Discount (period) - {formatCurrency(totalDiscountPeriod)}
             </Typography>

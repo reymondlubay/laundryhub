@@ -20,13 +20,14 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
   TextField,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import {
@@ -329,7 +330,7 @@ const ActivityLogPage: React.FC = () => {
         </Grid>
       </Paper>
 
-      <TableContainer component={Paper}>
+      <ResponsiveTableContainer component={Paper}>
         <Table size="small">
           <TableHead>
             {loading ? (
@@ -379,7 +380,7 @@ const ActivityLogPage: React.FC = () => {
           }}
           rowsPerPageOptions={[10, 25, 50, 100]}
         />
-      </TableContainer>
+      </ResponsiveTableContainer>
 
       <Dialog
         open={cleanupOpen}

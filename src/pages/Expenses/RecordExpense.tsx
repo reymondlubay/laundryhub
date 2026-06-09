@@ -22,13 +22,14 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
   TextField,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import type { SxProps, Theme } from "@mui/material/styles";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -633,15 +634,15 @@ const RecordExpensePage: React.FC = () => {
 
       <Paper>
         {loading ? (
-          <TableContainer sx={{ maxHeight: "calc(100vh - 340px)" }}>
+          <ResponsiveTableContainer sx={{ maxHeight: "calc(100vh - 340px)" }}>
             <Table size="small" stickyHeader>
               <TableHeaderSkeleton columns={7} />
               <TableSkeleton columns={7} rows={8} />
             </Table>
-          </TableContainer>
+          </ResponsiveTableContainer>
         ) : (
           <>
-            <TableContainer sx={{ maxHeight: "calc(100vh - 340px)" }}>
+            <ResponsiveTableContainer sx={{ maxHeight: "calc(100vh - 340px)" }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -705,7 +706,7 @@ const RecordExpensePage: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <TablePagination
               rowsPerPageOptions={[25, 50, 100, 200]}

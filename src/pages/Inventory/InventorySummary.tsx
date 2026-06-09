@@ -8,11 +8,12 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import { buildExportFileName } from "../../utils/exportFileName";
 import { API_ERRORS } from "../../constants/messages";
 import inventoryItemService, {
@@ -201,7 +202,7 @@ const InventorySummaryPage: React.FC = () => {
             Export to excel
           </Button>
         </Box>
-        <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+        <ResponsiveTableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
@@ -236,7 +237,7 @@ const InventorySummaryPage: React.FC = () => {
               )}
             </TableBody>
           </Table>
-        </TableContainer>
+        </ResponsiveTableContainer>
       </Paper>
     </Box>
   );

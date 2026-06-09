@@ -11,12 +11,13 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   TextField,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import inventoryItemService, {
@@ -280,7 +281,7 @@ const InventoryReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Internal Usage Report
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -309,7 +310,7 @@ const InventoryReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <Box sx={{ mt: 2 }}>
               <Typography sx={{ fontWeight: 700 }}>
@@ -325,7 +326,7 @@ const InventoryReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               External Usage Report
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -354,7 +355,7 @@ const InventoryReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <Box sx={{ mt: 2 }}>
               <Typography sx={{ fontWeight: 700 }}>

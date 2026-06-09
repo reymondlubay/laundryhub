@@ -11,14 +11,15 @@
     "deploy:laundry-local": "npm run build:laundry-local && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-iis.ps1 -Source publish/laundry-local -Dest \"C:/Projects/Laundryhub Prod/Published/laundry-local\"",
     "deploy:laundry-network": "npm run build:laundry-network && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-iis.ps1 -Source publish/laundry-network -Dest \"C:/Projects/Laundryhub Prod/Published/laundry-network\"",
     "deploy:all": "npm run deploy:laundry-local && npm run deploy:laundry-network",
+    "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@hookform/resolvers": "^5.2.2",
     "@mui/icons-material": "^7.3.4",
     "@mui/material": "^7.3.4",
     "@mui/x-date-pickers": "^8.14.1",
@@ -29,7 +30,6 @@
     "formik": "^2.4.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-hook-form": "^7.68.0",
     "react-icons": "^5.5.0",
     "react-pro-sidebar": "^1.1.0",
     "react-router-dom": "^7.9.4",
@@ -49,6 +49,7 @@
     "sass": "^1.93.2",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.45.0",
-    "vite": "^7.1.7"
+    "vite": "^7.1.7",
+    "vitest": "^4.1.8"
   }
 }

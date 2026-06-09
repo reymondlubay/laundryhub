@@ -10,11 +10,12 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import { LocalizationProvider, TimePicker } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import type { Dayjs } from "dayjs";
@@ -195,7 +196,7 @@ const DatabaseScheduleSection: React.FC<Props> = ({
           {DEFAULT_BACKUP_SCHEDULE_LABELS.join(", ")}.
         </Typography>
       ) : (
-        <TableContainer
+        <ResponsiveTableContainer
           sx={{
             border: `1px solid ${borderColor}`,
             borderRadius: 1,
@@ -260,7 +261,7 @@ const DatabaseScheduleSection: React.FC<Props> = ({
               ))}
             </TableBody>
           </Table>
-        </TableContainer>
+        </ResponsiveTableContainer>
       )}
 
       <Dialog

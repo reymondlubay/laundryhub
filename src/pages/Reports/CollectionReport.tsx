@@ -11,12 +11,13 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import transactionService, {
@@ -396,7 +397,7 @@ const CollectionReport: React.FC = () => {
               </Grid>
             </Grid>
 
-            <TableContainer sx={{ maxHeight: 420 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 420 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -429,7 +430,7 @@ const CollectionReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <TablePagination
               rowsPerPageOptions={[25, 50, 100]}
@@ -480,7 +481,7 @@ const CollectionReport: React.FC = () => {
               </LocalizationProvider>
             </Stack>
 
-            <TableContainer sx={{ maxHeight: 360, mb: 2 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 360, mb: 2 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -518,7 +519,7 @@ const CollectionReport: React.FC = () => {
                   ) : null}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <TotalsBlock
               label={`Daily collection total (${monthLabel})`}
@@ -547,7 +548,7 @@ const CollectionReport: React.FC = () => {
               totals below are for {monthLabel}.
             </Typography>
 
-            <TableContainer sx={{ maxHeight: 280, mb: 2 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 280, mb: 2 }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -584,7 +585,7 @@ const CollectionReport: React.FC = () => {
                   ))}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <TotalsBlock
               label={`Monthly collection total (${monthLabel})`}

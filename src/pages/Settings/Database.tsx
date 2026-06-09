@@ -12,7 +12,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   TablePagination,
@@ -22,6 +21,8 @@ import {
   IconButton,
   Checkbox,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import ClearIcon from "@mui/icons-material/Clear";
 import dayjs from "dayjs";
 import authService from "../../services/authService";
@@ -555,7 +556,7 @@ const DatabaseSettings: React.FC = () => {
               >
                 Saved backup folders
               </Typography>
-              <TableContainer
+              <ResponsiveTableContainer
                 sx={{
                   border: `1px solid ${borderColor}`,
                   borderRadius: 1,
@@ -637,7 +638,7 @@ const DatabaseSettings: React.FC = () => {
                     ))}
                   </TableBody>
                 </Table>
-              </TableContainer>
+              </ResponsiveTableContainer>
             </Box>
           ) : null}
 
@@ -708,14 +709,14 @@ const DatabaseSettings: React.FC = () => {
           </Button>
         </Stack>
         {initialLoading ? (
-          <TableContainer>
+          <ResponsiveTableContainer>
             <Table size="small">
               <TableHeaderSkeleton columns={8} />
               <TableSkeleton columns={8} rows={5} />
             </Table>
-          </TableContainer>
+          </ResponsiveTableContainer>
         ) : (
-          <TableContainer>
+          <ResponsiveTableContainer>
             <Table size="small">
               <TableHead sx={{ bgcolor: headBg }}>
                 <TableRow>
@@ -950,7 +951,7 @@ const DatabaseSettings: React.FC = () => {
                 )}
               </TableBody>
             </Table>
-          </TableContainer>
+          </ResponsiveTableContainer>
         )}
         {!initialLoading && backups.length > 0 ? (
           <TablePagination

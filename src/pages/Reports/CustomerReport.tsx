@@ -12,7 +12,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
@@ -20,6 +19,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import customerService, { type Customer } from "../../services/customerService";
@@ -476,7 +477,7 @@ const CustomerReport: React.FC = () => {
               Export to excel
             </Button>
           </Box>
-          <TableContainer sx={{ maxHeight: 520 }}>
+          <ResponsiveTableContainer sx={{ maxHeight: 520 }}>
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
@@ -570,7 +571,7 @@ const CustomerReport: React.FC = () => {
                 )}
               </TableBody>
             </Table>
-          </TableContainer>
+          </ResponsiveTableContainer>
 
           <TablePagination
             rowsPerPageOptions={[20, 50, 100, 200]}

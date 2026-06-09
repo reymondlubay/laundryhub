@@ -17,13 +17,14 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
   TextField,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog";
@@ -249,7 +250,7 @@ const FixedMonthlyExpensesPage: React.FC = () => {
           </Stack>
         ) : (
           <>
-            <TableContainer>
+            <ResponsiveTableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -317,7 +318,7 @@ const FixedMonthlyExpensesPage: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
             {items.length > 0 ? (
               <TablePagination
                 component="div"

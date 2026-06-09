@@ -9,11 +9,12 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import transactionService, {
@@ -520,7 +521,7 @@ const TransactionGraphSummary: React.FC = () => {
               showDowLegend
               sx={{ mb: 1.5 }}
             />
-            <TableContainer>
+            <ResponsiveTableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -604,7 +605,7 @@ const TransactionGraphSummary: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
           </Paper>
 
           <Paper sx={{ p: 2 }}>
@@ -627,7 +628,7 @@ const TransactionGraphSummary: React.FC = () => {
               </Alert>
             ) : (
               <>
-            <TableContainer sx={{ mb: 2 }}>
+            <ResponsiveTableContainer sx={{ mb: 2 }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -664,7 +665,7 @@ const TransactionGraphSummary: React.FC = () => {
                   })}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <BarChart
               title="SUM of Load vs. Month"

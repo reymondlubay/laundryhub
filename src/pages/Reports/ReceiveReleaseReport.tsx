@@ -13,13 +13,14 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
   TextField,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import transactionService, { type Transaction } from "../../services/transactionService";
@@ -592,7 +593,7 @@ const ReceiveReleaseReport: React.FC = () => {
           </Box>
         ) : (
           <>
-            <TableContainer
+            <ResponsiveTableContainer
               sx={{
                 border: 1,
                 borderColor: "divider",
@@ -649,7 +650,7 @@ const ReceiveReleaseReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <TablePagination
               component="div"
@@ -669,7 +670,7 @@ const ReceiveReleaseReport: React.FC = () => {
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                 Totals by employee
               </Typography>
-              <TableContainer
+              <ResponsiveTableContainer
                 sx={{
                   border: 1,
                   borderColor: "divider",
@@ -766,7 +767,7 @@ const ReceiveReleaseReport: React.FC = () => {
                     )}
                   </TableBody>
                 </Table>
-              </TableContainer>
+              </ResponsiveTableContainer>
             </Box>
           </>
         )}

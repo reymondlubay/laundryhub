@@ -16,7 +16,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   Typography,
@@ -35,6 +34,7 @@ import {
 import { UI_TEXT } from "../../constants/messages";
 import { toPascalCase } from "../../utils/stringUtils";
 import { ignoreBackdropClose } from "../../utils/muiDialogClose";
+import ResponsiveTableContainer from "../ResponsiveTableContainer/ResponsiveTableContainer";
 
 type PaymentModalProps = {
   isOpen: boolean;
@@ -309,7 +309,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         </Box>
 
         {history.length > 0 ? (
-          <TableContainer component={Paper} variant="outlined">
+          <Paper variant="outlined">
+            <ResponsiveTableContainer>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -339,7 +340,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   ))}
               </TableBody>
             </Table>
-          </TableContainer>
+            </ResponsiveTableContainer>
+          </Paper>
         ) : null}
       </DialogContent>
 

@@ -11,11 +11,12 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import transactionService, { type Transaction } from "../../services/transactionService";
@@ -345,7 +346,7 @@ const LoadReport: React.FC = () => {
 
             <LoadsThresholdLegend sx={{ mb: 1.5 }} />
 
-            <TableContainer sx={{ maxHeight: 360, mb: 2 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 360, mb: 2 }}>
               <Table size="small" stickyHeader>
                 <LoadMetricsTableHead periodLabel="Date" />
                 <TableBody>
@@ -387,7 +388,7 @@ const LoadReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <LoadSummaryBlock
               label={`Daily loads total (${monthLabel})`}
@@ -427,7 +428,7 @@ const LoadReport: React.FC = () => {
 
             <LoadsThresholdLegend sx={{ mb: 1.5 }} />
 
-            <TableContainer sx={{ maxHeight: 360, mb: 2 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 360, mb: 2 }}>
               <Table size="small" stickyHeader>
                 <LoadMetricsTableHead periodLabel="Month" />
                 <TableBody>
@@ -469,7 +470,7 @@ const LoadReport: React.FC = () => {
                   ))}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
 
             <LoadSummaryBlock
               label={`Monthly loads total (${monthLabel})`}

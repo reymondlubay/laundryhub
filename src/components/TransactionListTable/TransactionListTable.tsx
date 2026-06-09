@@ -6,7 +6,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
@@ -24,6 +23,7 @@ import {
   TableHeaderSkeleton,
   TableSkeleton,
 } from "../Skeletons/SkeletonComponents";
+import ResponsiveTableContainer from "../ResponsiveTableContainer/ResponsiveTableContainer";
 
 type BaseColumnKey =
   | "dateReceived"
@@ -98,15 +98,15 @@ const TransactionListTable: React.FC<TransactionListTableProps> = ({
       ) : null}
 
       {loading ? (
-        <TableContainer>
+        <ResponsiveTableContainer>
           <Table size="small">
             <TableHeaderSkeleton columns={columnCount} />
             <TableSkeleton columns={columnCount} rows={5} />
           </Table>
-        </TableContainer>
+        </ResponsiveTableContainer>
       ) : (
         <>
-          <TableContainer>
+          <ResponsiveTableContainer>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -157,7 +157,7 @@ const TransactionListTable: React.FC<TransactionListTableProps> = ({
                 )}
               </TableBody>
             </Table>
-          </TableContainer>
+          </ResponsiveTableContainer>
 
           {onPageChange && onRowsPerPageChange ? (
             <TablePagination

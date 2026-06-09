@@ -11,12 +11,13 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
   Typography,
 } from "@mui/material";
+import ResponsiveTableContainer from "../../components/ResponsiveTableContainer/ResponsiveTableContainer";
+
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import transactionService, {
@@ -381,7 +382,7 @@ const SalesReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Sales ({monthText})
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -423,7 +424,7 @@ const SalesReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
             <TablePagination
               rowsPerPageOptions={[25, 50, 100, 200]}
               component="div"
@@ -446,7 +447,7 @@ const SalesReport: React.FC = () => {
               Table lists recorded expenses only. Active fixed monthly items from
               Settings are included in Summary totals below.
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <ResponsiveTableContainer sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -484,7 +485,7 @@ const SalesReport: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ResponsiveTableContainer>
             <TablePagination
               rowsPerPageOptions={[25, 50, 100, 200]}
               component="div"
