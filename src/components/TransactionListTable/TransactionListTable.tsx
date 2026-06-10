@@ -25,7 +25,7 @@ import {
   TableSkeleton,
 } from "../Skeletons/SkeletonComponents";
 
-type BaseColumnKey =
+export type TransactionListColumnKey =
   | "dateReceived"
   | "customer"
   | "kg"
@@ -35,7 +35,7 @@ type BaseColumnKey =
   | "datePaid"
   | "datePickup";
 
-const BASE_COLUMNS: Array<{ key: BaseColumnKey; label: string }> = [
+const BASE_COLUMNS: Array<{ key: TransactionListColumnKey; label: string }> = [
   { key: "dateReceived", label: "Date Received" },
   { key: "customer", label: "Customer" },
   { key: "kg", label: "KG" },
@@ -52,6 +52,8 @@ export type TransactionListTableProps = {
   loading?: boolean;
   emptyMessage?: string;
   showDeletedDate?: boolean;
+  visibleColumns?: TransactionListColumnKey[];
+  columnLabels?: Partial<Record<TransactionListColumnKey, string>>;
   renderActions?: (row: TransactionListRow) => React.ReactNode;
   page?: number;
   rowsPerPage?: number;
@@ -66,6 +68,8 @@ const TransactionListTable: React.FC<TransactionListTableProps> = ({
   loading = false,
   emptyMessage = "No transactions found.",
   showDeletedDate = false,
+  visibleColumns,
+  columnLabels,
   renderActions,
   page = 0,
   rowsPerPage = 25,
@@ -73,6 +77,17 @@ const TransactionListTable: React.FC<TransactionListTableProps> = ({
   onRowsPerPageChange,
   title,
 }) => {
+  const columns = useMemo(() => {
+    const selected = visibleColumns
+      ? BASE_COLUMNS.filter((column) => visibleColumns.includes(column.key))
+      : BASE_COLUMNS;
+
+    return selected.map((column) => ({
+      key: column.key,
+      label: columnLabels?.[column.key] ?? column.label,
+    }));
+  }, [visibleColumns, columnLabels]);
+
   const rows = useMemo(
     () =>
       transactions.map((transaction) =>
@@ -87,7 +102,7 @@ const TransactionListTable: React.FC<TransactionListTableProps> = ({
   }, [rows, page, rowsPerPage]);
 
   const columnCount =
-    BASE_COLUMNS.length + (showDeletedDate ? 1 : 0) + (renderActions ? 1 : 0);
+    columns.length + (showDeletedDate ? 1 : 0) + (renderActions ? 1 : 0);
 
   return (
     <Box>
@@ -110,7 +125,7 @@ const TransactionListTable: React.FC<TransactionListTableProps> = ({
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  {BASE_COLUMNS.map((column) => (
+                  {columns.map((column) => (
                     <TableCell key={column.key}>{column.label}</TableCell>
                   ))}
                   {showDeletedDate ? (
@@ -131,7 +146,7 @@ const TransactionListTable: React.FC<TransactionListTableProps> = ({
                 ) : (
                   paginatedRows.map((row) => (
                     <TableRow key={row.id} hover>
-                      {BASE_COLUMNS.map((column) => (
+                      {columns.map((column) => (
                         <TableCell key={column.key}>
                           {formatTransactionListCell(column.key, row)}
                         </TableCell>

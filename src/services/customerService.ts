@@ -233,6 +233,41 @@ const customerService = {
     }
   },
 
+  mergeTransactions: async (
+    sourceCustomerId: string,
+    targetCustomerId: string,
+  ): Promise<{ movedCount: number; sourceName: string; targetName: string }> => {
+    try {
+      const { data } = await axiosClient.post(API_ROUTES.CUSTOMERS_MERGE, {
+        sourceCustomerId,
+        targetCustomerId,
+      });
+      invalidateCustomerLookup();
+      void getAllForLookup().catch(() => {
+        /* cache refresh best-effort */
+      });
+      return {
+        movedCount: Number(data.movedCount ?? 0),
+        sourceName: String(data.sourceName ?? ""),
+        targetName: String(data.targetName ?? ""),
+      };
+    } catch (error: unknown) {
+      const message =
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { message?: string } } })
+          .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.MERGE_CUSTOMERS_FAILED
+          : error instanceof Error
+            ? error.message
+            : API_ERRORS.MERGE_CUSTOMERS_FAILED;
+
+      throw new Error(message);
+    }
+  },
+
   getAllForLookup,
   subscribeToCustomerLookup,
 };

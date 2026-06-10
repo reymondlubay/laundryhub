@@ -367,6 +367,7 @@ const transactionService = {
   // Get all transactions, optionally filtered
   getAll: async (params?: {
     customer?: string;
+    customerId?: string;
     fromDate?: string;
     toDate?: string;
     date?: string;

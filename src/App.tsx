@@ -38,6 +38,9 @@ const SettingsActivityLogPage = lazy(
 const SettingsDeletedTransactionsPage = lazy(
   () => import("./pages/Settings/DeletedTransactions"),
 );
+const SettingsMergeCustomerTransactionsPage = lazy(
+  () => import("./pages/Settings/MergeCustomerTransactions"),
+);
 const ArchiveRecordPage = lazy(() => import("./pages/Archive/ArchiveRecord"));
 const ArchiveListingPage = lazy(() => import("./pages/Archive/ArchiveListing"));
 const InventoryItemsPage = lazy(
@@ -380,6 +383,18 @@ function App() {
                 <MainLayout>
                   <Suspense fallback={null}>
                     <SettingsDeletedTransactionsPage />
+                  </Suspense>
+                </MainLayout>
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path={route.SETTINGS_MERGE_CUSTOMER_TRANSACTIONS}
+            element={
+              <RoleProtectedRoute>
+                <MainLayout>
+                  <Suspense fallback={null}>
+                    <SettingsMergeCustomerTransactionsPage />
                   </Suspense>
                 </MainLayout>
               </RoleProtectedRoute>
