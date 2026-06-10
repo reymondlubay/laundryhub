@@ -107,10 +107,11 @@ export const formatEstimatedPickupTooltip = (
 ): string => {
   const estimated = dayjs(estimatedPickup);
   if (!estimated.isValid()) return "";
+  const timePart = estimated.format("h:mm A");
   const datePart = estimated.format("dddd, MMMM D, YYYY");
   return isEstimatedPickupTomorrow(estimatedPickup)
-    ? `Tomorrow, ${datePart}`
-    : datePart;
+    ? `Tomorrow, ${timePart}, ${datePart}`
+    : `${timePart}, ${datePart}`;
 };
 
 /** Unloaded rows scheduled for tomorrow are pinned to the top; later dates use receive-date order. */
