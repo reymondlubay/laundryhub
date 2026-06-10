@@ -78,7 +78,7 @@ import {
 } from "../../../utils/pricing";
 import { pickTransactionNum } from "../../../utils/normalizeTransaction";
 import { getTransactionNoteDetailLines } from "../../../utils/transactionNoteDetails";
-import { formatEstimatedPickupTooltip } from "../utils/transactionListFilters";
+import { getEstimatedPickupTooltipParts } from "../utils/transactionListFilters";
 import {
   clampPickupLoadsValue,
   getPickupHistoryLines,
@@ -180,6 +180,14 @@ const numberInputSx = {
 } as const;
 
 const TX_TABLE_STATUS_ICON_SIZE = 22;
+
+const TX_ESTIMATED_PICKUP_TIME_SX = {
+  color: "#ff5252",
+  fontWeight: 700,
+  fontSize: "1.08rem",
+  letterSpacing: "0.03em",
+  textShadow: "0 0 8px rgba(255, 82, 82, 0.45)",
+} as const;
 
 const TX_TABLE_TOOLTIP_SLOT_PROPS = {
   tooltip: {
@@ -1222,23 +1230,48 @@ function TransactionTableInner({
             >
               {params.data?.isFirstRow && params.data?.estimatedPickup ? (
                 <Tooltip
-                  title={
-                    <Box
-                      sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 0.25,
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      <span>Scheduled Pick Up</span>
-                      <span>
-                        {formatEstimatedPickupTooltip(
-                          params.data.estimatedPickup,
-                        )}
-                      </span>
-                    </Box>
-                  }
+                  title={(() => {
+                    const pickupTooltip = getEstimatedPickupTooltipParts(
+                      params.data.estimatedPickup,
+                    );
+                    if (!pickupTooltip) return "";
+                    return (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 0.25,
+                          fontSize: "0.95rem",
+                        }}
+                      >
+                        <span>Scheduled Pick Up</span>
+                        <Box component="span" sx={{ lineHeight: 1.5 }}>
+                          {pickupTooltip.isTomorrow ? (
+                            <>
+                              Tomorrow,{" "}
+                              <Box
+                                component="span"
+                                sx={TX_ESTIMATED_PICKUP_TIME_SX}
+                              >
+                                {pickupTooltip.timePart}
+                              </Box>
+                              , {pickupTooltip.datePart}
+                            </>
+                          ) : (
+                            <>
+                              <Box
+                                component="span"
+                                sx={TX_ESTIMATED_PICKUP_TIME_SX}
+                              >
+                                {pickupTooltip.timePart}
+                              </Box>
+                              , {pickupTooltip.datePart}
+                            </>
+                          )}
+                        </Box>
+                      </Box>
+                    );
+                  })()}
                   arrow
                   placement="right"
                   slotProps={TX_TABLE_TOOLTIP_SLOT_PROPS}
