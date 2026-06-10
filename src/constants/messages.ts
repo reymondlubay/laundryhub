@@ -32,6 +32,7 @@ export const API_ERRORS = {
   CREATE_CUSTOMER_FAILED: "Failed to create customer",
   UPDATE_CUSTOMER_FAILED: "Failed to update customer",
   DELETE_CUSTOMER_FAILED: "Failed to delete customer",
+  MERGE_CUSTOMERS_FAILED: "Failed to merge customer transactions",
   FETCH_TRANSACTIONS_FAILED: "Failed to fetch transactions",
   FETCH_TRANSACTION_FAILED: "Failed to fetch transaction",
   CREATE_TRANSACTION_FAILED: "Failed to create transaction",
@@ -62,6 +63,12 @@ export const CONFIRM_MESSAGES = {
     "Restore this transaction? It will appear again in the active transaction list.",
   ARCHIVE_TRANSACTIONS: (year: number, count: number) =>
     `Archive ${count} completed transaction(s) from ${year}? They will be moved to the archive and removed from active records.`,
+  MERGE_CUSTOMER_TRANSACTIONS: (
+    sourceName: string,
+    targetName: string,
+    count: number,
+  ) =>
+    `${sourceName} has ${count} transaction(s) that will be reassigned to ${targetName}. After the merge, ${sourceName} will be permanently deleted. This action cannot be undone.`,
   DELETE_PAYMENT:
     "Are you sure you want to delete this payment? This action cannot be undone.",
   PICKUP_WITH_BALANCE:
@@ -89,4 +96,19 @@ export const UI_TEXT = {
   RECONNECTING: "Reconnecting to server…",
   BACKEND_UNAVAILABLE: "Could not reach the server.",
   RETRY: "Retry",
+  MERGE_CUSTOMER_TRANSACTIONS: "Move and delete customer",
+  MERGE_CUSTOMER_TRANSACTIONS_TITLE: "Merge customer transactions",
+  MERGE_CONFIRM_PLACEHOLDER: "MERGE",
+  MERGE_CONFIRM_TITLE: "Confirm customer merge",
+  MERGE_CONFIRM_ACTION: "Merge customers",
+  MERGE_CONFIRM_TYPING: "Type MERGE to confirm.",
+  MERGE_SUCCESS: (count: number, sourceName: string, targetName: string) =>
+    `${count} transaction(s) moved from ${sourceName} to ${targetName}. ${sourceName} was deleted.`,
+  FROM_CUSTOMER: "From",
+  TO_CUSTOMER: "To",
+  SELECT_CUSTOMER: "Select customer",
+  TRANSACTIONS_TO_MOVE: (count: number) =>
+    `${count} transaction(s) will be moved`,
+  TARGET_TRANSACTION_COUNT: (count: number) =>
+    `${count} existing transaction(s)`,
 } as const;

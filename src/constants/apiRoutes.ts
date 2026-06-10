@@ -8,6 +8,7 @@ export const API_ROUTES = {
   ARCHIVED_TRANSACTIONS: "/archived-transactions",
   USERS: "/users",
   CUSTOMERS: "/customers",
+  CUSTOMERS_MERGE: "/customers/merge",
   INVENTORY_ITEMS: "/inventory-items",
   INVENTORY_RECORDS: "/inventory-records",
   EXPENSE_ITEMS: "/expense-items",

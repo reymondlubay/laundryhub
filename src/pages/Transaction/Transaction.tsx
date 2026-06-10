@@ -237,8 +237,26 @@ const Transaction = () => {
   );
 
   const handleKeyDown = React.useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter") void handleSearch();
+    (
+      e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+      autocompleteKeyDown?: React.KeyboardEventHandler<
+        HTMLInputElement | HTMLTextAreaElement
+      >,
+    ) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        setSuppressOptionHighlight(true);
+        setComboOpen(false);
+        void handleSearch();
+        return;
+      }
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        setSuppressOptionHighlight(false);
+      }
+
+      autocompleteKeyDown?.(e);
     },
     [handleSearch],
   );
@@ -262,12 +280,15 @@ const Transaction = () => {
   );
 
   const [comboOpen, setComboOpen] = React.useState(false);
+  const [suppressOptionHighlight, setSuppressOptionHighlight] =
+    React.useState(true);
   const canShowSuggestionList = searchText.trim().length >= 2;
   const suggestionListOpen = comboOpen && canShowSuggestionList;
 
   const handleClearCustomerSearch = () => {
     const useDefaultDateRange = !showReadyForPickupOnly;
     setComboOpen(false);
+    setSuppressOptionHighlight(true);
     setSearchText("");
     void search({ searchText: "", useDefaultDateRange });
   };
@@ -279,14 +300,25 @@ const Transaction = () => {
         {/* Customer search */}
         <Grid size={{ xs: 12, sm: "auto" }} sx={{ minWidth: { sm: 240 } }}>
           <Stack spacing={0.25}>
-            <Autocomplete<Customer, false, true, true>
+            <Autocomplete<Customer, false, false, true>
               freeSolo
-              disableClearable
+              popupIcon={null}
               size="small"
               fullWidth
               disabled={loading}
+              value={null}
+              autoHighlight={false}
+              selectOnFocus={false}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  paddingRight: "6px !important",
+                },
+              }}
               open={suggestionListOpen}
-              onOpen={() => setComboOpen(true)}
+              onOpen={() => {
+                setComboOpen(true);
+                setSuppressOptionHighlight(true);
+              }}
               onClose={() => setComboOpen(false)}
               options={autocompleteOptions}
               getOptionLabel={(option) =>
@@ -294,22 +326,45 @@ const Transaction = () => {
               }
               inputValue={searchText}
               onInputChange={(_, value, reason) => {
-                if (reason === "reset") return;
                 setSearchText(value);
+                if (reason === "input") {
+                  setSuppressOptionHighlight(true);
+                }
               }}
               onChange={(_, value) => {
                 if (value && typeof value === "object" && "name" in value) {
                   setSearchText(value.name);
+                  setSuppressOptionHighlight(true);
                   setComboOpen(false);
                   void handleSearch({ searchText: value.name });
                 }
               }}
               filterOptions={(options) => options}
+              slotProps={{
+                listbox: suppressOptionHighlight
+                  ? {
+                      sx: {
+                        "& .MuiAutocomplete-option.Mui-focused": {
+                          backgroundColor: "transparent",
+                        },
+                        "& .MuiAutocomplete-option[aria-selected='true']": {
+                          backgroundColor: "transparent",
+                          fontWeight: "inherit",
+                        },
+                      },
+                    }
+                  : undefined,
+              }}
               renderInput={(params) => (
                 <TextField
                   {...params}
                   placeholder="Type at least 2 characters for suggestions…"
-                  onKeyDown={handleKeyDown}
+                  inputProps={{
+                    ...params.inputProps,
+                    onKeyDown: (event) => {
+                      handleKeyDown(event, params.inputProps?.onKeyDown);
+                    },
+                  }}
                   InputProps={{
                     ...params.InputProps,
                     startAdornment: (
@@ -321,16 +376,15 @@ const Transaction = () => {
                       </>
                     ),
                     endAdornment: searchText ? (
-                      <InputAdornment position="end">
-                        <IconButton
-                          size="small"
-                          onClick={handleClearCustomerSearch}
-                          edge="end"
-                          aria-label="Clear customer search and refresh"
-                        >
-                          <ClearIcon fontSize="small" />
-                        </IconButton>
-                      </InputAdornment>
+                      <IconButton
+                        size="small"
+                        onClick={handleClearCustomerSearch}
+                        edge="end"
+                        aria-label="Clear customer search and refresh"
+                        sx={{ mr: -0.5 }}
+                      >
+                        <ClearIcon fontSize="small" />
+                      </IconButton>
                     ) : null,
                   }}
                 />

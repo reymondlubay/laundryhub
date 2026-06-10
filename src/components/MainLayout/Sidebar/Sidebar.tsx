@@ -404,6 +404,16 @@ export default function SidebarMenu() {
               Deleted transactions
             </MenuItem>
           )}
+          {isAdminUser && (
+            <MenuItem
+              component={
+                <Link to={route.SETTINGS_MERGE_CUSTOMER_TRANSACTIONS} />
+              }
+              active={activePath === route.SETTINGS_MERGE_CUSTOMER_TRANSACTIONS}
+            >
+              Merge customer transactions
+            </MenuItem>
+          )}
         </SubMenu>
       </Menu>
     </Sidebar>

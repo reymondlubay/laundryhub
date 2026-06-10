@@ -26,6 +26,7 @@ const route = {
   SETTINGS_FIXED_MONTHLY_EXPENSES: "/settings/fixed-monthly-expenses",
   SETTINGS_ACTIVITY_LOG: "/settings/activity-log",
   SETTINGS_DELETED_TRANSACTIONS: "/settings/deleted-transactions",
+  SETTINGS_MERGE_CUSTOMER_TRANSACTIONS: "/settings/merge-customer-transactions",
   ARCHIVE_RECORD: "/archive/record",
   ARCHIVE_LISTING: "/archive/listing",
 };
