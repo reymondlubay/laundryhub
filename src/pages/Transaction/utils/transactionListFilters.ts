@@ -102,16 +102,22 @@ export const isEstimatedPickupTomorrow = (
   return estimated.startOf("day").isSame(tomorrow, "day");
 };
 
-export const formatEstimatedPickupTooltip = (
+export type EstimatedPickupTooltipParts = {
+  isTomorrow: boolean;
+  timePart: string;
+  datePart: string;
+};
+
+export const getEstimatedPickupTooltipParts = (
   estimatedPickup?: string | null,
-): string => {
+): EstimatedPickupTooltipParts | null => {
   const estimated = dayjs(estimatedPickup);
-  if (!estimated.isValid()) return "";
-  const timePart = estimated.format("h:mm A");
-  const datePart = estimated.format("dddd, MMMM D, YYYY");
-  return isEstimatedPickupTomorrow(estimatedPickup)
-    ? `Tomorrow, ${timePart}, ${datePart}`
-    : `${timePart}, ${datePart}`;
+  if (!estimated.isValid()) return null;
+  return {
+    isTomorrow: isEstimatedPickupTomorrow(estimatedPickup),
+    timePart: estimated.format("h:mm A"),
+    datePart: estimated.format("dddd, MMMM D, YYYY"),
+  };
 };
 
 /** Unloaded rows scheduled for tomorrow are pinned to the top; later dates use receive-date order. */
