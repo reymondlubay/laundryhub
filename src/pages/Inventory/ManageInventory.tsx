@@ -45,6 +45,13 @@ import inventoryRecordService, {
   type InventoryRecord,
   type UpdateInventoryRecordPayload,
 } from "../../services/inventoryRecordService";
+import expenseRecordService, {
+  type ExpenseRecord,
+} from "../../services/expenseRecordService";
+import {
+  getLotConsumptionByRecordId,
+  inventoryConsumptionFromExpenses,
+} from "../../utils/inventoryFifo";
 import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 
 type FormState = {
@@ -66,6 +73,7 @@ const emptyForm = (): FormState => ({
 const ManageInventoryPage: React.FC = () => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [records, setRecords] = useState<InventoryRecord[]>([]);
+  const [expenseRecords, setExpenseRecords] = useState<ExpenseRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +96,23 @@ const ManageInventoryPage: React.FC = () => {
     items.forEach((i) => map.set(i.id, i));
     return map;
   }, [items]);
+
+  const lotConsumptionByRecordId = useMemo(
+    () =>
+      getLotConsumptionByRecordId({
+        inventoryRecords: records,
+        consumptionRecords: inventoryConsumptionFromExpenses(expenseRecords),
+      }),
+    [expenseRecords, records],
+  );
+
+  const isRecordLockedByUsage = useCallback(
+    (recordId: string): boolean =>
+      (lotConsumptionByRecordId.get(recordId)?.consumedPieces ?? 0) >= 1,
+    [lotConsumptionByRecordId],
+  );
+
+  const editingIsLocked = editing ? isRecordLockedByUsage(editing.id) : false;
 
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
@@ -118,12 +143,14 @@ const ManageInventoryPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [lookupItems, data] = await Promise.all([
+      const [lookupItems, data, expenseData] = await Promise.all([
         inventoryItemService.getAllForLookup(),
         inventoryRecordService.getAll(),
+        expenseRecordService.getAll(),
       ]);
       setItems(lookupItems);
       setRecords(data);
+      setExpenseRecords(expenseData);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : API_ERRORS.SAVE_FAILED);
     } finally {
@@ -207,10 +234,12 @@ const ManageInventoryPage: React.FC = () => {
         const payload: UpdateInventoryRecordPayload = {
           itemId: form.item?.id,
           date: form.date.toISOString(),
-          pieces: Number(form.pieces),
-          pricePerPiece: Number(form.pricePerPiece),
           dateOfPrice: form.dateOfPrice.toISOString(),
         };
+        if (!editingIsLocked) {
+          payload.pieces = Number(form.pieces);
+          payload.pricePerPiece = Number(form.pricePerPiece);
+        }
         await inventoryRecordService.update(editing.id, payload);
       } else {
         const payload: CreateInventoryRecordPayload = {
@@ -399,6 +428,7 @@ const ManageInventoryPage: React.FC = () => {
                           <IconButton
                             color="error"
                             onClick={() => setDeleteId(record.id)}
+                            disabled={isRecordLockedByUsage(record.id)}
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -485,8 +515,14 @@ const ManageInventoryPage: React.FC = () => {
                   size="small"
                   label="Pieces"
                   value={form.pieces}
+                  disabled={editingIsLocked}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, pieces: e.target.value }))
+                  }
+                  helperText={
+                    editingIsLocked
+                      ? "Pieces cannot be changed because this entry has been used in recorded expenses."
+                      : undefined
                   }
                 />
               </Grid>
@@ -497,11 +533,17 @@ const ManageInventoryPage: React.FC = () => {
                   size="small"
                   label="Price per piece"
                   value={form.pricePerPiece}
+                  disabled={editingIsLocked}
                   onChange={(e) =>
                     setForm((prev) => ({
                       ...prev,
                       pricePerPiece: e.target.value,
                     }))
+                  }
+                  helperText={
+                    editingIsLocked
+                      ? "Price per piece cannot be changed because this entry has been used in recorded expenses."
+                      : undefined
                   }
                 />
               </Grid>

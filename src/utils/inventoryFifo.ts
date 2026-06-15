@@ -24,17 +24,35 @@ export type UsageCostResult = {
   totalPrice: number;
 };
 
+export type LotConsumptionInfo = {
+  originalPieces: number;
+  consumedPieces: number;
+  remainingPieces: number;
+};
+
+export const FIFO_PREVIEW_EXPENSE_ID = "__fifo-preview__";
+
 const toTime = (value?: string | null): number => {
   if (!value) return 0;
   const d = dayjs(value);
   return d.isValid() ? d.valueOf() : 0;
 };
 
+const sortInventoryRecords = (records: InventoryRecord[]): InventoryRecord[] =>
+  [...records].sort((a, b) => {
+    const byPriceDate = toTime(a.dateOfPrice) - toTime(b.dateOfPrice);
+    if (byPriceDate !== 0) return byPriceDate;
+    const byDate = toTime(a.date) - toTime(b.date);
+    if (byDate !== 0) return byDate;
+    const byCreated = toTime(a.createdAt) - toTime(b.createdAt);
+    if (byCreated !== 0) return byCreated;
+    return a.id.localeCompare(b.id);
+  });
+
 /**
  * FIFO costing:
- * - Inventory lots are ordered by `dateOfPrice` ascending (then by record `date`).
- * - Consumption records are ordered by `date` ascending.
- * Each consumption consumes the oldest remaining lots first.
+ * - Inventory lots are ordered by dateOfPrice, then date, then createdAt.
+ * - Consumption records are ordered by date ascending.
  */
 export function computeFifoUsageCosts(params: {
   inventoryRecords: InventoryRecord[];
@@ -44,27 +62,23 @@ export function computeFifoUsageCosts(params: {
   remainingLotsByItemId: Map<string, FifoLot[]>;
 } {
   const lotsByItemId = new Map<string, FifoLot[]>();
+  const recordsByItem = new Map<string, InventoryRecord[]>();
 
   params.inventoryRecords.forEach((r) => {
-    const itemId = r.itemId;
-    const lot: FifoLot = {
+    const arr = recordsByItem.get(r.itemId) || [];
+    arr.push(r);
+    recordsByItem.set(r.itemId, arr);
+  });
+
+  recordsByItem.forEach((records, itemId) => {
+    const lots = sortInventoryRecords(records).map((r) => ({
       inventoryRecordId: r.id,
       itemId,
       dateOfPrice: r.dateOfPrice,
       pricePerPiece: Number(r.pricePerPiece) || 0,
       remainingPieces: Number(r.pieces) || 0,
-    };
-    const arr = lotsByItemId.get(itemId) || [];
-    arr.push(lot);
-    lotsByItemId.set(itemId, arr);
-  });
-
-  lotsByItemId.forEach((arr) => {
-    arr.sort((a, b) => {
-      const byPriceDate = toTime(a.dateOfPrice) - toTime(b.dateOfPrice);
-      if (byPriceDate !== 0) return byPriceDate;
-      return a.inventoryRecordId.localeCompare(b.inventoryRecordId);
-    });
+    }));
+    lotsByItemId.set(itemId, lots);
   });
 
   const usages = [...params.consumptionRecords].sort((a, b) => {
@@ -130,4 +144,78 @@ export function inventoryConsumptionFromExpenses(
       pieces: Number(r.pieces) || 0,
       isExternalUsage: Boolean(r.isExternalUsage),
     }));
+}
+
+export function getLotConsumptionByRecordId(params: {
+  inventoryRecords: InventoryRecord[];
+  consumptionRecords: InventoryConsumptionRecord[];
+}): Map<string, LotConsumptionInfo> {
+  const originalById = new Map<string, number>();
+  params.inventoryRecords.forEach((r) => {
+    originalById.set(r.id, Number(r.pieces) || 0);
+  });
+
+  const { remainingLotsByItemId } = computeFifoUsageCosts(params);
+  const result = new Map<string, LotConsumptionInfo>();
+
+  remainingLotsByItemId.forEach((lots) => {
+    lots.forEach((lot) => {
+      const original = originalById.get(lot.inventoryRecordId) ?? 0;
+      const remaining = lot.remainingPieces;
+      result.set(lot.inventoryRecordId, {
+        originalPieces: original,
+        consumedPieces: Math.max(0, original - remaining),
+        remainingPieces: remaining,
+      });
+    });
+  });
+
+  params.inventoryRecords.forEach((r) => {
+    if (!result.has(r.id)) {
+      const original = Number(r.pieces) || 0;
+      result.set(r.id, {
+        originalPieces: original,
+        consumedPieces: 0,
+        remainingPieces: original,
+      });
+    }
+  });
+
+  return result;
+}
+
+export function computeInventoryExpenseAmount(params: {
+  inventoryRecords: InventoryRecord[];
+  consumptionRecords: InventoryConsumptionRecord[];
+  inventoryItemId: string;
+  pieces: number;
+  expenseDate: string;
+  expenseId?: string;
+  excludeExpenseId?: string;
+}): number | null {
+  const pieces = Math.floor(Number(params.pieces));
+  if (!Number.isFinite(pieces) || pieces < 1) return null;
+
+  const filtered = params.consumptionRecords.filter(
+    (r) => r.id !== params.excludeExpenseId,
+  );
+  const targetId = params.expenseId ?? FIFO_PREVIEW_EXPENSE_ID;
+
+  const { usageCostsById } = computeFifoUsageCosts({
+    inventoryRecords: params.inventoryRecords,
+    consumptionRecords: [
+      ...filtered,
+      {
+        id: targetId,
+        itemId: params.inventoryItemId,
+        date: params.expenseDate,
+        pieces,
+        isExternalUsage: false,
+      },
+    ],
+  });
+
+  const result = usageCostsById.get(targetId);
+  if (!result) return null;
+  return Number(result.totalPrice.toFixed(2));
 }

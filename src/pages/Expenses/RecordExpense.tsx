@@ -61,6 +61,10 @@ import expenseRecordService, {
 } from "../../services/expenseRecordService";
 import { isAdmin } from "../../utils/roleAccess";
 import { ignoreBackdropClose } from "../../utils/muiDialogClose";
+import {
+  computeInventoryExpenseAmount,
+  inventoryConsumptionFromExpenses,
+} from "../../utils/inventoryFifo";
 
 type ExpenseOption = {
   key: string;
@@ -188,31 +192,10 @@ const RecordExpensePage: React.FC = () => {
     return map;
   }, [expenseItems]);
 
-  const latestPriceByItemId = useMemo(() => {
-    const map = new Map<string, number>();
-    const seenByItem = new Map<
-      string,
-      { dateOfPrice: number; createdAt: number; pricePerPiece: number }
-    >();
-    inventoryRecords.forEach((rec) => {
-      const dop = dayjs(rec.dateOfPrice || rec.date || 0).valueOf() || 0;
-      const ca = dayjs(rec.createdAt || rec.date || 0).valueOf() || 0;
-      const prev = seenByItem.get(rec.itemId);
-      if (
-        !prev ||
-        dop > prev.dateOfPrice ||
-        (dop === prev.dateOfPrice && ca > prev.createdAt)
-      ) {
-        seenByItem.set(rec.itemId, {
-          dateOfPrice: dop,
-          createdAt: ca,
-          pricePerPiece: Number(rec.pricePerPiece) || 0,
-        });
-      }
-    });
-    seenByItem.forEach((v, k) => map.set(k, v.pricePerPiece));
-    return map;
-  }, [inventoryRecords]);
+  const inventoryConsumptionRecords = useMemo(
+    () => inventoryConsumptionFromExpenses(records),
+    [records],
+  );
 
   const visibleExpenseItems = useMemo(() => {
     if (isCurrentUserAdmin) return expenseItems;
@@ -307,10 +290,23 @@ const RecordExpensePage: React.FC = () => {
     if (form.option?.type !== "inventory") return null;
     const pieces = Number(form.pieces);
     if (!Number.isFinite(pieces) || pieces <= 0) return null;
-    const price = latestPriceByItemId.get(form.option.id);
-    if (price == null) return null;
-    return Number((pieces * price).toFixed(2));
-  }, [form.option, form.pieces, latestPriceByItemId]);
+    return computeInventoryExpenseAmount({
+      inventoryRecords,
+      consumptionRecords: inventoryConsumptionRecords,
+      inventoryItemId: form.option.id,
+      pieces,
+      expenseDate: form.date.toISOString(),
+      expenseId: editing?.id,
+      excludeExpenseId: editing?.id,
+    });
+  }, [
+    editing?.id,
+    form.date,
+    form.option,
+    form.pieces,
+    inventoryConsumptionRecords,
+    inventoryRecords,
+  ]);
 
   const filteredRecords = useMemo(() => {
     const bySource =
@@ -884,11 +880,11 @@ const RecordExpensePage: React.FC = () => {
                           isCurrentUserAdmin
                         ? `Amount preview: ${phpFormatter.format(
                             computedAmountPreview,
-                          )} (auto-calculated on save)`
+                          )} (FIFO cost, auto-calculated on save)`
                         : isInventory &&
                             isCurrentUserAdmin &&
                             computedAmountPreview == null
-                          ? "Amount is auto-calculated from latest inventory price on save."
+                          ? "Amount is auto-calculated from oldest inventory stock (FIFO) on save."
                           : ""
                   }
                 />
