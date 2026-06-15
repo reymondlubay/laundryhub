@@ -36,6 +36,15 @@ type SummaryRow = {
   totalPrice: number;
 };
 
+type PricingSummaryRow = {
+  key: string;
+  itemId: string;
+  itemName: string;
+  pricePerPiece: number;
+  remainingPieces: number;
+  totalPrice: number;
+};
+
 const currency = new Intl.NumberFormat("en-PH", {
   style: "currency",
   currency: "PHP",
@@ -111,6 +120,50 @@ const InventorySummaryPage: React.FC = () => {
     });
 
     rows.sort((a, b) => a.itemName.localeCompare(b.itemName));
+    return rows;
+  }, [itemById, records, allConsumption]);
+
+  const pricingSummary = useMemo<PricingSummaryRow[]>(() => {
+    const { remainingLotsByItemId } = computeFifoUsageCosts({
+      inventoryRecords: records,
+      consumptionRecords: allConsumption,
+    });
+
+    const rows: PricingSummaryRow[] = [];
+
+    remainingLotsByItemId.forEach((lots, itemId) => {
+      const remainingByPrice = new Map<number, number>();
+
+      lots.forEach((lot) => {
+        const remaining = Number(lot.remainingPieces) || 0;
+        if (remaining <= 0) return;
+        const pricePerPiece = Number(lot.pricePerPiece) || 0;
+        remainingByPrice.set(
+          pricePerPiece,
+          (remainingByPrice.get(pricePerPiece) || 0) + remaining,
+        );
+      });
+
+      const itemName = itemById.get(itemId)?.name || "Unknown Item";
+
+      remainingByPrice.forEach((remainingPieces, pricePerPiece) => {
+        rows.push({
+          key: `${itemId}:${pricePerPiece}`,
+          itemId,
+          itemName,
+          pricePerPiece,
+          remainingPieces,
+          totalPrice: remainingPieces * pricePerPiece,
+        });
+      });
+    });
+
+    rows.sort((a, b) => {
+      const byName = a.itemName.localeCompare(b.itemName);
+      if (byName !== 0) return byName;
+      return a.pricePerPiece - b.pricePerPiece;
+    });
+
     return rows;
   }, [itemById, records, allConsumption]);
 
@@ -228,6 +281,52 @@ const InventorySummaryPage: React.FC = () => {
                   <TableRow key={row.itemId}>
                     <TableCell>{row.itemName}</TableCell>
                     <TableCell align="right">{row.totalPieces}</TableCell>
+                    <TableCell align="right">
+                      {currency.format(row.totalPrice)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      <Paper sx={{ mt: 3 }}>
+        <Typography variant="subtitle1" sx={{ p: 2, pb: 1, fontWeight: 700 }}>
+          Summary By Pricing
+        </Typography>
+        <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell>Item</TableCell>
+                <TableCell align="right">Price</TableCell>
+                <TableCell align="right">Remaining Pcs</TableCell>
+                <TableCell align="right">Total Price</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    Loading...
+                  </TableCell>
+                </TableRow>
+              ) : pricingSummary.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    No remaining inventory by price.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pricingSummary.map((row) => (
+                  <TableRow key={row.key}>
+                    <TableCell>{row.itemName}</TableCell>
+                    <TableCell align="right">
+                      {currency.format(row.pricePerPiece)}
+                    </TableCell>
+                    <TableCell align="right">{row.remainingPieces}</TableCell>
                     <TableCell align="right">
                       {currency.format(row.totalPrice)}
                     </TableCell>
