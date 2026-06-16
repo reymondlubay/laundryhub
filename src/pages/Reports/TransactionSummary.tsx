@@ -102,27 +102,16 @@ const getTransactionFieldDate = (
 
 type RecordTypeFilter =
   | "all"
+  | "pending"
+  | "paid"
+  | "unpaid"
+  | "pickup"
+  | "not-pickup"
   | "with-balance"
   | "withdrawn"
   | "wrong-record"
   | "backdate-payment"
   | "backdate-pickup";
-
-type StatusIncludeFilters = {
-  pending: boolean;
-  paid: boolean;
-  unpaid: boolean;
-  pickup: boolean;
-  notPickup: boolean;
-};
-
-const DEFAULT_STATUS_INCLUDES: StatusIncludeFilters = {
-  pending: true,
-  paid: true,
-  unpaid: true,
-  pickup: true,
-  notPickup: true,
-};
 
 type ExportColumnKey =
   | "dateReceived"
@@ -185,56 +174,6 @@ const isPaid = (
   if (total <= 0) return totalPaid > 0;
   return totalPaid >= total;
 };
-
-const matchesPrimaryStatusIncludes = (
-  transaction: Transaction,
-  filters: StatusIncludeFilters,
-  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
-): boolean => {
-  if (isPending(transaction) && filters.pending) return true;
-  if (isUnpaid(transaction) && filters.unpaid) return true;
-  if (isPaid(transaction, addonsPricing) && filters.paid) return true;
-  if (
-    !isPending(transaction) &&
-    !isPaid(transaction, addonsPricing) &&
-    !isUnpaid(transaction) &&
-    (filters.paid || filters.unpaid)
-  ) {
-    return true;
-  }
-  return false;
-};
-
-const matchesStatusIncludes = (
-  transaction: Transaction,
-  filters: StatusIncludeFilters,
-  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
-): boolean => {
-  const primaryActive =
-    filters.pending || filters.paid || filters.unpaid;
-  if (
-    primaryActive &&
-    !matchesPrimaryStatusIncludes(transaction, filters, addonsPricing)
-  ) {
-    return false;
-  }
-
-  if (filters.pickup || filters.notPickup) {
-    const matchesPickupFilter =
-      (isPickup(transaction) && filters.pickup) ||
-      (isNotPickup(transaction) && filters.notPickup);
-    if (!matchesPickupFilter) return false;
-  }
-
-  return true;
-};
-
-const hasAnyStatusInclude = (filters: StatusIncludeFilters): boolean =>
-  filters.pending ||
-  filters.paid ||
-  filters.unpaid ||
-  filters.pickup ||
-  filters.notPickup;
 
 const parseAmountFilter = (value: string): number | null => {
   const trimmed = value.trim();
@@ -439,6 +378,16 @@ const matchesRecordTypeFilter = (
   if (recordType === "all") return true;
 
   switch (recordType) {
+    case "pending":
+      return isPending(transaction);
+    case "paid":
+      return isPaid(transaction, addonsPricing);
+    case "unpaid":
+      return isUnpaid(transaction);
+    case "pickup":
+      return isPickup(transaction);
+    case "not-pickup":
+      return isNotPickup(transaction);
     case "with-balance": {
       const total = getTransactionGrandTotal(transaction, addonsPricing);
       const totalPaid = getTotalPaidAmount(transaction);
@@ -478,8 +427,6 @@ const TransactionSummary = () => {
   const [allTime, setAllTime] = React.useState(false);
   const [recordTypeFilter, setRecordTypeFilter] =
     React.useState<RecordTypeFilter>("all");
-  const [statusIncludes, setStatusIncludes] =
-    React.useState<StatusIncludeFilters>(DEFAULT_STATUS_INCLUDES);
   const [amountMin, setAmountMin] = React.useState("");
   const [amountMax, setAmountMax] = React.useState("");
   const [page, setPage] = React.useState(0);
@@ -530,14 +477,9 @@ const TransactionSummary = () => {
     dateTo,
     allTime,
     recordTypeFilter,
-    statusIncludes,
     amountMin,
     amountMax,
   ]);
-
-  const statusIncludesActive = recordTypeFilter === "all";
-  const noStatusIncludesSelected =
-    statusIncludesActive && !hasAnyStatusInclude(statusIncludes);
 
   React.useEffect(() => {
     const loadData = async () => {
@@ -598,11 +540,7 @@ const TransactionSummary = () => {
       parsedAmountMax == null ||
       parsedAmountMax >= parsedAmountMin;
 
-    if (noStatusIncludesSelected) {
-      return [];
-    }
-
-    // Record type + status include filters
+    // Record type filters
     result = result.filter((transaction) => {
       const isDeleted =
         transaction.isDeleted ||
@@ -626,18 +564,12 @@ const TransactionSummary = () => {
 
       if (isDeleted) return false;
 
-      if (recordTypeFilter !== "all") {
-        if (
-          !matchesRecordTypeFilter(
-            transaction,
-            recordTypeFilter,
-            addonsPricing,
-          )
-        ) {
-          return false;
-        }
-      } else if (
-        !matchesStatusIncludes(transaction, statusIncludes, addonsPricing)
+      if (
+        !matchesRecordTypeFilter(
+          transaction,
+          recordTypeFilter,
+          addonsPricing,
+        )
       ) {
         return false;
       }
@@ -659,8 +591,6 @@ const TransactionSummary = () => {
     dateTo,
     allTime,
     recordTypeFilter,
-    statusIncludes,
-    noStatusIncludesSelected,
     parsedAmountMin,
     parsedAmountMax,
     addonsPricing,
@@ -947,7 +877,7 @@ const TransactionSummary = () => {
             flexWrap="wrap"
             useFlexGap
           >
-            <FormControl sx={{ minWidth: 200 }} size="small">
+            <FormControl sx={{ minWidth: 220 }} size="small">
               <InputLabel>Record type</InputLabel>
               <Select
                 value={recordTypeFilter}
@@ -957,113 +887,17 @@ const TransactionSummary = () => {
                 }
               >
                 <MenuItem value="all">All Records</MenuItem>
+                <MenuItem value="pending">Pending</MenuItem>
+                <MenuItem value="paid">Paid</MenuItem>
+                <MenuItem value="unpaid">Unpaid</MenuItem>
+                <MenuItem value="pickup">Pickup</MenuItem>
+                <MenuItem value="not-pickup">Not picked up</MenuItem>
                 <MenuItem value="with-balance">With balance</MenuItem>
                 <MenuItem value="backdate-payment">Backdate payment</MenuItem>
                 <MenuItem value="backdate-pickup">Backdate pickup</MenuItem>
                 <MenuItem value="withdrawn">Withdrawn</MenuItem>
                 <MenuItem value="wrong-record">Wrong Record</MenuItem>
               </Select>
-            </FormControl>
-
-            <FormControl
-              component="fieldset"
-              variant="standard"
-              disabled={!statusIncludesActive}
-              sx={{ minWidth: 0 }}
-            >
-              <Typography
-                component="legend"
-                variant="caption"
-                sx={{ fontWeight: 600, color: "text.secondary", mb: 0.5 }}
-              >
-                Include
-              </Typography>
-              <FormGroup row sx={{ gap: { xs: 0, sm: 1 } }}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={statusIncludes.pending}
-                      onChange={(e) =>
-                        setStatusIncludes((prev) => ({
-                          ...prev,
-                          pending: e.target.checked,
-                        }))
-                      }
-                    />
-                  }
-                  label="Pending"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={statusIncludes.paid}
-                      onChange={(e) =>
-                        setStatusIncludes((prev) => ({
-                          ...prev,
-                          paid: e.target.checked,
-                        }))
-                      }
-                    />
-                  }
-                  label="Paid"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={statusIncludes.unpaid}
-                      onChange={(e) =>
-                        setStatusIncludes((prev) => ({
-                          ...prev,
-                          unpaid: e.target.checked,
-                        }))
-                      }
-                    />
-                  }
-                  label="Unpaid"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={statusIncludes.pickup}
-                      onChange={(e) =>
-                        setStatusIncludes((prev) => ({
-                          ...prev,
-                          pickup: e.target.checked,
-                        }))
-                      }
-                    />
-                  }
-                  label="Pickup"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={statusIncludes.notPickup}
-                      onChange={(e) =>
-                        setStatusIncludes((prev) => ({
-                          ...prev,
-                          notPickup: e.target.checked,
-                        }))
-                      }
-                    />
-                  }
-                  label="Not picked up"
-                />
-              </FormGroup>
-              {!statusIncludesActive ? (
-                <FormHelperText>
-                  Status checkboxes apply only for All Records.
-                </FormHelperText>
-              ) : noStatusIncludesSelected ? (
-                <FormHelperText error>
-                  Select at least one status to show transactions.
-                </FormHelperText>
-              ) : null}
             </FormControl>
 
             <TextField
@@ -1105,10 +939,6 @@ const TransactionSummary = () => {
         <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
           <CircularProgress />
         </Box>
-      ) : noStatusIncludesSelected ? (
-        <Alert severity="warning">
-          Select at least one status under Include to show transactions.
-        </Alert>
       ) : filteredTransactions.length === 0 ? (
         <Alert severity="info">No transactions found.</Alert>
       ) : (
