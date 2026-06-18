@@ -50,22 +50,10 @@ const authService = {
 
         // Store user info
         if (data.user) {
-          const normalizedUser = {
-            ...data.user,
-            userName:
-              data.user.userName || data.user.username || credentials.userName,
-            username:
-              data.user.username || data.user.userName || credentials.userName,
-            name:
-              data.user.name ||
-              [data.user.firstName, data.user.lastName]
-                .filter(Boolean)
-                .join(" ")
-                .trim() ||
-              data.user.userName ||
-              data.user.username ||
-              credentials.userName,
-          };
+          const normalizedUser = authService.normalizeStoredUser(
+            data.user,
+            credentials.userName,
+          );
           localStorage.setItem("user", JSON.stringify(normalizedUser));
         }
       }
@@ -188,6 +176,26 @@ const authService = {
   getToken: (): string | null => {
     return storage.getToken(storageKey.TOKEN);
   },
+
+  normalizeStoredUser: (
+    raw: UserInfo & { username?: string; firstname?: string; lastname?: string },
+    fallbackUserName?: string,
+  ): UserInfo => ({
+    ...raw,
+    firstName: raw.firstName || raw.firstname || "",
+    lastName: raw.lastName || raw.lastname || "",
+    userName: raw.userName || raw.username || fallbackUserName,
+    username: raw.username || raw.userName || fallbackUserName,
+    name:
+      [raw.firstName || raw.firstname, raw.lastName || raw.lastname]
+        .filter(Boolean)
+        .join(" ")
+        .trim() ||
+      raw.name ||
+      raw.userName ||
+      raw.username ||
+      fallbackUserName,
+  }),
 };
 
 export default authService;

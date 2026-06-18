@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Avatar,
   IconButton,
@@ -10,12 +10,62 @@ import {
   Box,
 } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
-import authService from "../../services/authService";
-import { toPascalCase, toTitleCaseWords } from "../../utils/stringUtils";
+import PersonIcon from "@mui/icons-material/Person";
+import { useNavigate } from "react-router-dom";
+import authService, { type UserInfo } from "../../services/authService";
+import userService from "../../services/userService";
+import route from "../../constants/route";
+import { toTitleCaseWords } from "../../utils/stringUtils";
+
+const getFullName = (user: UserInfo | null): string =>
+  toTitleCaseWords(
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim(),
+  );
 
 const UserMenu: React.FC = () => {
+  const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const user = authService.getCurrentUser();
+  const [user, setUser] = useState(authService.getCurrentUser());
+
+  const refreshUser = () => setUser(authService.getCurrentUser());
+
+  useEffect(() => {
+    refreshUser();
+
+    const current = authService.getCurrentUser();
+    if (!current?.id) return;
+
+    const hasName = Boolean(
+      current.firstName?.trim() || current.lastName?.trim(),
+    );
+    if (hasName) return;
+
+    let cancelled = false;
+
+    void userService
+      .getById(current.id)
+      .then((profile) => {
+        if (cancelled) return;
+        const enriched = authService.normalizeStoredUser({
+          ...current,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          userName: profile.userName,
+        });
+        localStorage.setItem("user", JSON.stringify(enriched));
+        setUser(enriched);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("auth-user-updated", refreshUser);
+    return () => window.removeEventListener("auth-user-updated", refreshUser);
+  }, []);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -30,6 +80,11 @@ const UserMenu: React.FC = () => {
     authService.logout();
   };
 
+  const handleProfile = () => {
+    handleMenuClose();
+    navigate(route.PROFILE);
+  };
+
   const getInitials = (name?: string): string => {
     if (!name) return "U";
     return name
@@ -40,16 +95,7 @@ const UserMenu: React.FC = () => {
       .slice(0, 2);
   };
 
-  const fullName = toTitleCaseWords(
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim(),
-  );
-  const rawDisplayName =
-    fullName ||
-    user?.name ||
-    user?.userName ||
-    (user as { username?: string } | null)?.username ||
-    "User";
-  const displayName = toTitleCaseWords(String(rawDisplayName || "User").trim());
+  const displayName = getFullName(user) || "User";
 
   return (
     <>
@@ -73,7 +119,7 @@ const UserMenu: React.FC = () => {
       >
         <Box sx={{ px: 2, py: 1.5 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-            {toPascalCase(displayName)}
+            {displayName}
           </Typography>
           <Typography variant="caption" sx={{ color: "text.secondary" }}>
             Role: {user?.role || "Unknown"}
@@ -81,6 +127,13 @@ const UserMenu: React.FC = () => {
         </Box>
 
         <Divider />
+
+        <MenuItem onClick={handleProfile}>
+          <ListItemIcon>
+            <PersonIcon fontSize="small" />
+          </ListItemIcon>
+          <Typography variant="body2">My Profile</Typography>
+        </MenuItem>
 
         <MenuItem onClick={handleLogout}>
           <ListItemIcon>

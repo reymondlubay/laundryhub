@@ -27,6 +27,7 @@ const route = {
   SETTINGS_ACTIVITY_LOG: "/settings/activity-log",
   SETTINGS_DELETED_TRANSACTIONS: "/settings/deleted-transactions",
   SETTINGS_MERGE_CUSTOMER_TRANSACTIONS: "/settings/merge-customer-transactions",
+  PROFILE: "/profile",
   ARCHIVE_RECORD: "/archive/record",
   ARCHIVE_LISTING: "/archive/listing",
 };

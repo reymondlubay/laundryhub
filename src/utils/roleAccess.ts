@@ -37,6 +37,7 @@ const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
     "/settings/activity-log",
     "/settings/deleted-transactions",
     "/settings/merge-customer-transactions",
+    "/profile",
     "/archive/record",
     "/archive/listing",
   ],
@@ -47,6 +48,7 @@ const MODULE_ACCESS: Record<UserRoleValue, string[]> = {
     "/reports/transaction",
     "/expenses/records",
     "/settings/database",
+    "/profile",
   ],
 };
 
