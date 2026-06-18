@@ -3,6 +3,8 @@ import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { notifyNetworkFailure } from "../utils/backendNetworkHandler";
 import { storage, storageKey } from "../utils/storage";
 
+const SESSION_INVALIDATED_CODE = "session_invalidated";
+
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 if (!baseURL) {
@@ -36,11 +38,15 @@ axiosClient.interceptors.response.use(
   (error: AxiosError) => {
     const requestUrl = error.config?.url ?? "";
     const isLoginRequest = requestUrl.includes("/login");
+    const responseData = error.response?.data as { code?: string } | undefined;
 
     // Handle 401 unauthorized
     if (error?.response?.status === 401 && !isLoginRequest) {
       storage.removeToken(storageKey.TOKEN);
       localStorage.removeItem("user");
+      if (responseData?.code === SESSION_INVALIDATED_CODE) {
+        sessionStorage.setItem("auth_logout_reason", SESSION_INVALIDATED_CODE);
+      }
       window.location.href = "/login";
     }
 

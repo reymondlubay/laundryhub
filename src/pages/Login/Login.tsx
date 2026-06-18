@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Container,
@@ -26,6 +26,14 @@ const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState({ userName: false, password: false });
+
+  useEffect(() => {
+    const logoutReason = sessionStorage.getItem("auth_logout_reason");
+    if (logoutReason === "session_invalidated") {
+      setError(API_ERRORS.SESSION_INVALIDATED);
+      sessionStorage.removeItem("auth_logout_reason");
+    }
+  }, []);
 
   const validateForm = (): boolean => {
     return userName.trim() !== "" && password.trim() !== "";
