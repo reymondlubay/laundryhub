@@ -66,6 +66,24 @@ const normalizeUser = (raw: unknown): UserItem => {
 };
 
 const userService = {
+  getById: async (id: string): Promise<UserItem> => {
+    try {
+      const { data } = await axiosClient.get(`${API_ROUTES.USERS}/${id}`);
+      return normalizeUser(data.user);
+    } catch (error: unknown) {
+      const message =
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { message?: string } } })
+          .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || API_ERRORS.FETCH_USERS_FAILED
+          : API_ERRORS.FETCH_USERS_FAILED;
+      throw new Error(message);
+    }
+  },
+
   getAll: async (): Promise<UserItem[]> => {
     try {
       const { data } = await axiosClient.get(API_ROUTES.USERS);

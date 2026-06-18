@@ -1,6 +1,7 @@
 export const API_ROUTES = {
   LOGIN: "/login",
   LOGOUT: "/logout",
+  PROFILE: "/profile",
   TRANSACTIONS: "/transactions",
   TRANSACTIONS_DELETED: "/transactions/deleted",
   TRANSACTIONS_ARCHIVE_CANDIDATES: "/transactions/archive-candidates",
