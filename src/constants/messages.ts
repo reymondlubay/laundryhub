@@ -26,6 +26,8 @@ export const FORM_ERRORS = {
 
 export const API_ERRORS = {
   LOGIN_FAILED: "Login failed. Please try again.",
+  SESSION_INVALIDATED:
+    "Your session ended because your password was changed. Please sign in again.",
   FETCH_USERS_FAILED: "Failed to fetch users",
   CREATE_USER_FAILED: "Failed to create user",
   UPDATE_USER_FAILED: "Failed to update user",

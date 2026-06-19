@@ -175,6 +175,16 @@ const isPaid = (
   return totalPaid >= total;
 };
 
+/** Has payment on record but balance remains (e.g. initial/down payment at receive). */
+const hasPartialPayment = (
+  transaction: Transaction,
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): boolean => {
+  const totalPaid = getTotalPaidAmount(transaction);
+  if (totalPaid <= 0) return false;
+  return !isPaid(transaction, addonsPricing);
+};
+
 const parseAmountFilter = (value: string): number | null => {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -381,9 +391,15 @@ const matchesRecordTypeFilter = (
     case "pending":
       return isPending(transaction);
     case "paid":
-      return isPaid(transaction, addonsPricing);
+      return (
+        isPaid(transaction, addonsPricing) ||
+        hasPartialPayment(transaction, addonsPricing)
+      );
     case "unpaid":
-      return isUnpaid(transaction);
+      return (
+        isUnpaid(transaction) ||
+        hasPartialPayment(transaction, addonsPricing)
+      );
     case "pickup":
       return isPickup(transaction);
     case "not-pickup":
