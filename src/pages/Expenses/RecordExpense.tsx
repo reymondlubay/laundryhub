@@ -431,7 +431,12 @@ const RecordExpensePage: React.FC = () => {
       if (!Number.isFinite(amount) || amount <= 0) {
         return "Amount must be greater than 0.";
       }
-      if (form.pieces.trim()) {
+      if (selectedExpenseItem?.piecesRequired) {
+        const p = Math.floor(Number(form.pieces));
+        if (!Number.isFinite(p) || p < 1) {
+          return "Pieces is required for this expense item.";
+        }
+      } else if (form.pieces.trim()) {
         const p = Math.floor(Number(form.pieces));
         if (!Number.isFinite(p) || p < 1) {
           return "Pieces must be 1 or more when provided.";
@@ -531,6 +536,11 @@ const RecordExpensePage: React.FC = () => {
   const sourceType = form.option?.type ?? null;
   const isInventory = sourceType === "inventory";
   const isExpense = sourceType === "expense";
+  const selectedExpenseItem =
+    form.option?.type === "expense"
+      ? (expenseItemById.get(form.option.id) ?? null)
+      : null;
+  const isPiecesRequiredForExpense = Boolean(selectedExpenseItem?.piecesRequired);
 
   return (
     <Box>
@@ -849,13 +859,16 @@ const RecordExpensePage: React.FC = () => {
                   size="small"
                   label={
                     isExpense
-                      ? "Pieces (optional)"
+                      ? isPiecesRequiredForExpense
+                        ? "Pieces"
+                        : "Pieces (optional)"
                       : isInventory
                         ? "Pieces"
                         : "Pieces"
                   }
                   value={form.option ? form.pieces : ""}
                   disabled={!form.option}
+                  required={isInventory || isPiecesRequiredForExpense}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, pieces: e.target.value }))
                   }

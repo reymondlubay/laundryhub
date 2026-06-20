@@ -93,6 +93,25 @@ const getEstimatedPickup = (transaction: Transaction): dayjs.Dayjs => {
   return dayjs(transaction.estimatedPickup || tx.estimatedpickup);
 };
 
+/** Raw estimated pickup value from API row (camelCase or lowercase). */
+export const getTransactionEstimatedPickupIso = (
+  transaction: Transaction | null | undefined,
+): string | null => {
+  if (!transaction) return null;
+  const tx = transaction as Transaction & { estimatedpickup?: string | null };
+  const raw = transaction.estimatedPickup ?? tx.estimatedpickup ?? null;
+  if (raw == null || String(raw).trim() === "") return null;
+  const d = dayjs(raw);
+  return d.isValid() ? String(raw) : null;
+};
+
+/** Scheduled pickup applies only to unloaded transactions with a valid estimate. */
+export const hasScheduledPickup = (transaction: Transaction): boolean => {
+  const tx = transaction as Transaction & { dateloaded?: string };
+  if (transaction.dateLoaded || tx.dateloaded) return false;
+  return getTransactionEstimatedPickupIso(transaction) != null;
+};
+
 export const isEstimatedPickupTomorrow = (
   estimatedPickup?: string | null,
 ): boolean => {

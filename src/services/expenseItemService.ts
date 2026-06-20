@@ -8,6 +8,7 @@ export interface ExpenseItem {
   description?: string;
   notes?: string;
   isAdminOnly: boolean;
+  piecesRequired: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -17,6 +18,7 @@ export interface CreateExpenseItemPayload {
   description?: string;
   notes?: string;
   isAdminOnly?: boolean;
+  piecesRequired?: boolean;
 }
 
 export interface UpdateExpenseItemPayload {
@@ -24,6 +26,7 @@ export interface UpdateExpenseItemPayload {
   description?: string;
   notes?: string;
   isAdminOnly?: boolean;
+  piecesRequired?: boolean;
 }
 
 const normalize = (raw: unknown): ExpenseItem => {
@@ -34,6 +37,7 @@ const normalize = (raw: unknown): ExpenseItem => {
     description: String(item.description ?? ""),
     notes: String(item.notes ?? ""),
     isAdminOnly: Boolean(item.isAdminOnly ?? item.isadminonly ?? false),
+    piecesRequired: Boolean(item.piecesRequired ?? item.piecesrequired ?? false),
     createdAt: String(item.createdAt ?? item.createdat ?? ""),
     updatedAt: String(item.updatedAt ?? item.updatedat ?? ""),
   };

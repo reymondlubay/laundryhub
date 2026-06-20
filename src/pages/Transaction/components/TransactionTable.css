@@ -93,6 +93,30 @@
   animation: txRowHighlightFade 5s ease-out forwards;
 }
 
+.transaction-grouped-grid.tx-grid-light .ag-row.tx-row-alt-even {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.transaction-grouped-grid.tx-grid-light .ag-row.tx-row-alt-odd {
+  background-color: transparent;
+}
+
+.transaction-grouped-grid.tx-grid-dark .ag-row.tx-row-alt-even {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.transaction-grouped-grid.tx-grid-dark .ag-row.tx-row-alt-odd {
+  background-color: transparent;
+}
+
+.transaction-grouped-grid.tx-grid-light .ag-row:hover {
+  background-color: rgba(25, 118, 210, 0.1) !important;
+}
+
+.transaction-grouped-grid.tx-grid-dark .ag-row:hover {
+  background-color: rgba(144, 202, 249, 0.14) !important;
+}
+
 /* Date Paid column highlight — orange at row-hover opacity */
 .transaction-grouped-grid.tx-grid-light .ag-cell.tx-date-paid-cell {
   background-color: rgba(255, 152, 0, 0.09);

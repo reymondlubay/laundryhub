@@ -22,7 +22,7 @@ import {
 import ClearIcon from "@mui/icons-material/Clear";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import HistoryIcon from "@mui/icons-material/History";
@@ -78,7 +78,10 @@ import {
 } from "../../../utils/pricing";
 import { pickTransactionNum } from "../../../utils/normalizeTransaction";
 import { getTransactionNoteDetailLines } from "../../../utils/transactionNoteDetails";
-import { getEstimatedPickupTooltipParts } from "../utils/transactionListFilters";
+import {
+  getEstimatedPickupTooltipParts,
+  getTransactionEstimatedPickupIso,
+} from "../utils/transactionListFilters";
 import {
   clampPickupLoadsValue,
   getPickupHistoryLines,
@@ -392,7 +395,8 @@ function flattenTransactionRows(
   const estimatedPickup = tx.estimatedPickup || tx.estimatedpickup || null;
   const datePickup = tx.datePickup || tx.datepickup || null;
   const hasDateLoaded = Boolean(dateLoaded);
-  const hasEstimatedPickup = Boolean(estimatedPickup);
+  const hasEstimatedPickup =
+    Boolean(estimatedPickup) && dayjs(estimatedPickup).isValid() && !hasDateLoaded;
   const hasDatePickup = Boolean(datePickup);
   const totalLoadsCount = getTotalLoads(transaction);
   const loadsPickedUpCount = getLoadsPickedUp(transaction);
@@ -950,6 +954,7 @@ function TransactionTableInner({
           return;
         }
         transactionUpdate.dateLoaded = toApiDateTimeString(markDateTime);
+        transactionUpdate.estimatedPickup = null;
       } else {
         if (!isTransactionLoaded(selectedTransactionForMark)) {
           handleCloseMarkModal();
@@ -1228,7 +1233,7 @@ function TransactionTableInner({
                 flexShrink: 0,
               }}
             >
-              {params.data?.isFirstRow && params.data?.estimatedPickup ? (
+              {params.data?.isFirstRow && params.data?.hasEstimatedPickup ? (
                 <Tooltip
                   title={(() => {
                     const pickupTooltip = getEstimatedPickupTooltipParts(
@@ -1285,7 +1290,7 @@ function TransactionTableInner({
                       flexShrink: 0,
                     }}
                   >
-                    <AccessTimeIcon
+                    <HourglassTopIcon
                       sx={{ fontSize: TX_TABLE_STATUS_ICON_SIZE }}
                     />
                   </Box>
@@ -2015,7 +2020,10 @@ function TransactionTableInner({
     [],
   );
 
-  const getRowClass = (params: { data?: FlatTransactionRow }) => {
+  const getRowClass = (params: {
+    data?: FlatTransactionRow;
+    node?: { rowIndex?: number | null };
+  }) => {
     const classes: string[] = [];
 
     if (
@@ -2023,6 +2031,12 @@ function TransactionTableInner({
       params.data?.transactionId === highlightTransactionId
     ) {
       classes.push("tx-highlight-fade");
+    }
+
+    if ((params.node?.rowIndex ?? 0) % 2 === 0) {
+      classes.push("tx-row-alt-even");
+    } else {
+      classes.push("tx-row-alt-odd");
     }
 
     if (params.data?.isFirstRow) {
@@ -2170,6 +2184,76 @@ function TransactionTableInner({
                   )} as picked up?`}
             </Typography>
           ) : null}
+          {markModalType === "loaded" && selectedTransactionForMark
+            ? (() => {
+                const noteLines = getTransactionNoteDetailLines(
+                  selectedTransactionForMark,
+                );
+                const estimatedIso = getTransactionEstimatedPickupIso(
+                  selectedTransactionForMark,
+                );
+                const pickupTooltip = estimatedIso
+                  ? getEstimatedPickupTooltipParts(estimatedIso)
+                  : null;
+                if (noteLines.length === 0 && !pickupTooltip) return null;
+                return (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 0.75,
+                color: "#d32f2f",
+                fontSize: "0.95rem",
+                lineHeight: 1.45,
+                fontWeight: 500,
+              }}
+            >
+              {noteLines.map((line) => (
+                <Typography key={line} component="span" variant="body2">
+                  {line}
+                </Typography>
+              ))}
+              {pickupTooltip ? (
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
+                    <Typography component="span" variant="body2">
+                      Scheduled Pick Up
+                    </Typography>
+                    <Typography component="span" variant="body2">
+                      {pickupTooltip.isTomorrow ? (
+                        <>
+                          Tomorrow,{" "}
+                          <Box
+                            component="span"
+                            sx={{
+                              ...TX_ESTIMATED_PICKUP_TIME_SX,
+                              fontSize: "0.95rem",
+                            }}
+                          >
+                            {pickupTooltip.timePart}
+                          </Box>
+                          , {pickupTooltip.datePart}
+                        </>
+                      ) : (
+                        <>
+                          <Box
+                            component="span"
+                            sx={{
+                              ...TX_ESTIMATED_PICKUP_TIME_SX,
+                              fontSize: "0.95rem",
+                            }}
+                          >
+                            {pickupTooltip.timePart}
+                          </Box>
+                          , {pickupTooltip.datePart}
+                        </>
+                      )}
+                    </Typography>
+                  </Box>
+              ) : null}
+            </Box>
+                );
+              })()
+            : null}
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DateTimePicker
               label={markModalType === "loaded" ? "Loaded Date" : "Pickup Date"}
