@@ -1261,7 +1261,18 @@ function TransactionTableInner({
                       >
                         <span>Scheduled Pick Up</span>
                         <Box component="span" sx={{ lineHeight: 1.5 }}>
-                          {pickupTooltip.isTomorrow ? (
+                          {pickupTooltip.isToday ? (
+                            <>
+                              Today,{" "}
+                              <Box
+                                component="span"
+                                sx={TX_ESTIMATED_PICKUP_TIME_SX}
+                              >
+                                {pickupTooltip.timePart}
+                              </Box>
+                              , {pickupTooltip.datePart}
+                            </>
+                          ) : pickupTooltip.isTomorrow ? (
                             <>
                               Tomorrow,{" "}
                               <Box
@@ -2237,7 +2248,21 @@ function TransactionTableInner({
                           Scheduled Pick Up
                         </Typography>
                         <Typography component="span" variant="body2">
-                          {pickupTooltip.isTomorrow ? (
+                          {pickupTooltip.isToday ? (
+                            <>
+                              Today,{" "}
+                              <Box
+                                component="span"
+                                sx={{
+                                  ...TX_ESTIMATED_PICKUP_TIME_SX,
+                                  fontSize: "0.95rem",
+                                }}
+                              >
+                                {pickupTooltip.timePart}
+                              </Box>
+                              , {pickupTooltip.datePart}
+                            </>
+                          ) : pickupTooltip.isTomorrow ? (
                             <>
                               Tomorrow,{" "}
                               <Box
