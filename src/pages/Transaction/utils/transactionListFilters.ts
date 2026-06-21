@@ -123,6 +123,14 @@ export const hasScheduledPickup = (transaction: Transaction): boolean => {
   return getTransactionEstimatedPickupIso(transaction) != null;
 };
 
+export const isEstimatedPickupToday = (
+  estimatedPickup?: string | null,
+): boolean => {
+  const estimated = dayjs(estimatedPickup);
+  if (!estimated.isValid()) return false;
+  return estimated.startOf("day").isSame(dayjs().startOf("day"), "day");
+};
+
 export const isEstimatedPickupTomorrow = (
   estimatedPickup?: string | null,
 ): boolean => {
@@ -133,6 +141,7 @@ export const isEstimatedPickupTomorrow = (
 };
 
 export type EstimatedPickupTooltipParts = {
+  isToday: boolean;
   isTomorrow: boolean;
   timePart: string;
   datePart: string;
@@ -144,22 +153,25 @@ export const getEstimatedPickupTooltipParts = (
   const estimated = dayjs(estimatedPickup);
   if (!estimated.isValid()) return null;
   return {
+    isToday: isEstimatedPickupToday(estimatedPickup),
     isTomorrow: isEstimatedPickupTomorrow(estimatedPickup),
     timePart: estimated.format("h:mm A"),
     datePart: estimated.format("dddd, MMMM D, YYYY"),
   };
 };
 
-/** Unloaded rows scheduled for tomorrow are pinned to the top; later dates use receive-date order. */
-const hasTomorrowPickupPriority = (transaction: Transaction): boolean => {
+/** Unloaded rows scheduled for today or tomorrow are pinned to the top; later dates use receive-date order. */
+const hasUrgentPickupPriority = (transaction: Transaction): boolean => {
   const tx = transaction as Transaction & {
     dateloaded?: string;
     estimatedpickup?: string;
   };
   const loaded = Boolean(transaction.dateLoaded || tx.dateloaded);
   if (loaded) return false;
-  return isEstimatedPickupTomorrow(
-    transaction.estimatedPickup || tx.estimatedpickup,
+  const estimatedPickup = transaction.estimatedPickup || tx.estimatedpickup;
+  return (
+    isEstimatedPickupToday(estimatedPickup) ||
+    isEstimatedPickupTomorrow(estimatedPickup)
   );
 };
 
@@ -175,8 +187,8 @@ const compareDefault = (a: Transaction, b: Transaction): number => {
 
   const aEstimated = getEstimatedPickup(a);
   const bEstimated = getEstimatedPickup(b);
-  const aPriority = hasTomorrowPickupPriority(a);
-  const bPriority = hasTomorrowPickupPriority(b);
+  const aPriority = hasUrgentPickupPriority(a);
+  const bPriority = hasUrgentPickupPriority(b);
 
   if (aPriority && !bPriority) return -1;
   if (!aPriority && bPriority) return 1;
