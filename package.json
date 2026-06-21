@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:laundry-local": "tsc -b && vite build --mode laundry-local --emptyOutDir --outDir \"./publish/laundry-local\"",
-    "build:laundry-network": "tsc -b && vite build --mode laundry-network --emptyOutDir --outDir \"./publish/laundry-network\"",
+    "build:laundry-local": "node scripts/copy-web-config.js && tsc -b && vite build --mode laundry-local --emptyOutDir --outDir \"./publish/laundry-local\"",
+    "build:laundry-network": "node scripts/copy-web-config.js && tsc -b && vite build --mode laundry-network --emptyOutDir --outDir \"./publish/laundry-network\"",
     "deploy:laundry-local": "npm run build:laundry-local && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-iis.ps1 -Source publish/laundry-local -Dest \"C:/Projects/Laundryhub Prod/Published/laundry-local\"",
     "deploy:laundry-network": "npm run build:laundry-network && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-iis.ps1 -Source publish/laundry-network -Dest \"C:/Projects/Laundryhub Prod/Published/laundry-network\"",
     "deploy:all": "npm run deploy:laundry-local && npm run deploy:laundry-network",

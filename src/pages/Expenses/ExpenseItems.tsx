@@ -45,6 +45,7 @@ type ExpenseItemFormState = {
   description: string;
   notes: string;
   isAdminOnly: boolean;
+  piecesRequired: boolean;
 };
 
 const emptyForm: ExpenseItemFormState = {
@@ -52,6 +53,7 @@ const emptyForm: ExpenseItemFormState = {
   description: "",
   notes: "",
   isAdminOnly: false,
+  piecesRequired: false,
 };
 
 const ExpenseItemsPage: React.FC = () => {
@@ -108,6 +110,7 @@ const ExpenseItemsPage: React.FC = () => {
       description: item.description || "",
       notes: item.notes || "",
       isAdminOnly: Boolean(item.isAdminOnly),
+      piecesRequired: Boolean(item.piecesRequired),
     });
     setDialogError(null);
     setDialogOpen(true);
@@ -143,6 +146,7 @@ const ExpenseItemsPage: React.FC = () => {
           description: form.description.trim() || undefined,
           notes: form.notes.trim() || undefined,
           isAdminOnly: form.isAdminOnly,
+          piecesRequired: form.piecesRequired,
         };
         await expenseItemService.update(editing.id, payload);
       } else {
@@ -151,6 +155,7 @@ const ExpenseItemsPage: React.FC = () => {
           description: form.description.trim() || undefined,
           notes: form.notes.trim() || undefined,
           isAdminOnly: form.isAdminOnly,
+          piecesRequired: form.piecesRequired,
         };
         await expenseItemService.create(payload);
       }
@@ -203,8 +208,8 @@ const ExpenseItemsPage: React.FC = () => {
         {loading ? (
           <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
             <Table size="small" stickyHeader>
-              <TableHeaderSkeleton columns={5} />
-              <TableSkeleton columns={5} rows={8} />
+              <TableHeaderSkeleton columns={6} />
+              <TableSkeleton columns={6} rows={8} />
             </Table>
           </TableContainer>
         ) : (
@@ -217,13 +222,14 @@ const ExpenseItemsPage: React.FC = () => {
                     <TableCell>Description</TableCell>
                     <TableCell>Notes</TableCell>
                     <TableCell>Visibility</TableCell>
+                    <TableCell>Pieces Required</TableCell>
                     <TableCell align="right">Action</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {pagedItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center">
+                      <TableCell colSpan={6} align="center">
                         No expense items.
                       </TableCell>
                     </TableRow>
@@ -242,6 +248,13 @@ const ExpenseItemsPage: React.FC = () => {
                             />
                           ) : (
                             <Chip size="small" label="All users" />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {item.piecesRequired ? (
+                            <Chip size="small" color="error" label="Required" />
+                          ) : (
+                            <Chip size="small" label="Optional" />
                           )}
                         </TableCell>
                         <TableCell align="right">
@@ -358,6 +371,22 @@ const ExpenseItemsPage: React.FC = () => {
                   />
                 }
                 label="Admin only (hidden from non-admin users when logging expenses)"
+              />
+            </Grid>
+            <Grid size={12}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={form.piecesRequired}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        piecesRequired: e.target.checked,
+                      }))
+                    }
+                  />
+                }
+                label="Pieces required when recording this expense"
               />
             </Grid>
           </Grid>

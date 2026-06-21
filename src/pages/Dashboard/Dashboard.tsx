@@ -23,7 +23,7 @@ import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HistoryIcon from "@mui/icons-material/History";
@@ -1120,7 +1120,7 @@ const Dashboard = () => {
                                           color: "#f44336",
                                         }}
                                       >
-                                        <AccessTimeIcon sx={{ fontSize: 16 }} />
+                                        <HourglassTopIcon sx={{ fontSize: 16 }} />
                                       </Box>
                                     </Tooltip>
                                   ) : null}

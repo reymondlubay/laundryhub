@@ -47,6 +47,7 @@ const Transaction = () => {
   const [loadTypeFilter, setLoadTypeFilter] =
     React.useState<TransactionLoadTypeFilter>("");
   const [showUnpaidOnly, setShowUnpaidOnly] = React.useState(false);
+  const [showDeliveryOnly, setShowDeliveryOnly] = React.useState(false);
   const [priceMin, setPriceMin] = React.useState("");
   const [priceMax, setPriceMax] = React.useState("");
   const [addonsPricing, setAddonsPricing] = React.useState<AddonsPricing>(
@@ -182,6 +183,7 @@ const Transaction = () => {
     setShowPendingOnly(false);
     setShowReadyForPickupOnly(false);
     setShowUnpaidOnly(false);
+    setShowDeliveryOnly(false);
     setSortBy("default");
     setSortDirection("desc");
     setLoadTypeFilter("");
@@ -214,6 +216,7 @@ const Transaction = () => {
         showPendingOnly,
         showReadyForPickupOnly,
         showUnpaidOnly,
+        showDeliveryOnly,
         loadTypeFilter,
         priceMin: priceRangeInvalid ? null : parsedPriceMin,
         priceMax: priceRangeInvalid ? null : parsedPriceMax,
@@ -226,6 +229,7 @@ const Transaction = () => {
       showPendingOnly,
       showReadyForPickupOnly,
       showUnpaidOnly,
+      showDeliveryOnly,
       loadTypeFilter,
       parsedPriceMin,
       parsedPriceMax,
@@ -476,6 +480,7 @@ const Transaction = () => {
         showPendingOnly={showPendingOnly}
         showReadyForPickupOnly={showReadyForPickupOnly}
         showUnpaidOnly={showUnpaidOnly}
+        showDeliveryOnly={showDeliveryOnly}
         sortBy={sortBy}
         sortDirection={sortDirection}
         loadTypeFilter={loadTypeFilter}
@@ -485,6 +490,7 @@ const Transaction = () => {
         onShowPendingOnlyChange={setShowPendingOnly}
         onShowReadyForPickupOnlyChange={handleReadyForPickupChange}
         onShowUnpaidOnlyChange={setShowUnpaidOnly}
+        onShowDeliveryOnlyChange={setShowDeliveryOnly}
         onSortByChange={setSortBy}
         onSortDirectionChange={setSortDirection}
         onLoadTypeFilterChange={setLoadTypeFilter}

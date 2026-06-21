@@ -31,6 +31,7 @@ type TransactionListControlsProps = {
   showPendingOnly: boolean;
   showReadyForPickupOnly: boolean;
   showUnpaidOnly: boolean;
+  showDeliveryOnly: boolean;
   sortBy: TransactionSortBy;
   sortDirection: TransactionSortDirection;
   loadTypeFilter: TransactionLoadTypeFilter;
@@ -40,6 +41,7 @@ type TransactionListControlsProps = {
   onShowPendingOnlyChange: (checked: boolean) => void;
   onShowReadyForPickupOnlyChange: (checked: boolean) => void;
   onShowUnpaidOnlyChange: (checked: boolean) => void;
+  onShowDeliveryOnlyChange: (checked: boolean) => void;
   onSortByChange: (value: TransactionSortBy) => void;
   onSortDirectionChange: (value: TransactionSortDirection) => void;
   onLoadTypeFilterChange: (value: TransactionLoadTypeFilter) => void;
@@ -102,6 +104,7 @@ const TransactionListControls: React.FC<TransactionListControlsProps> = ({
   showPendingOnly,
   showReadyForPickupOnly,
   showUnpaidOnly,
+  showDeliveryOnly,
   sortBy,
   sortDirection,
   loadTypeFilter,
@@ -111,6 +114,7 @@ const TransactionListControls: React.FC<TransactionListControlsProps> = ({
   onShowPendingOnlyChange,
   onShowReadyForPickupOnlyChange,
   onShowUnpaidOnlyChange,
+  onShowDeliveryOnlyChange,
   onSortByChange,
   onSortDirectionChange,
   onLoadTypeFilterChange,
@@ -291,6 +295,22 @@ const TransactionListControls: React.FC<TransactionListControlsProps> = ({
               sx={compactPriceFieldSx}
             />
           </Stack>
+
+          <FormControlLabel
+            sx={{ m: 0 }}
+            control={
+              <Checkbox
+                size="small"
+                checked={showDeliveryOnly}
+                onChange={(e) => onShowDeliveryOnlyChange(e.target.checked)}
+              />
+            }
+            label={
+              <Typography variant="body2" sx={{ fontSize: "0.8125rem" }}>
+                Delivery
+              </Typography>
+            }
+          />
         </Stack>
 
         <Box sx={{ display: { xs: "none", lg: "block" } }}>
