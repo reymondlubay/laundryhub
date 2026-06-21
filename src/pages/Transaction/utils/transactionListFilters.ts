@@ -53,6 +53,17 @@ export const parsePriceFilter = (value: string): number | null => {
   return amount;
 };
 
+export const isTransactionDelivered = (transaction: Transaction): boolean => {
+  const tx = transaction as Transaction & { isdelivered?: boolean };
+  return Boolean(transaction.isDelivered ?? tx.isdelivered);
+};
+
+/** Delivery orders that have not been fully picked up yet. */
+export const transactionMatchesDeliveryFilter = (
+  transaction: Transaction,
+): boolean =>
+  isTransactionDelivered(transaction) && !isFullyPickedUp(transaction);
+
 export const isTransactionUnpaid = (transaction: Transaction): boolean => {
   const payments = transaction.paymentDetails ?? [];
   if (payments.length === 0) return true;
@@ -231,6 +242,7 @@ export const filterAndSortTransactions = (
     showPendingOnly: boolean;
     showReadyForPickupOnly: boolean;
     showUnpaidOnly: boolean;
+    showDeliveryOnly: boolean;
     loadTypeFilter: TransactionLoadTypeFilter;
     priceMin: number | null;
     priceMax: number | null;
@@ -263,6 +275,12 @@ export const filterAndSortTransactions = (
 
   if (options.showUnpaidOnly) {
     list = list.filter((transaction) => isTransactionUnpaid(transaction));
+  }
+
+  if (options.showDeliveryOnly) {
+    list = list.filter((transaction) =>
+      transactionMatchesDeliveryFilter(transaction),
+    );
   }
 
   if (options.loadTypeFilter) {

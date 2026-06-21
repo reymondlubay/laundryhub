@@ -396,7 +396,9 @@ function flattenTransactionRows(
   const datePickup = tx.datePickup || tx.datepickup || null;
   const hasDateLoaded = Boolean(dateLoaded);
   const hasEstimatedPickup =
-    Boolean(estimatedPickup) && dayjs(estimatedPickup).isValid() && !hasDateLoaded;
+    Boolean(estimatedPickup) &&
+    dayjs(estimatedPickup).isValid() &&
+    !hasDateLoaded;
   const hasDatePickup = Boolean(datePickup);
   const totalLoadsCount = getTotalLoads(transaction);
   const loadsPickedUpCount = getLoadsPickedUp(transaction);
@@ -787,8 +789,7 @@ function TransactionTableInner({
         flashTransactionHighlight(updated.id);
         onToast?.({
           severity: "success",
-          message:
-          `${toPascalCase(
+          message: `${toPascalCase(
             selectedTransactionForPayment.customer?.name || "Customer",
           )} payment of ₱${Number(payment.amount || 0).toFixed(2)} has been saved.`,
         });
@@ -1008,7 +1009,9 @@ function TransactionTableInner({
       flashTransactionHighlight(updated.id);
       if (markModalType === "pickup") {
         const remainingBefore = getRemainingLoads(selectedTransactionForMark);
-        const pickedCount = Number(transactionUpdate.pickupLoads ?? pickupLoads);
+        const pickedCount = Number(
+          transactionUpdate.pickupLoads ?? pickupLoads,
+        );
         onToast?.({
           severity: "success",
           message: `${toPascalCase(
@@ -1182,7 +1185,11 @@ function TransactionTableInner({
                       ) : null}
                       <Box
                         component="span"
-                        sx={{ display: "block", opacity: 0.75, ...TX_CUSTOMER_TEXT_WRAP_SX }}
+                        sx={{
+                          display: "block",
+                          opacity: 0.75,
+                          ...TX_CUSTOMER_TEXT_WRAP_SX,
+                        }}
                       >
                         ({line.loadType})
                       </Box>
@@ -1191,7 +1198,10 @@ function TransactionTableInner({
                 </Box>
               ) : (
                 <>
-                  <Box component="span" sx={{ display: "block", ...TX_CUSTOMER_TEXT_WRAP_SX }}>
+                  <Box
+                    component="span"
+                    sx={{ display: "block", ...TX_CUSTOMER_TEXT_WRAP_SX }}
+                  >
                     {params.data?.customer || "-"}
                   </Box>
                   {params.data?.loadLines?.[0]?.nickname ? (
@@ -1368,7 +1378,7 @@ function TransactionTableInner({
           }
           return typeof params.value === "number"
             ? toMixedFraction(params.value)
-            : params.value ?? "";
+            : (params.value ?? "");
         },
       },
       {
@@ -1506,7 +1516,9 @@ function TransactionTableInner({
                 </span>
               ) : null}
               {notYetPaid ? (
-                <span style={{ color: "#f44336", fontWeight: 600 }}>Unpaid</span>
+                <span style={{ color: "#f44336", fontWeight: 600 }}>
+                  Unpaid
+                </span>
               ) : null}
               {hasPartialBalance ? (
                 <span style={{ color: "#f44336", fontWeight: 600 }}>
@@ -2197,60 +2209,66 @@ function TransactionTableInner({
                   : null;
                 if (noteLines.length === 0 && !pickupTooltip) return null;
                 return (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 0.75,
-                color: "#d32f2f",
-                fontSize: "0.95rem",
-                lineHeight: 1.45,
-                fontWeight: 500,
-              }}
-            >
-              {noteLines.map((line) => (
-                <Typography key={line} component="span" variant="body2">
-                  {line}
-                </Typography>
-              ))}
-              {pickupTooltip ? (
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
-                    <Typography component="span" variant="body2">
-                      Scheduled Pick Up
-                    </Typography>
-                    <Typography component="span" variant="body2">
-                      {pickupTooltip.isTomorrow ? (
-                        <>
-                          Tomorrow,{" "}
-                          <Box
-                            component="span"
-                            sx={{
-                              ...TX_ESTIMATED_PICKUP_TIME_SX,
-                              fontSize: "0.95rem",
-                            }}
-                          >
-                            {pickupTooltip.timePart}
-                          </Box>
-                          , {pickupTooltip.datePart}
-                        </>
-                      ) : (
-                        <>
-                          <Box
-                            component="span"
-                            sx={{
-                              ...TX_ESTIMATED_PICKUP_TIME_SX,
-                              fontSize: "0.95rem",
-                            }}
-                          >
-                            {pickupTooltip.timePart}
-                          </Box>
-                          , {pickupTooltip.datePart}
-                        </>
-                      )}
-                    </Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 0.75,
+                      color: "#d32f2f",
+                      fontSize: "0.95rem",
+                      lineHeight: 1.45,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {noteLines.map((line) => (
+                      <Typography key={line} component="span" variant="body2">
+                        {line}
+                      </Typography>
+                    ))}
+                    {pickupTooltip ? (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 0.25,
+                        }}
+                      >
+                        <Typography component="span" variant="body2">
+                          Scheduled Pick Up
+                        </Typography>
+                        <Typography component="span" variant="body2">
+                          {pickupTooltip.isTomorrow ? (
+                            <>
+                              Tomorrow,{" "}
+                              <Box
+                                component="span"
+                                sx={{
+                                  ...TX_ESTIMATED_PICKUP_TIME_SX,
+                                  fontSize: "0.95rem",
+                                }}
+                              >
+                                {pickupTooltip.timePart}
+                              </Box>
+                              , {pickupTooltip.datePart}
+                            </>
+                          ) : (
+                            <>
+                              <Box
+                                component="span"
+                                sx={{
+                                  ...TX_ESTIMATED_PICKUP_TIME_SX,
+                                  fontSize: "0.95rem",
+                                }}
+                              >
+                                {pickupTooltip.timePart}
+                              </Box>
+                              , {pickupTooltip.datePart}
+                            </>
+                          )}
+                        </Typography>
+                      </Box>
+                    ) : null}
                   </Box>
-              ) : null}
-            </Box>
                 );
               })()
             : null}
@@ -2336,52 +2354,52 @@ function TransactionTableInner({
                     : undefined
                 }
               />
-            <Stack direction="row" spacing={0.5} alignItems="flex-start">
-              <FormControl fullWidth size="small" required>
-                <InputLabel id="mark-pickup-release-by-label" shrink>
-                  Release By
-                </InputLabel>
-                <Select
-                  labelId="mark-pickup-release-by-label"
-                  label="Release By"
-                  displayEmpty
-                  value={releaseBy}
-                  onChange={(e) => setReleaseBy(String(e.target.value))}
-                  inputRef={releaseByInputRef}
-                  renderValue={(selected) => {
-                    if (!selected) {
-                      return (
-                        <Typography variant="body2" color="text.secondary">
-                          Select employee
-                        </Typography>
+              <Stack direction="row" spacing={0.5} alignItems="flex-start">
+                <FormControl fullWidth size="small" required>
+                  <InputLabel id="mark-pickup-release-by-label" shrink>
+                    Release By
+                  </InputLabel>
+                  <Select
+                    labelId="mark-pickup-release-by-label"
+                    label="Release By"
+                    displayEmpty
+                    value={releaseBy}
+                    onChange={(e) => setReleaseBy(String(e.target.value))}
+                    inputRef={releaseByInputRef}
+                    renderValue={(selected) => {
+                      if (!selected) {
+                        return (
+                          <Typography variant="body2" color="text.secondary">
+                            Select employee
+                          </Typography>
+                        );
+                      }
+                      const emp = employees.find(
+                        (e) => String(e.id) === String(selected),
                       );
-                    }
-                    const emp = employees.find(
-                      (e) => String(e.id) === String(selected),
-                    );
-                    return emp?.name ?? "";
-                  }}
-                >
-                  {employees.map((employee) => (
-                    <MenuItem key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              {releaseBy ? (
-                <Tooltip title="Clear release by">
-                  <IconButton
-                    aria-label="clear release by"
-                    size="small"
-                    sx={{ mt: 0.25 }}
-                    onClick={() => setReleaseBy("")}
+                      return emp?.name ?? "";
+                    }}
                   >
-                    <ClearIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              ) : null}
-            </Stack>
+                    {employees.map((employee) => (
+                      <MenuItem key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                {releaseBy ? (
+                  <Tooltip title="Clear release by">
+                    <IconButton
+                      aria-label="clear release by"
+                      size="small"
+                      sx={{ mt: 0.25 }}
+                      onClick={() => setReleaseBy("")}
+                    >
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                ) : null}
+              </Stack>
             </>
           ) : null}
 
@@ -2424,7 +2442,11 @@ function TransactionTableInner({
           <Typography>{pickupConfirmMessage}</Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button variant="contained" onClick={handlePickupConfirmYes} autoFocus>
+          <Button
+            variant="contained"
+            onClick={handlePickupConfirmYes}
+            autoFocus
+          >
             Yes
           </Button>
           <Button variant="outlined" onClick={handlePickupConfirmNo}>
