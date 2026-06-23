@@ -49,6 +49,7 @@ export interface Transaction {
     id: string;
     name: string;
     mobileNumber: string;
+    address?: string;
   };
   receivedByUser?: {
     id: string;

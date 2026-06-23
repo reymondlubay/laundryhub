@@ -42,6 +42,7 @@ import {
   TableSkeleton,
   TableHeaderSkeleton,
 } from "../../components/Skeletons/SkeletonComponents";
+import { usePaginatedTableScroll } from "../../hooks/usePaginatedTableScroll";
 
 type CustomerFormState = {
   name: string;
@@ -72,6 +73,11 @@ const CustomerPage: React.FC = () => {
   const [form, setForm] = useState<CustomerFormState>(emptyForm);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
+  const {
+    tableContainerRef,
+    onPageChange: makePageChange,
+    onRowsPerPageChange: makeRowsChange,
+  } = usePaginatedTableScroll();
 
   const loadCustomers = useCallback(async (searchTerm = "") => {
     try {
@@ -250,7 +256,10 @@ const CustomerPage: React.FC = () => {
 
       <Paper>
         {loading ? (
-          <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+          <TableContainer
+            ref={tableContainerRef}
+            sx={{ maxHeight: "calc(100vh - 260px)" }}
+          >
             <Table size="small" stickyHeader>
               <TableHeaderSkeleton columns={5} />
               <TableSkeleton columns={5} rows={8} />
@@ -258,7 +267,10 @@ const CustomerPage: React.FC = () => {
           </TableContainer>
         ) : (
           <>
-            <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+            <TableContainer
+              ref={tableContainerRef}
+              sx={{ maxHeight: "calc(100vh - 260px)" }}
+            >
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -319,11 +331,8 @@ const CustomerPage: React.FC = () => {
               count={customers.length}
               rowsPerPage={rowsPerPage}
               page={page}
-              onPageChange={(_, newPage) => setPage(newPage)}
-              onRowsPerPageChange={(event) => {
-                setRowsPerPage(parseInt(event.target.value, 10));
-                setPage(0);
-              }}
+              onPageChange={makePageChange(setPage)}
+              onRowsPerPageChange={makeRowsChange(setRowsPerPage, setPage)}
             />
           </>
         )}

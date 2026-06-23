@@ -36,6 +36,7 @@ import {
 } from "../../components/Skeletons/SkeletonComponents";
 import DatabaseScheduleSection from "./DatabaseScheduleSection";
 import { ignoreBackdropClose } from "../../utils/muiDialogClose";
+import { usePaginatedTableScroll } from "../../hooks/usePaginatedTableScroll";
 
 const formatSize = (bytes: number): string => {
   if (!bytes || bytes < 1) return "0 B";
@@ -97,6 +98,11 @@ const DatabaseSettings: React.FC = () => {
 
   const [backupPage, setBackupPage] = React.useState(0);
   const [backupRowsPerPage, setBackupRowsPerPage] = React.useState(10);
+  const {
+    tableContainerRef,
+    onPageChange: makePageChange,
+    onRowsPerPageChange: makeRowsChange,
+  } = usePaginatedTableScroll();
 
   const hasPendingOperation = backups.some((item) => item.status === "Pending");
 
@@ -556,6 +562,7 @@ const DatabaseSettings: React.FC = () => {
                 Saved backup folders
               </Typography>
               <TableContainer
+                ref={tableContainerRef}
                 sx={{
                   border: `1px solid ${borderColor}`,
                   borderRadius: 1,
@@ -708,14 +715,14 @@ const DatabaseSettings: React.FC = () => {
           </Button>
         </Stack>
         {initialLoading ? (
-          <TableContainer>
+          <TableContainer ref={tableContainerRef}>
             <Table size="small">
               <TableHeaderSkeleton columns={8} />
               <TableSkeleton columns={8} rows={5} />
             </Table>
           </TableContainer>
         ) : (
-          <TableContainer>
+          <TableContainer ref={tableContainerRef}>
             <Table size="small">
               <TableHead sx={{ bgcolor: headBg }}>
                 <TableRow>
@@ -956,12 +963,12 @@ const DatabaseSettings: React.FC = () => {
           <TablePagination
             count={backups.length}
             page={backupPage}
-            onPageChange={(_, newPage) => setBackupPage(newPage)}
+            onPageChange={makePageChange(setBackupPage)}
             rowsPerPage={backupRowsPerPage}
-            onRowsPerPageChange={(event) => {
-              setBackupRowsPerPage(parseInt(event.target.value, 10));
-              setBackupPage(0);
-            }}
+            onRowsPerPageChange={makeRowsChange(
+              setBackupRowsPerPage,
+              setBackupPage,
+            )}
             rowsPerPageOptions={[10, 25, 50]}
           />
         ) : null}

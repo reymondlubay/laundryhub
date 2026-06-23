@@ -26,6 +26,7 @@ import transactionService, {
 import { toPascalCase } from "../../utils/stringUtils";
 import { getTransactionDiscount } from "../../utils/pricing";
 import ReportBarChart from "../../components/ReportBarChart/ReportBarChart";
+import { usePaginatedTableScroll } from "../../hooks/usePaginatedTableScroll";
 
 type PaymentWithLegacy = PaymentDetail & {
   paymentdate?: string;
@@ -178,6 +179,11 @@ const CollectionReport: React.FC = () => {
 
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(25);
+  const {
+    tableContainerRef,
+    onPageChange: makePageChange,
+    onRowsPerPageChange: makeRowsChange,
+  } = usePaginatedTableScroll();
 
   React.useEffect(() => {
     setPage(0);
@@ -396,7 +402,7 @@ const CollectionReport: React.FC = () => {
               </Grid>
             </Grid>
 
-            <TableContainer sx={{ maxHeight: 420 }}>
+            <TableContainer ref={tableContainerRef} sx={{ maxHeight: 420 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -436,11 +442,8 @@ const CollectionReport: React.FC = () => {
               count={rangePayments.length}
               rowsPerPage={rowsPerPage}
               page={page}
-              onPageChange={(_, newPage) => setPage(newPage)}
-              onRowsPerPageChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value, 10));
-                setPage(0);
-              }}
+              onPageChange={makePageChange(setPage)}
+              onRowsPerPageChange={makeRowsChange(setRowsPerPage, setPage)}
             />
 
             <Divider sx={{ my: 2 }} />
@@ -480,7 +483,7 @@ const CollectionReport: React.FC = () => {
               </LocalizationProvider>
             </Stack>
 
-            <TableContainer sx={{ maxHeight: 360, mb: 2 }}>
+            <TableContainer ref={tableContainerRef} sx={{ maxHeight: 360, mb: 2 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -547,7 +550,7 @@ const CollectionReport: React.FC = () => {
               totals below are for {monthLabel}.
             </Typography>
 
-            <TableContainer sx={{ maxHeight: 280, mb: 2 }}>
+            <TableContainer ref={tableContainerRef} sx={{ maxHeight: 280, mb: 2 }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>

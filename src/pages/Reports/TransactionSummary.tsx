@@ -62,6 +62,7 @@ import {
   hasPartialPickup,
   isFullyPickedUp,
 } from "../../utils/transactionPickup";
+import { usePaginatedTableScroll } from "../../hooks/usePaginatedTableScroll";
 
 type TransactionWithLegacyFields = Transaction & {
   customerid?: string;
@@ -447,6 +448,7 @@ const TransactionSummary = () => {
   const [amountMax, setAmountMax] = React.useState("");
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(20);
+  const { tableContainerRef, scrollTableToTop } = usePaginatedTableScroll();
   const [exportDialogOpen, setExportDialogOpen] = React.useState(false);
   const [exportColumns, setExportColumns] = React.useState<
     Record<ExportColumnKey, boolean>
@@ -713,6 +715,7 @@ const TransactionSummary = () => {
     newPage: number,
   ) => {
     setPage(newPage);
+    scrollTableToTop();
   };
 
   const handleRowsPerPageChange = (
@@ -720,6 +723,7 @@ const TransactionSummary = () => {
   ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
+    scrollTableToTop();
   };
 
   const handleExportToExcel = React.useCallback(() => {
@@ -958,7 +962,7 @@ const TransactionSummary = () => {
       ) : filteredTransactions.length === 0 ? (
         <Alert severity="info">No transactions found.</Alert>
       ) : (
-        <TableContainer component={Paper} sx={{ mb: 2 }}>
+        <Paper sx={{ mb: 2 }}>
           <Box
             sx={{
               display: "flex",
@@ -977,7 +981,8 @@ const TransactionSummary = () => {
             </Button>
           </Box>
 
-          <Table stickyHeader>
+          <TableContainer ref={tableContainerRef} sx={{ maxHeight: 450 }}>
+            <Table stickyHeader size="small">
             <TableHead>
               <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
                 <TableCell
@@ -1262,6 +1267,7 @@ const TransactionSummary = () => {
               ))}
             </TableBody>
           </Table>
+          </TableContainer>
           <TablePagination
             rowsPerPageOptions={[20, 50, 100]}
             component="div"
@@ -1271,7 +1277,7 @@ const TransactionSummary = () => {
             onPageChange={handlePageChange}
             onRowsPerPageChange={handleRowsPerPageChange}
           />
-        </TableContainer>
+        </Paper>
       )}
 
       {!loading ? (

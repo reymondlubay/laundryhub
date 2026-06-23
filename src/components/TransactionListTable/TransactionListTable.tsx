@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import {
   Box,
   Button,
@@ -77,6 +77,22 @@ const TransactionListTable: React.FC<TransactionListTableProps> = ({
   onRowsPerPageChange,
   title,
 }) => {
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollTableToTop = () => {
+    tableContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handlePageChange = (nextPage: number) => {
+    onPageChange?.(nextPage);
+    scrollTableToTop();
+  };
+
+  const handleRowsPerPageChange = (nextRowsPerPage: number) => {
+    onRowsPerPageChange?.(nextRowsPerPage);
+    scrollTableToTop();
+  };
+
   const columns = useMemo(() => {
     const selected = visibleColumns
       ? BASE_COLUMNS.filter((column) => visibleColumns.includes(column.key))
@@ -121,7 +137,7 @@ const TransactionListTable: React.FC<TransactionListTableProps> = ({
         </TableContainer>
       ) : (
         <>
-          <TableContainer>
+          <TableContainer ref={tableContainerRef}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -179,10 +195,10 @@ const TransactionListTable: React.FC<TransactionListTableProps> = ({
               component="div"
               count={rows.length}
               page={page}
-              onPageChange={(_, nextPage) => onPageChange(nextPage)}
+              onPageChange={(_, nextPage) => handlePageChange(nextPage)}
               rowsPerPage={rowsPerPage}
               onRowsPerPageChange={(event) =>
-                onRowsPerPageChange(parseInt(event.target.value, 10))
+                handleRowsPerPageChange(parseInt(event.target.value, 10))
               }
               rowsPerPageOptions={[10, 25, 50, 100]}
             />

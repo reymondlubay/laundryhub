@@ -24,6 +24,7 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog";
+import { usePaginatedTableScroll } from "../../hooks/usePaginatedTableScroll";
 import {
   TableHeaderSkeleton,
   TableSkeleton,
@@ -63,6 +64,11 @@ const InventoryItemsPage: React.FC = () => {
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
+  const {
+    tableContainerRef,
+    onPageChange: makePageChange,
+    onRowsPerPageChange: makeRowsChange,
+  } = usePaginatedTableScroll();
 
   const load = useCallback(async () => {
     try {
@@ -215,7 +221,10 @@ const InventoryItemsPage: React.FC = () => {
 
       <Paper>
         {loading ? (
-            <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+            <TableContainer
+              ref={tableContainerRef}
+              sx={{ maxHeight: "calc(100vh - 260px)" }}
+            >
             <Table size="small" stickyHeader>
               <TableHeaderSkeleton columns={4} />
               <TableSkeleton columns={4} rows={8} />
@@ -223,7 +232,10 @@ const InventoryItemsPage: React.FC = () => {
           </TableContainer>
         ) : (
           <>
-            <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+            <TableContainer
+              ref={tableContainerRef}
+              sx={{ maxHeight: "calc(100vh - 260px)" }}
+            >
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -278,11 +290,8 @@ const InventoryItemsPage: React.FC = () => {
               count={items.length}
               rowsPerPage={rowsPerPage}
               page={page}
-              onPageChange={(_, newPage) => setPage(newPage)}
-              onRowsPerPageChange={(event) => {
-                setRowsPerPage(parseInt(event.target.value, 10));
-                setPage(0);
-              }}
+              onPageChange={makePageChange(setPage)}
+              onRowsPerPageChange={makeRowsChange(setRowsPerPage, setPage)}
             />
           </>
         )}

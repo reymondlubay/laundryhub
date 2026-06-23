@@ -27,6 +27,7 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog";
+import { usePaginatedTableScroll } from "../../hooks/usePaginatedTableScroll";
 import {
   TableHeaderSkeleton,
   TableSkeleton,
@@ -74,6 +75,11 @@ const FixedMonthlyExpensesPage: React.FC = () => {
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const {
+    tableContainerRef,
+    onPageChange: makePageChange,
+    onRowsPerPageChange: makeRowsChange,
+  } = usePaginatedTableScroll();
 
   const load = useCallback(async () => {
     try {
@@ -249,7 +255,7 @@ const FixedMonthlyExpensesPage: React.FC = () => {
           </Stack>
         ) : (
           <>
-            <TableContainer>
+            <TableContainer ref={tableContainerRef}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -323,12 +329,9 @@ const FixedMonthlyExpensesPage: React.FC = () => {
                 component="div"
                 count={items.length}
                 page={page}
-                onPageChange={(_, p) => setPage(p)}
+                onPageChange={makePageChange(setPage)}
                 rowsPerPage={rowsPerPage}
-                onRowsPerPageChange={(e) => {
-                  setRowsPerPage(parseInt(e.target.value, 10));
-                  setPage(0);
-                }}
+                onRowsPerPageChange={makeRowsChange(setRowsPerPage, setPage)}
                 rowsPerPageOptions={[10, 25, 50]}
               />
             ) : null}

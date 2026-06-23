@@ -61,6 +61,7 @@ import {
   TableSkeleton,
   TableHeaderSkeleton,
 } from "../../components/Skeletons/SkeletonComponents";
+import { usePaginatedTableScroll } from "../../hooks/usePaginatedTableScroll";
 
 type UserFormState = {
   firstName: string;
@@ -100,6 +101,8 @@ const Users: React.FC = () => {
   const [form, setForm] = useState<UserFormState>(emptyForm);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
+  const { tableContainerRef, onPageChange: makePageChange, onRowsPerPageChange: makeRowsChange } =
+    usePaginatedTableScroll();
 
   const isAdmin = currentUser?.role === USER_ROLE_ADMIN;
 
@@ -286,7 +289,7 @@ const Users: React.FC = () => {
 
       <Paper>
         {loading ? (
-          <TableContainer sx={{ maxHeight: 560 }}>
+          <TableContainer ref={tableContainerRef} sx={{ maxHeight: 560 }}>
             <Table size="small" stickyHeader>
               <TableHeaderSkeleton columns={7} />
               <TableSkeleton columns={7} rows={8} />
@@ -294,7 +297,7 @@ const Users: React.FC = () => {
           </TableContainer>
         ) : (
           <>
-            <TableContainer sx={{ maxHeight: 560 }}>
+            <TableContainer ref={tableContainerRef} sx={{ maxHeight: 560 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -367,11 +370,8 @@ const Users: React.FC = () => {
               count={visibleUsers.length}
               rowsPerPage={rowsPerPage}
               page={page}
-              onPageChange={(_, newPage) => setPage(newPage)}
-              onRowsPerPageChange={(event) => {
-                setRowsPerPage(parseInt(event.target.value, 10));
-                setPage(0);
-              }}
+              onPageChange={makePageChange(setPage)}
+              onRowsPerPageChange={makeRowsChange(setRowsPerPage, setPage)}
             />
           </>
         )}

@@ -45,6 +45,7 @@ import {
   getTransactionAmountDue,
   getTransactionDiscount,
 } from "../../utils/pricing";
+import { usePaginatedTableScroll } from "../../hooks/usePaginatedTableScroll";
 
 type TransactionLegacy = Transaction & {
   customerid?: string;
@@ -154,6 +155,8 @@ const SalesReport: React.FC = () => {
   const [salesRowsPerPage, setSalesRowsPerPage] = React.useState(50);
   const [expensePage, setExpensePage] = React.useState(0);
   const [expenseRowsPerPage, setExpenseRowsPerPage] = React.useState(50);
+  const salesScroll = usePaginatedTableScroll();
+  const expenseScroll = usePaginatedTableScroll();
 
   React.useEffect(() => {
     setSalesPage(0);
@@ -381,7 +384,7 @@ const SalesReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Sales ({monthText})
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <TableContainer ref={salesScroll.tableContainerRef} sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -430,11 +433,11 @@ const SalesReport: React.FC = () => {
               count={salesRows.length}
               rowsPerPage={salesRowsPerPage}
               page={salesPage}
-              onPageChange={(_, newPage) => setSalesPage(newPage)}
-              onRowsPerPageChange={(e) => {
-                setSalesRowsPerPage(parseInt(e.target.value, 10));
-                setSalesPage(0);
-              }}
+              onPageChange={salesScroll.onPageChange(setSalesPage)}
+              onRowsPerPageChange={salesScroll.onRowsPerPageChange(
+                setSalesRowsPerPage,
+                setSalesPage,
+              )}
             />
           </Paper>
 
@@ -446,7 +449,7 @@ const SalesReport: React.FC = () => {
               Table lists recorded expenses only. Active fixed monthly items from
               Settings are included in Summary totals below.
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <TableContainer ref={expenseScroll.tableContainerRef} sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -491,11 +494,11 @@ const SalesReport: React.FC = () => {
               count={expenseRows.length}
               rowsPerPage={expenseRowsPerPage}
               page={expensePage}
-              onPageChange={(_, newPage) => setExpensePage(newPage)}
-              onRowsPerPageChange={(e) => {
-                setExpenseRowsPerPage(parseInt(e.target.value, 10));
-                setExpensePage(0);
-              }}
+              onPageChange={expenseScroll.onPageChange(setExpensePage)}
+              onRowsPerPageChange={expenseScroll.onRowsPerPageChange(
+                setExpenseRowsPerPage,
+                setExpensePage,
+              )}
             />
           </Paper>
 
