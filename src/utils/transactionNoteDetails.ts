@@ -26,7 +26,6 @@ export function getTransactionNoteDetailLines(
 ): string[] {
   if (!row) return [];
   const noteText = row.notes && row.notes !== "-" ? String(row.notes) : "";
-  const isDelivered = Boolean(row.isDelivered ?? row.isdelivered);
   const source = row as Record<string, unknown>;
   const whitePrice = pickTransactionNum(source, "whiteprice", "whitePrice");
   const fabconQty = pickTransactionNum(source, "fabconqty", "fabconQty");
@@ -42,7 +41,6 @@ export function getTransactionNoteDetailLines(
   );
 
   const details: string[] = [];
-  if (isDelivered) details.push("Delivery");
   if (whitePrice > 0)
     details.push(`Add White +${formatAmount(whitePrice)}`);
   if (fabconQty > 0) details.push(`Fabcon x${fabconQty}`);
@@ -51,4 +49,11 @@ export function getTransactionNoteDetailLines(
   if (noteText) details.push(`Notes ${noteText}`);
 
   return details;
+}
+
+export function getDeliveryTooltipLines(address?: string | null): string[] {
+  const lines = ["For delivery"];
+  const trimmed = address?.trim();
+  if (trimmed) lines.push(trimmed);
+  return lines;
 }

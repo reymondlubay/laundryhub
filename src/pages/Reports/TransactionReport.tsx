@@ -371,6 +371,15 @@ const TransactionReport: React.FC = () => {
   const [backdatePickupRowsPerPage, setBackdatePickupRowsPerPage] =
     React.useState(50);
 
+  const loadTableRef = React.useRef<HTMLDivElement>(null);
+  const payTableRef = React.useRef<HTMLDivElement>(null);
+  const backdateTableRef = React.useRef<HTMLDivElement>(null);
+  const backdatePickupTableRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollTableToTop = (ref: React.RefObject<HTMLDivElement | null>) => {
+    ref.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   /** Cash count vs system (cash-only; excludes GCash). */
   const [cashPanukliInput, setCashPanukliInput] = React.useState("");
   const [cashOnHandInput, setCashOnHandInput] = React.useState("");
@@ -804,7 +813,7 @@ const TransactionReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Load Report
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <TableContainer ref={loadTableRef} sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -886,10 +895,14 @@ const TransactionReport: React.FC = () => {
               count={loadReportRows.length}
               rowsPerPage={loadRowsPerPage}
               page={loadPage}
-              onPageChange={(_, newPage) => setLoadPage(newPage)}
+              onPageChange={(_, newPage) => {
+                setLoadPage(newPage);
+                scrollTableToTop(loadTableRef);
+              }}
               onRowsPerPageChange={(e) => {
                 setLoadRowsPerPage(parseInt(e.target.value, 10));
                 setLoadPage(0);
+                scrollTableToTop(loadTableRef);
               }}
             />
 
@@ -935,7 +948,7 @@ const TransactionReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Payment Report
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <TableContainer ref={payTableRef} sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -1159,10 +1172,14 @@ const TransactionReport: React.FC = () => {
               count={paymentReportRows.length}
               rowsPerPage={payRowsPerPage}
               page={payPage}
-              onPageChange={(_, newPage) => setPayPage(newPage)}
+              onPageChange={(_, newPage) => {
+                setPayPage(newPage);
+                scrollTableToTop(payTableRef);
+              }}
               onRowsPerPageChange={(e) => {
                 setPayRowsPerPage(parseInt(e.target.value, 10));
                 setPayPage(0);
+                scrollTableToTop(payTableRef);
               }}
             />
 
@@ -1237,7 +1254,7 @@ const TransactionReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Backdate Payment Report
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <TableContainer ref={backdateTableRef} sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -1335,10 +1352,14 @@ const TransactionReport: React.FC = () => {
               count={backdatePaymentRows.length}
               rowsPerPage={backdateRowsPerPage}
               page={backdatePage}
-              onPageChange={(_, newPage) => setBackdatePage(newPage)}
+              onPageChange={(_, newPage) => {
+                setBackdatePage(newPage);
+                scrollTableToTop(backdateTableRef);
+              }}
               onRowsPerPageChange={(e) => {
                 setBackdateRowsPerPage(parseInt(e.target.value, 10));
                 setBackdatePage(0);
+                scrollTableToTop(backdateTableRef);
               }}
             />
           </Paper>
@@ -1347,7 +1368,7 @@ const TransactionReport: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
               Backdate Date Pickup Report
             </Typography>
-            <TableContainer sx={{ maxHeight: 450 }}>
+            <TableContainer ref={backdatePickupTableRef} sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -1442,10 +1463,14 @@ const TransactionReport: React.FC = () => {
               count={backdatePickupRows.length}
               rowsPerPage={backdatePickupRowsPerPage}
               page={backdatePickupPage}
-              onPageChange={(_, newPage) => setBackdatePickupPage(newPage)}
+              onPageChange={(_, newPage) => {
+                setBackdatePickupPage(newPage);
+                scrollTableToTop(backdatePickupTableRef);
+              }}
               onRowsPerPageChange={(e) => {
                 setBackdatePickupRowsPerPage(parseInt(e.target.value, 10));
                 setBackdatePickupPage(0);
+                scrollTableToTop(backdatePickupTableRef);
               }}
             />
           </Paper>

@@ -28,6 +28,7 @@ import userService, { type UserItem } from "../../services/userService";
 import authService from "../../services/authService";
 import { USER_ROLE_EMPLOYEE } from "../../constants/roles";
 import { isEmployee } from "../../utils/roleAccess";
+import { usePaginatedTableScroll } from "../../hooks/usePaginatedTableScroll";
 
 type ActivityFilter = "all" | "receive" | "release";
 
@@ -251,6 +252,11 @@ const ReceiveReleaseReport: React.FC = () => {
     React.useState<ActivityFilter>("all");
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(25);
+  const {
+    tableContainerRef,
+    onPageChange: makePageChange,
+    onRowsPerPageChange: makeRowsChange,
+  } = usePaginatedTableScroll();
 
   React.useEffect(() => {
     const load = async () => {
@@ -593,6 +599,7 @@ const ReceiveReleaseReport: React.FC = () => {
         ) : (
           <>
             <TableContainer
+              ref={tableContainerRef}
               sx={{
                 border: 1,
                 borderColor: "divider",
@@ -655,12 +662,9 @@ const ReceiveReleaseReport: React.FC = () => {
               component="div"
               count={displayRows.length}
               page={page}
-              onPageChange={(_e, next) => setPage(next)}
+              onPageChange={makePageChange(setPage)}
               rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={(e) => {
-                setRowsPerPage(Number.parseInt(e.target.value, 10));
-                setPage(0);
-              }}
+              onRowsPerPageChange={makeRowsChange(setRowsPerPage, setPage)}
               rowsPerPageOptions={[10, 25, 50, 100]}
               sx={{ borderTop: 0 }}
             />
@@ -670,6 +674,7 @@ const ReceiveReleaseReport: React.FC = () => {
                 Totals by employee
               </Typography>
               <TableContainer
+                ref={tableContainerRef}
                 sx={{
                   border: 1,
                   borderColor: "divider",

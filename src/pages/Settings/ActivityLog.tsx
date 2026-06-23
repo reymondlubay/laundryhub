@@ -38,6 +38,7 @@ import activityLogService, {
   type ActivityLogEntry,
 } from "../../services/activityLogService";
 import { ignoreBackdropClose } from "../../utils/muiDialogClose";
+import { usePaginatedTableScroll } from "../../hooks/usePaginatedTableScroll";
 
 const ACTION_OPTIONS = [
   "Added",
@@ -93,6 +94,11 @@ const ActivityLogPage: React.FC = () => {
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const {
+    tableContainerRef,
+    onPageChange: makePageChange,
+    onRowsPerPageChange: makeRowsChange,
+  } = usePaginatedTableScroll();
 
   const [dateFrom, setDateFrom] = useState<Dayjs | null>(() => dayjs());
   const [dateTo, setDateTo] = useState<Dayjs | null>(() => dayjs());
@@ -329,7 +335,7 @@ const ActivityLogPage: React.FC = () => {
         </Grid>
       </Paper>
 
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} ref={tableContainerRef}>
         <Table size="small">
           <TableHead>
             {loading ? (
@@ -371,12 +377,9 @@ const ActivityLogPage: React.FC = () => {
         <TablePagination
           count={total}
           page={page}
-          onPageChange={(_, p) => setPage(p)}
+          onPageChange={makePageChange(setPage)}
           rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
-            setPage(0);
-          }}
+          onRowsPerPageChange={makeRowsChange(setRowsPerPage, setPage)}
           rowsPerPageOptions={[10, 25, 50, 100]}
         />
       </TableContainer>

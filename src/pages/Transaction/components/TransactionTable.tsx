@@ -77,7 +77,7 @@ import {
   getTransactionDiscount,
 } from "../../../utils/pricing";
 import { pickTransactionNum } from "../../../utils/normalizeTransaction";
-import { getTransactionNoteDetailLines } from "../../../utils/transactionNoteDetails";
+import { getTransactionNoteDetailLines, getDeliveryTooltipLines } from "../../../utils/transactionNoteDetails";
 import {
   getEstimatedPickupTooltipParts,
   getTransactionEstimatedPickupIso,
@@ -138,6 +138,7 @@ interface FlatTransactionRow {
   colorSafeQty: number;
   discount: number;
   isDelivered: boolean;
+  customerAddress: string;
   receivedBy: string;
   releasedBy: string;
   action: string;
@@ -411,6 +412,7 @@ function flattenTransactionRows(
       ?.loadsCount ?? 0;
   const pickupHistoryLines = getPickupHistoryLines(transaction);
   const customerName = toPascalCase(transaction.customer?.name || "Unknown");
+  const customerAddress = transaction.customer?.address?.trim() || "";
 
   const loadDetails = transaction.loadDetails || [];
   const totalKg = loadDetails.reduce(
@@ -523,6 +525,7 @@ function flattenTransactionRows(
         colorSafeQty,
         discount,
         isDelivered,
+        customerAddress,
         receivedBy,
         releasedBy,
         action: "",
@@ -570,6 +573,7 @@ function flattenTransactionRows(
       colorSafeQty,
       discount,
       isDelivered,
+      customerAddress,
       receivedBy,
       releasedBy,
       action: "",
@@ -1312,6 +1316,49 @@ function TransactionTableInner({
                     }}
                   >
                     <HourglassTopIcon
+                      sx={{ fontSize: TX_TABLE_STATUS_ICON_SIZE }}
+                    />
+                  </Box>
+                </Tooltip>
+              ) : null}
+              {params.data?.isFirstRow && params.data?.isDelivered ? (
+                <Tooltip
+                  title={
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 0.25,
+                        fontSize: "0.95rem",
+                      }}
+                    >
+                      {getDeliveryTooltipLines(params.data.customerAddress).map(
+                        (line, index) => (
+                          <Box
+                            key={`${index}-${line}`}
+                            component="span"
+                            sx={index > 0 ? { color: "#f44336" } : undefined}
+                          >
+                            {line}
+                          </Box>
+                        ),
+                      )}
+                    </Box>
+                  }
+                  arrow
+                  placement="right"
+                  slotProps={TX_TABLE_TOOLTIP_SLOT_PROPS}
+                >
+                  <Box
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      color: "#f44336",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <LocalShippingIcon
                       sx={{ fontSize: TX_TABLE_STATUS_ICON_SIZE }}
                     />
                   </Box>

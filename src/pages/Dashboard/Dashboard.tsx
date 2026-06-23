@@ -26,6 +26,7 @@ import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlin
 import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import DeliveryDiningOutlinedIcon from "@mui/icons-material/DeliveryDiningOutlined";
 import HistoryIcon from "@mui/icons-material/History";
 import dayjs from "dayjs";
 import { useThemeContext } from "../../components/ThemeContext/ThemeContext";
@@ -163,6 +164,20 @@ const AnimatedCount: React.FC<{ value: number }> = ({ value }) => {
   }, [endValue]);
 
   return <>{formatCount(displayValue)}</>;
+};
+
+const isTransactionForDelivery = (transaction: Transaction): boolean => {
+  const tx = transaction as Transaction & { isdelivered?: boolean };
+  return Boolean(transaction.isDelivered ?? tx.isdelivered);
+};
+
+const isReadyForDelivery = (transaction: Transaction): boolean => {
+  const hasLoadedDate = Boolean(getTransactionDate(transaction, "dateLoaded"));
+  return (
+    hasLoadedDate &&
+    !isFullyPickedUp(transaction) &&
+    isTransactionForDelivery(transaction)
+  );
 };
 
 const Dashboard = () => {
@@ -305,6 +320,9 @@ const Dashboard = () => {
       return hasLoadedDate && !isFullyPickedUp(transaction);
     }).length;
 
+    const readyForDeliveryCount = activeTransactions.filter(isReadyForDelivery)
+      .length;
+
     return {
       todaysTransactions,
       todaysLoad,
@@ -313,6 +331,7 @@ const Dashboard = () => {
       todaysPaid,
       todaysPickup,
       readyForPickupCount,
+      readyForDeliveryCount,
     };
   }, [activeTransactions]);
 
@@ -454,6 +473,28 @@ const Dashboard = () => {
     [readyForPickupTransactions],
   );
 
+  const readyForDeliveryTransactions = React.useMemo(() => {
+    return activeTransactions
+      .filter(isReadyForDelivery)
+      .sort((a, b) => {
+        const aDate = dayjs(getTransactionDate(a, "dateLoaded"));
+        const bDate = dayjs(getTransactionDate(b, "dateLoaded"));
+        if (!aDate.isValid() && !bDate.isValid()) return 0;
+        if (!aDate.isValid()) return 1;
+        if (!bDate.isValid()) return -1;
+        return aDate.valueOf() - bDate.valueOf();
+      });
+  }, [activeTransactions]);
+
+  const readyForDeliveryTotalLoads = React.useMemo(
+    () =>
+      readyForDeliveryTransactions.reduce(
+        (sum, transaction) => sum + getRemainingLoads(transaction),
+        0,
+      ),
+    [readyForDeliveryTransactions],
+  );
+
   const cards: DashboardCard[] = [
     {
       key: "todays-transaction",
@@ -506,6 +547,16 @@ const Dashboard = () => {
       icon: <CheckCircleOutlineIcon />,
       iconBg: "#e8f7f1",
       iconColor: "#1d9a72",
+    },
+    {
+      key: "ready-for-delivery",
+      title: "Ready for Delivery",
+      value: metrics.readyForDeliveryCount,
+      secondaryValue: readyForDeliveryTotalLoads,
+      secondaryLabel: "Transactions | Loads",
+      icon: <DeliveryDiningOutlinedIcon />,
+      iconBg: "#e3f2fd",
+      iconColor: "#1976d2",
     },
   ];
 
@@ -1283,6 +1334,7 @@ const Dashboard = () => {
 
           <Grid container spacing={2} sx={{ mt: 2 }}>
             <Grid size={{ xs: 12, md: 6 }}>
+              <Stack spacing={2}>
               <Paper
                 elevation={0}
                 sx={{
@@ -1521,6 +1573,149 @@ const Dashboard = () => {
                   </Table>
                 </TableContainer>
               </Paper>
+
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 1.25, sm: 2 },
+                  borderRadius: 3,
+                  bgcolor: surfaceColor,
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  sx={{ mb: 1.5 }}
+                >
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <DeliveryDiningOutlinedIcon
+                      sx={{ color: "#1976d2", fontSize: 20 }}
+                    />
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 700,
+                        color: headingColor,
+                        fontSize: { xs: "1rem", sm: "1.25rem" },
+                      }}
+                    >
+                      Ready for Delivery
+                    </Typography>
+                  </Stack>
+                  <Typography variant="body2" sx={tableTotalLabelSx}>
+                    Transactions:{" "}
+                    {tableTotalNum(readyForDeliveryTransactions.length)} | Loads:{" "}
+                    {tableTotalNum(readyForDeliveryTotalLoads)}
+                  </Typography>
+                </Stack>
+                <TableContainer sx={{ maxHeight: "35vh" }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ bgcolor: tableHeadBg, color: tableHeadColor, fontWeight: 700, whiteSpace: "nowrap" }}>
+                          Transaction Date
+                        </TableCell>
+                        <TableCell sx={{ bgcolor: tableHeadBg, color: tableHeadColor, fontWeight: 700, whiteSpace: "nowrap" }}>
+                          Customer
+                        </TableCell>
+                        <TableCell sx={{ bgcolor: tableHeadBg, color: tableHeadColor, fontWeight: 700, whiteSpace: "nowrap" }}>
+                          Loaded Date
+                        </TableCell>
+                        <TableCell sx={{ bgcolor: tableHeadBg, color: tableHeadColor, fontWeight: 700, whiteSpace: "nowrap" }}>
+                          Date Paid
+                        </TableCell>
+                        <TableCell align="right" sx={{ bgcolor: tableHeadBg, color: tableHeadColor, fontWeight: 700, whiteSpace: "nowrap" }}>
+                          Loads
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {readyForDeliveryTransactions.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} align="center" sx={{ color: tableCellColor }}>
+                            No transactions ready for delivery.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        readyForDeliveryTransactions.map((transaction) => {
+                          const payments = transaction.paymentDetails || [];
+                          const totalPaid = payments.reduce(
+                            (sum, p) => sum + (Number(p.amount) || 0),
+                            0,
+                          );
+                          const lastPaymentDate =
+                            payments.length > 0
+                              ? payments[payments.length - 1].paymentDate
+                              : null;
+                          const paymentHistoryTooltip =
+                            payments.length === 0
+                              ? "No payments"
+                              : payments
+                                  .map(
+                                    (p) =>
+                                      `${dayjs(p.paymentDate).format("MM-DD-YY h:mm A")} - ${new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(Number(p.amount) || 0)}`,
+                                  )
+                                  .join("\n");
+
+                          return (
+                            <TableRow key={`delivery-${transaction.id}`}>
+                              <TableCell sx={{ color: tableCellColor }}>
+                                {dayjs(getTransactionDate(transaction, "dateReceived")).isValid()
+                                  ? dayjs(getTransactionDate(transaction, "dateReceived")).format("MM-DD-YY h:mm A")
+                                  : "-"}
+                              </TableCell>
+                              <TableCell sx={{ color: tableCellColor }}>
+                                {toPascalCase(transaction.customer?.name || "-")}
+                              </TableCell>
+                              <TableCell sx={{ color: tableCellColor }}>
+                                {dayjs(getTransactionDate(transaction, "dateLoaded")).isValid()
+                                  ? dayjs(getTransactionDate(transaction, "dateLoaded")).format("MM-DD-YY h:mm A")
+                                  : "-"}
+                              </TableCell>
+                              <TableCell sx={{ color: tableCellColor }}>
+                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+                                  <span>
+                                    {lastPaymentDate
+                                      ? dayjs(lastPaymentDate).format("MM-DD-YY h:mm A")
+                                      : "-"}
+                                  </span>
+                                  {payments.length > 0 && (
+                                    <Tooltip
+                                      title={
+                                        <Box sx={{ whiteSpace: "pre-line", fontSize: "0.875rem" }}>
+                                          <div><strong>Payment History</strong></div>
+                                          <div>{paymentHistoryTooltip}</div>
+                                          <div style={{ marginTop: "0.5rem" }}>
+                                            <strong>
+                                              Total Paid:{" "}
+                                              {new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(totalPaid)}
+                                            </strong>
+                                          </div>
+                                        </Box>
+                                      }
+                                      arrow
+                                    >
+                                      <Box component="span" sx={{ width: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#1d9a72", cursor: "pointer" }}>
+                                        <HistoryIcon sx={{ fontSize: 16 }} />
+                                      </Box>
+                                    </Tooltip>
+                                  )}
+                                </Box>
+                              </TableCell>
+                              <TableCell align="right" sx={{ color: tableCellColor }}>
+                                {formatCount(getRemainingLoads(transaction))}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+              </Stack>
             </Grid>
 
             <Grid size={{ xs: 12, md: 6 }}>

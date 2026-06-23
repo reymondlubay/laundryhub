@@ -41,6 +41,7 @@ import {
   formatExportMonthLabel,
 } from "../../utils/exportFileName";
 import { toPascalCase } from "../../utils/stringUtils";
+import { usePaginatedTableScroll } from "../../hooks/usePaginatedTableScroll";
 
 type TransactionWithLegacyFields = Transaction & {
   customerid?: string;
@@ -169,6 +170,11 @@ const CustomerReport: React.FC = () => {
   const [monthTo, setMonthTo] = React.useState<Dayjs>(dayjs());
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(20);
+  const {
+    tableContainerRef,
+    onPageChange: makePageChange,
+    onRowsPerPageChange: makeRowsChange,
+  } = usePaginatedTableScroll();
 
   type SortableColumn =
     | "customerName"
@@ -476,7 +482,7 @@ const CustomerReport: React.FC = () => {
               Export to excel
             </Button>
           </Box>
-          <TableContainer sx={{ maxHeight: 520 }}>
+          <TableContainer ref={tableContainerRef} sx={{ maxHeight: 520 }}>
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
@@ -578,11 +584,8 @@ const CustomerReport: React.FC = () => {
             count={sortedReportRows.length}
             rowsPerPage={rowsPerPage}
             page={page}
-            onPageChange={(_, newPage) => setPage(newPage)}
-            onRowsPerPageChange={(event) => {
-              setRowsPerPage(parseInt(event.target.value, 10));
-              setPage(0);
-            }}
+            onPageChange={makePageChange(setPage)}
+            onRowsPerPageChange={makeRowsChange(setRowsPerPage, setPage)}
           />
 
           <Box sx={{ mt: 2 }}>
