@@ -39,6 +39,8 @@ import {
   getTransactionDiscount,
 } from "../../utils/pricing";
 import { isEmployee } from "../../utils/roleAccess";
+import { isGcashPaymentMode } from "../../constants/payment";
+import { GcashIcon } from "../../components/Payment/GcashIcon";
 
 type PaymentModeTotals = {
   cash: number;
@@ -540,6 +542,10 @@ const TransactionReport: React.FC = () => {
           ? getLatestPaymentDate(paymentsInRange)
           : null;
 
+      const hasGcashPayment = paymentsInRange.some((payment) =>
+        isGcashPaymentMode(payment.mode),
+      );
+
       return {
         transaction,
         paymentsInRange,
@@ -552,6 +558,7 @@ const TransactionReport: React.FC = () => {
         balanceAmount,
         overAmount,
         datePaid,
+        hasGcashPayment,
       };
     });
   }, [addonsPricing, dateFrom, dateTo, paymentReportRows]);
@@ -986,6 +993,7 @@ const TransactionReport: React.FC = () => {
                           isFullyPaid,
                           balanceAmount,
                           overAmount,
+                          hasGcashPayment,
                         }) => {
                           const totals = getTransactionTotals(
                             transaction,
@@ -1104,6 +1112,7 @@ const TransactionReport: React.FC = () => {
                                   <span>
                                     {formatCurrency(amountPaidInRange)}
                                   </span>
+                                  {hasGcashPayment ? <GcashIcon size={18} /> : null}
                                   <Tooltip title={tooltipTitle} arrow>
                                     <Box
                                       component="span"

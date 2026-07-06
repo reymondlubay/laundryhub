@@ -17,3 +17,7 @@ export const PAYMENT_MODE_OPTIONS = [
 ] as const;
 
 export const DEFAULT_PAYMENT_MODE = PAYMENT_MODE_CASH;
+
+export function isGcashPaymentMode(mode: string | undefined | null): boolean {
+  return String(mode ?? "").trim().toLowerCase() === "gcash";
+}
