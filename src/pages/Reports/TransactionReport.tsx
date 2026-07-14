@@ -818,143 +818,73 @@ const TransactionReport: React.FC = () => {
         <Stack spacing={3}>
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
-              Load Report
+              Payment Report
             </Typography>
-            <TableContainer ref={loadTableRef} sx={{ maxHeight: 450 }}>
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Date Receive</TableCell>
-                    <TableCell>Customer</TableCell>
-                    <TableCell>kg</TableCell>
-                    <TableCell>load</TableCell>
-                    <TableCell>price</TableCell>
-                    <TableCell>Date loaded</TableCell>
-                    <TableCell>Date paid</TableCell>
-                    <TableCell>Date pickup</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {loadReportRows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} align="center">
-                        No records found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    sortedLoadReportRows
-                      .slice(
-                        loadPage * loadRowsPerPage,
-                        loadPage * loadRowsPerPage + loadRowsPerPage,
-                      )
-                      .map((transaction) => {
-                        const totals = getTransactionTotals(
-                          transaction,
-                          addonsPricing,
-                        );
-                        return (
-                          <TableRow key={`load-${transaction.id}`}>
-                            <TableCell>
-                              {formatDateTime(
-                                getTransactionFieldDate(
-                                  transaction,
-                                  "dateReceived",
-                                ),
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {toPascalCase(transaction.customer?.name || "-")}
-                            </TableCell>
-                            <TableCell>{formatCount(totals.kg)}</TableCell>
-                            <TableCell>{formatCount(totals.loads)}</TableCell>
-                            <TableCell>
-                              {formatCurrency(totals.price)}
-                            </TableCell>
-                            <TableCell>
-                              {formatDateTime(
-                                getTransactionFieldDate(
-                                  transaction,
-                                  "dateLoaded",
-                                ),
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {formatDateTime(totals.latestPaymentDate)}
-                            </TableCell>
-                            <TableCell>
-                              {formatDateTime(
-                                getTransactionFieldDate(
-                                  transaction,
-                                  "datePickup",
-                                ),
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <TablePagination
-              rowsPerPageOptions={[25, 50, 100, 200]}
-              component="div"
-              count={loadReportRows.length}
-              rowsPerPage={loadRowsPerPage}
-              page={loadPage}
-              onPageChange={(_, newPage) => {
-                setLoadPage(newPage);
-                scrollTableToTop(loadTableRef);
-              }}
-              onRowsPerPageChange={(e) => {
-                setLoadRowsPerPage(parseInt(e.target.value, 10));
-                setLoadPage(0);
-                scrollTableToTop(loadTableRef);
-              }}
-            />
-
-            <Box sx={{ mt: 2 }}>
+            <Box sx={{ mb: 2 }}>
               <Typography sx={{ fontWeight: 700 }}>
-                Total load from {fromText} - {toText}
+                Total payments from {fromText} - {toText}
+              </Typography>
+              <Divider sx={{ my: 1 }} />
+              <Typography>
+                Total Payment Cash -{" "}
+                {formatCurrency(paymentSummary.totalPaymentCash)}
+              </Typography>
+              <Typography>
+                Total Payment Gcash -{" "}
+                {formatCurrency(paymentSummary.totalPaymentGcash)}
+              </Typography>
+              <Typography sx={{ fontWeight: 700 }}>
+                Total Payment - {formatCurrency(paymentSummary.totalPayment)}
+              </Typography>
+              <Typography sx={{ fontWeight: 700, color: "#f44336" }}>
+                Total Backdate Payment - {formatCurrency(totalBackdatePayment)}
+              </Typography>
+              <Typography sx={{ fontWeight: 700, color: "#f44336" }}>
+                Total Discount - {formatCurrency(paymentSummary.totalDiscount)}
               </Typography>
               <Divider sx={{ my: 1 }} />
               <Typography sx={{ fontWeight: 700 }}>
-                Total Loads - {formatCount(totalLoads)}
+                Total Balance - {formatCurrency(paymentSummary.totalBalance)}
+              </Typography>
+              <Divider sx={{ my: 1 }} />
+              <Typography sx={{ fontWeight: 700 }}>
+                Total over - {formatCurrency(paymentSummary.totalOver)}
+              </Typography>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Cash count vs system (excluding GCash)
+              </Typography>
+              <Grid container spacing={2} sx={{ mb: 1 }}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    label="Initials / Panukli"
+                    value={cashPanukliInput}
+                    onChange={(e) => setCashPanukliInput(e.target.value)}
+                    placeholder="0"
+                    size="small"
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    label="Total cash on hand"
+                    value={cashOnHandInput}
+                    onChange={(e) => setCashOnHandInput(e.target.value)}
+                    placeholder="0"
+                    size="small"
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+              </Grid>
+              <Typography sx={{ fontWeight: 700 }}>
+                Short - {formatCurrency(cashReconciliation.short)}
               </Typography>
               <Typography sx={{ fontWeight: 700 }}>
-                {formatKgWithAvg(
-                  "Total Clothes KG",
-                  loadReportTypeTotals.clothesKg,
-                  loadReportTypeTotals.clothesLoads,
-                  loadReportTypeTotals.clothesAvgKg,
-                )}
-              </Typography>
-              <Typography sx={{ fontWeight: 700 }}>
-                {formatKgWithAvg(
-                  "Total Beddings KG",
-                  loadReportTypeTotals.beddingsKg,
-                  loadReportTypeTotals.beddingsLoads,
-                  loadReportTypeTotals.beddingsAvgKg,
-                )}
-              </Typography>
-              <Typography sx={{ fontWeight: 700 }}>
-                Total Comforter - {formatCount(loadReportTypeTotals.comforterLoads)}
-              </Typography>
-              <Typography sx={{ fontWeight: 700 }}>
-                {formatKgWithAvg(
-                  "Total KG Load",
-                  loadReportTypeTotals.totalKgLoad,
-                  loadReportTypeTotals.totalKgLoads,
-                  loadReportTypeTotals.totalKgLoadAvg,
-                )}
+                Over - {formatCurrency(cashReconciliation.over)}
               </Typography>
             </Box>
-          </Paper>
-
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
-              Payment Report
-            </Typography>
             <TableContainer ref={payTableRef} sx={{ maxHeight: 450 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
@@ -1192,69 +1122,139 @@ const TransactionReport: React.FC = () => {
               }}
             />
 
+          </Paper>
+
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
+              Load Report
+            </Typography>
+            <TableContainer ref={loadTableRef} sx={{ maxHeight: 450 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date Receive</TableCell>
+                    <TableCell>Customer</TableCell>
+                    <TableCell>kg</TableCell>
+                    <TableCell>load</TableCell>
+                    <TableCell>price</TableCell>
+                    <TableCell>Date loaded</TableCell>
+                    <TableCell>Date paid</TableCell>
+                    <TableCell>Date pickup</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loadReportRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center">
+                        No records found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sortedLoadReportRows
+                      .slice(
+                        loadPage * loadRowsPerPage,
+                        loadPage * loadRowsPerPage + loadRowsPerPage,
+                      )
+                      .map((transaction) => {
+                        const totals = getTransactionTotals(
+                          transaction,
+                          addonsPricing,
+                        );
+                        return (
+                          <TableRow key={`load-${transaction.id}`}>
+                            <TableCell>
+                              {formatDateTime(
+                                getTransactionFieldDate(
+                                  transaction,
+                                  "dateReceived",
+                                ),
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {toPascalCase(transaction.customer?.name || "-")}
+                            </TableCell>
+                            <TableCell>{formatCount(totals.kg)}</TableCell>
+                            <TableCell>{formatCount(totals.loads)}</TableCell>
+                            <TableCell>
+                              {formatCurrency(totals.price)}
+                            </TableCell>
+                            <TableCell>
+                              {formatDateTime(
+                                getTransactionFieldDate(
+                                  transaction,
+                                  "dateLoaded",
+                                ),
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {formatDateTime(totals.latestPaymentDate)}
+                            </TableCell>
+                            <TableCell>
+                              {formatDateTime(
+                                getTransactionFieldDate(
+                                  transaction,
+                                  "datePickup",
+                                ),
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              rowsPerPageOptions={[25, 50, 100, 200]}
+              component="div"
+              count={loadReportRows.length}
+              rowsPerPage={loadRowsPerPage}
+              page={loadPage}
+              onPageChange={(_, newPage) => {
+                setLoadPage(newPage);
+                scrollTableToTop(loadTableRef);
+              }}
+              onRowsPerPageChange={(e) => {
+                setLoadRowsPerPage(parseInt(e.target.value, 10));
+                setLoadPage(0);
+                scrollTableToTop(loadTableRef);
+              }}
+            />
+
             <Box sx={{ mt: 2 }}>
               <Typography sx={{ fontWeight: 700 }}>
-                Total payments from {fromText} - {toText}
-              </Typography>
-              <Divider sx={{ my: 1 }} />
-              <Typography>
-                Total Payment Cash -{" "}
-                {formatCurrency(paymentSummary.totalPaymentCash)}
-              </Typography>
-              <Typography>
-                Total Payment Gcash -{" "}
-                {formatCurrency(paymentSummary.totalPaymentGcash)}
-              </Typography>
-              <Typography sx={{ fontWeight: 700 }}>
-                Total Payment - {formatCurrency(paymentSummary.totalPayment)}
-              </Typography>
-              <Typography sx={{ fontWeight: 700, color: "#f44336" }}>
-                Total Backdate Payment - {formatCurrency(totalBackdatePayment)}
-              </Typography>
-              <Typography sx={{ fontWeight: 700, color: "#f44336" }}>
-                Total Discount - {formatCurrency(paymentSummary.totalDiscount)}
+                Total load from {fromText} - {toText}
               </Typography>
               <Divider sx={{ my: 1 }} />
               <Typography sx={{ fontWeight: 700 }}>
-                Total Balance - {formatCurrency(paymentSummary.totalBalance)}
-              </Typography>
-              <Divider sx={{ my: 1 }} />
-              <Typography sx={{ fontWeight: 700 }}>
-                Total over - {formatCurrency(paymentSummary.totalOver)}
-              </Typography>
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Cash count vs system (excluding GCash)
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 1 }}>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    label="Initials / Panukli"
-                    value={cashPanukliInput}
-                    onChange={(e) => setCashPanukliInput(e.target.value)}
-                    placeholder="0"
-                    size="small"
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    label="Total cash on hand"
-                    value={cashOnHandInput}
-                    onChange={(e) => setCashOnHandInput(e.target.value)}
-                    placeholder="0"
-                    size="small"
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-              </Grid>
-              <Typography sx={{ fontWeight: 700 }}>
-                Short - {formatCurrency(cashReconciliation.short)}
+                Total Loads - {formatCount(totalLoads)}
               </Typography>
               <Typography sx={{ fontWeight: 700 }}>
-                Over - {formatCurrency(cashReconciliation.over)}
+                {formatKgWithAvg(
+                  "Total Clothes KG",
+                  loadReportTypeTotals.clothesKg,
+                  loadReportTypeTotals.clothesLoads,
+                  loadReportTypeTotals.clothesAvgKg,
+                )}
+              </Typography>
+              <Typography sx={{ fontWeight: 700 }}>
+                {formatKgWithAvg(
+                  "Total Beddings KG",
+                  loadReportTypeTotals.beddingsKg,
+                  loadReportTypeTotals.beddingsLoads,
+                  loadReportTypeTotals.beddingsAvgKg,
+                )}
+              </Typography>
+              <Typography sx={{ fontWeight: 700 }}>
+                Total Comforter - {formatCount(loadReportTypeTotals.comforterLoads)}
+              </Typography>
+              <Typography sx={{ fontWeight: 700 }}>
+                {formatKgWithAvg(
+                  "Total KG Load",
+                  loadReportTypeTotals.totalKgLoad,
+                  loadReportTypeTotals.totalKgLoads,
+                  loadReportTypeTotals.totalKgLoadAvg,
+                )}
               </Typography>
             </Box>
           </Paper>

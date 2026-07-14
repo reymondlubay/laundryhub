@@ -73,7 +73,15 @@ type ExpenseOption = {
   id: string;
   name: string;
   label: string;
+  /** True for the duplicated entries shown under the "Most Recent" group. */
+  recent?: boolean;
 };
+
+/** How far back to look when computing the most-selected expense names. */
+const RECENT_MONTHS_WINDOW = 2;
+/** How many entries to surface in the "Most Recent" group. */
+const RECENT_TOP_COUNT = 10;
+const RECENT_GROUP_LABEL = "Most Recent";
 
 type FormState = {
   option: ExpenseOption | null;
@@ -227,6 +235,43 @@ const RecordExpensePage: React.FC = () => {
       a.label.localeCompare(b.label),
     );
   }, [inventoryItems, visibleExpenseItems]);
+
+  // Top expense names selected within the recent window, most-selected first.
+  const recentTopOptions = useMemo<ExpenseOption[]>(() => {
+    const cutoff = dayjs()
+      .subtract(RECENT_MONTHS_WINDOW, "month")
+      .startOf("day");
+    const counts = new Map<string, number>();
+    for (const r of records) {
+      const date = dayjs(r.date);
+      if (!date.isValid() || date.isBefore(cutoff)) continue;
+      let key: string | null = null;
+      if (r.source === "inventory" && r.inventoryItemId) {
+        key = `inventory:${r.inventoryItemId}`;
+      } else if (r.source === "expense" && r.expenseItemId) {
+        key = `expense:${r.expenseItemId}`;
+      }
+      if (!key) continue;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const byKey = new Map(combinedOptions.map((o) => [o.key, o]));
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([key]) => byKey.get(key))
+      .filter((o): o is ExpenseOption => Boolean(o))
+      .slice(0, RECENT_TOP_COUNT);
+  }, [records, combinedOptions]);
+
+  // Options for the "Expense Name" select: recent picks first (as their own
+  // group), followed by the full alphabetized list.
+  const formOptions = useMemo<ExpenseOption[]>(() => {
+    const recent = recentTopOptions.map((o) => ({
+      ...o,
+      key: `recent:${o.key}`,
+      recent: true,
+    }));
+    return [...recent, ...combinedOptions];
+  }, [recentTopOptions, combinedOptions]);
 
   const load = useCallback(async () => {
     try {
@@ -808,7 +853,7 @@ const RecordExpensePage: React.FC = () => {
             <Grid container spacing={2} sx={{ mt: 0.5 }}>
               <Grid size={12}>
                 <Autocomplete
-                  options={combinedOptions}
+                  options={formOptions}
                   value={form.option}
                   onChange={(_, value) => {
                     let pieces = "";
@@ -835,8 +880,20 @@ const RecordExpensePage: React.FC = () => {
                   }
                   getOptionLabel={(option) => option.label || ""}
                   groupBy={(option) =>
-                    option.type === "inventory" ? "Inventory" : "Expense"
+                    option.recent
+                      ? RECENT_GROUP_LABEL
+                      : option.type === "inventory"
+                        ? "Inventory"
+                        : "Expense"
                   }
+                  renderOption={(props, option) => {
+                    const { key: _key, ...rest } = props;
+                    return (
+                      <li {...rest} key={option.key}>
+                        {option.label}
+                      </li>
+                    );
+                  }}
                   renderInput={(params) => (
                     <TextField {...params} label="Expense Name" size="small" />
                   )}
