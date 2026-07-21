@@ -104,8 +104,6 @@ const getTransactionFieldDate = (
 type RecordTypeFilter =
   | "all"
   | "pending"
-  | "paid"
-  | "unpaid"
   | "pickup"
   | "not-pickup"
   | "with-balance"
@@ -391,16 +389,6 @@ const matchesRecordTypeFilter = (
   switch (recordType) {
     case "pending":
       return isPending(transaction);
-    case "paid":
-      return (
-        isPaid(transaction, addonsPricing) ||
-        hasPartialPayment(transaction, addonsPricing)
-      );
-    case "unpaid":
-      return (
-        isUnpaid(transaction) ||
-        hasPartialPayment(transaction, addonsPricing)
-      );
     case "pickup":
       return isPickup(transaction);
     case "not-pickup":
@@ -425,6 +413,28 @@ const matchesRecordTypeFilter = (
   }
 };
 
+/** Matches Paid/Unpaid checkboxes against a transaction (partial counts as both). */
+const matchesPaymentStatusFilter = (
+  transaction: Transaction,
+  filterPaid: boolean,
+  filterUnpaid: boolean,
+  addonsPricing: AddonsPricing = DEFAULT_ADDONS_PRICING,
+): boolean => {
+  // Neither checked: no payment-status filter.
+  if (!filterPaid && !filterUnpaid) return true;
+  // Both checked: show paid and unpaid alike (equivalent to no filter).
+  if (filterPaid && filterUnpaid) return true;
+
+  const matchesPaid =
+    isPaid(transaction, addonsPricing) ||
+    hasPartialPayment(transaction, addonsPricing);
+  const matchesUnpaid =
+    isUnpaid(transaction) || hasPartialPayment(transaction, addonsPricing);
+
+  if (filterPaid) return matchesPaid;
+  return matchesUnpaid;
+};
+
 const TransactionSummary = () => {
   const [customers, setCustomers] = React.useState<Customer[]>([]);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
@@ -444,6 +454,8 @@ const TransactionSummary = () => {
   const [allTime, setAllTime] = React.useState(false);
   const [recordTypeFilter, setRecordTypeFilter] =
     React.useState<RecordTypeFilter>("all");
+  const [filterPaid, setFilterPaid] = React.useState(false);
+  const [filterUnpaid, setFilterUnpaid] = React.useState(false);
   const [amountMin, setAmountMin] = React.useState("");
   const [amountMax, setAmountMax] = React.useState("");
   const [page, setPage] = React.useState(0);
@@ -495,6 +507,8 @@ const TransactionSummary = () => {
     dateTo,
     allTime,
     recordTypeFilter,
+    filterPaid,
+    filterUnpaid,
     amountMin,
     amountMax,
   ]);
@@ -592,6 +606,17 @@ const TransactionSummary = () => {
         return false;
       }
 
+      if (
+        !matchesPaymentStatusFilter(
+          transaction,
+          filterPaid,
+          filterUnpaid,
+          addonsPricing,
+        )
+      ) {
+        return false;
+      }
+
       if (!amountRangeValid) return true;
       return matchesAmountRange(
         transaction,
@@ -609,6 +634,8 @@ const TransactionSummary = () => {
     dateTo,
     allTime,
     recordTypeFilter,
+    filterPaid,
+    filterUnpaid,
     parsedAmountMin,
     parsedAmountMax,
     addonsPricing,
@@ -908,8 +935,6 @@ const TransactionSummary = () => {
               >
                 <MenuItem value="all">All Records</MenuItem>
                 <MenuItem value="pending">Pending</MenuItem>
-                <MenuItem value="paid">Paid</MenuItem>
-                <MenuItem value="unpaid">Unpaid</MenuItem>
                 <MenuItem value="pickup">Pickup</MenuItem>
                 <MenuItem value="not-pickup">Not picked up</MenuItem>
                 <MenuItem value="with-balance">With balance</MenuItem>
@@ -919,6 +944,29 @@ const TransactionSummary = () => {
                 <MenuItem value="wrong-record">Wrong Record</MenuItem>
               </Select>
             </FormControl>
+
+            <FormGroup row>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={filterPaid}
+                    onChange={(e) => setFilterPaid(e.target.checked)}
+                  />
+                }
+                label="Paid"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={filterUnpaid}
+                    onChange={(e) => setFilterUnpaid(e.target.checked)}
+                  />
+                }
+                label="Unpaid"
+              />
+            </FormGroup>
 
             <TextField
               label="Min amount"
