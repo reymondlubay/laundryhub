@@ -359,7 +359,7 @@ const LoadReport: React.FC = () => {
                     dailyRowsWithData.map((row) => (
                       <TableRow key={row.dateKey}>
                         <TableCell>
-                          {dayjs(row.dateKey).format("MM-DD-YYYY")}
+                          {dayjs(row.dateKey).format("MM-DD-YYYY dddd")}
                         </TableCell>
                         <TableCell align="right">
                           {formatCount(row.clothesLoads)}

@@ -59,6 +59,8 @@ type DashboardCard = {
   value: number;
   secondaryValue?: number;
   secondaryLabel?: string;
+  /** Shown after the title as (N), using loads threshold color. */
+  titleCount?: number;
   icon: React.ReactNode;
   iconBg: string;
   iconColor: string;
@@ -495,7 +497,42 @@ const Dashboard = () => {
     [readyForDeliveryTransactions],
   );
 
+  // Loads received before today that were not loaded before today
+  // (still pending, or loaded today — count does not drop when loaded today).
+  const availableOlderLoads = React.useMemo(
+    () =>
+      activeTransactions
+        .filter((transaction) => {
+          const received = getTransactionDate(transaction, "dateReceived");
+          if (received) {
+            const date = dayjs(received);
+            if (date.isValid() && date.isSame(dayjs(), "day")) return false;
+          }
+          const loaded = getTransactionDate(transaction, "dateLoaded");
+          return !loaded || isSameDay(loaded);
+        })
+        .reduce(
+          (sum, transaction) => sum + getTransactionLoads(transaction),
+          0,
+        ),
+    [activeTransactions],
+  );
+
+  const availableTodayLoads = metrics.todaysLoad;
+  const totalAvailableLoads = availableOlderLoads + availableTodayLoads;
+
   const cards: DashboardCard[] = [
+    {
+      key: "total-available-loads",
+      title: "Total Available Loads",
+      titleCount: totalAvailableLoads,
+      value: availableOlderLoads,
+      secondaryValue: availableTodayLoads,
+      secondaryLabel: "Older | Today",
+      icon: <HistoryIcon />,
+      iconBg: "#e8f0fe",
+      iconColor: "#1976d2",
+    },
     {
       key: "todays-transaction",
       title: "Transaction",
@@ -664,7 +701,7 @@ const Dashboard = () => {
 
       {loading ? (
         <>
-          <DashboardCardsSkeleton count={6} />
+          <DashboardCardsSkeleton count={7} />
 
           <Grid container spacing={2} sx={{ mt: 2 }}>
             <Grid size={{ xs: 12, md: 6 }}>
@@ -782,13 +819,26 @@ const Dashboard = () => {
                 typeof secondaryVal === "number" &&
                 pairedLabels.length === 2;
 
+              const titleCountColor =
+                typeof card.titleCount === "number"
+                  ? getLoadsThresholdColor(card.titleCount)
+                  : undefined;
+
               const loadsThresholdColor =
                 card.key === "todays-transaction" &&
                 typeof secondaryVal === "number"
                   ? getLoadsThresholdColor(secondaryVal)
                   : card.key === "todays-loaded"
                     ? getLoadsThresholdColor(card.value)
-                    : undefined;
+                    : card.key === "total-available-loads" &&
+                        typeof secondaryVal === "number"
+                      ? getLoadsThresholdColor(secondaryVal)
+                      : undefined;
+
+              const primaryValueColor =
+                card.key === "total-available-loads"
+                  ? getLoadsThresholdColor(card.value)
+                  : undefined;
 
               const valueTypographySx = {
                 fontWeight: 700,
@@ -844,7 +894,7 @@ const Dashboard = () => {
                     {card.icon}
                   </Box>
 
-                  <Box sx={{ minWidth: 0 }}>
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
                     <Typography
                       variant="subtitle1"
                       sx={{
@@ -859,6 +909,21 @@ const Dashboard = () => {
                       }}
                     >
                       {card.title}
+                      {typeof card.titleCount === "number" ? (
+                        <>
+                          {" ("}
+                          <Box
+                            component="span"
+                            style={{
+                              color: titleCountColor ?? titleColor,
+                              fontWeight: 700,
+                            }}
+                          >
+                            <AnimatedCount value={card.titleCount} />
+                          </Box>
+                          {")"}
+                        </>
+                      ) : null}
                     </Typography>
                     {usePairedMetricLayout ? (
                       <Box
@@ -877,7 +942,15 @@ const Dashboard = () => {
                             pr: { xs: 1, sm: 1.25 },
                           }}
                         >
-                          <Typography variant="h4" sx={valueTypographySx}>
+                          <Typography
+                            variant="h4"
+                            sx={{
+                              ...valueTypographySx,
+                              ...(primaryValueColor
+                                ? { color: primaryValueColor }
+                                : {}),
+                            }}
+                          >
                             <AnimatedCount value={card.value} />
                           </Typography>
                           <Typography variant="caption" sx={metricCaptionSx}>

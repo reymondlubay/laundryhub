@@ -91,6 +91,11 @@ import {
   hasPartialPickup,
   isFullyPickedUp,
 } from "../../../utils/transactionPickup";
+import {
+  buildCarriedPreviousBalanceByTransactionId,
+  formatPreviousBalanceDateTime,
+  type PreviousBalanceItem,
+} from "../../../utils/customerPreviousBalance";
 import "./TransactionTable.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -128,6 +133,9 @@ interface FlatTransactionRow {
   price: number | null;
   totalPaid: number | null;
   balance: number | null;
+  /** Previous unpaid balance from older fully-picked-up txs (shown on new records only). */
+  carriedPreviousBalance: number;
+  carriedPreviousBalanceItems: PreviousBalanceItem[];
   paymentHistory: string[];
   datePaid: string | null;
   datePickup: string | null;
@@ -379,6 +387,8 @@ const getNoteDetails = (row?: FlatTransactionRow): string[] =>
 function flattenTransactionRows(
   transaction: Transaction,
   addonsPricing: AddonsPricing,
+  carriedPreviousBalance = 0,
+  carriedPreviousBalanceItems: PreviousBalanceItem[] = [],
 ): FlatTransactionRow[] {
   const tx = transaction as Transaction & {
     datereceived?: string;
@@ -515,6 +525,8 @@ function flattenTransactionRows(
         price: totalPrice,
         totalPaid,
         balance,
+        carriedPreviousBalance,
+        carriedPreviousBalanceItems,
         paymentHistory,
         datePaid,
         datePickup,
@@ -563,6 +575,8 @@ function flattenTransactionRows(
       price: totalPrice,
       totalPaid,
       balance,
+      carriedPreviousBalance,
+      carriedPreviousBalanceItems,
       paymentHistory,
       datePaid,
       datePickup,
@@ -1069,13 +1083,24 @@ function TransactionTableInner({
     void loadPricing();
   }, []);
 
-  const rowData = useMemo<FlatTransactionRow[]>(
-    () =>
-      transactions.flatMap((transaction) =>
-        flattenTransactionRows(transaction, addonsPricing),
-      ),
-    [addonsPricing, transactions],
-  );
+  const rowData = useMemo<FlatTransactionRow[]>(() => {
+    // Only the newest record after previous-balance source(s) gets carryover.
+    // Amount is the sum of all old fully-picked-up unpaid balances.
+    const carriedByTransactionId = buildCarriedPreviousBalanceByTransactionId(
+      transactions,
+      addonsPricing,
+    );
+
+    return transactions.flatMap((transaction) => {
+      const carried = carriedByTransactionId[transaction.id];
+      return flattenTransactionRows(
+        transaction,
+        addonsPricing,
+        carried?.amount ?? 0,
+        carried?.items ?? [],
+      );
+    });
+  }, [addonsPricing, transactions]);
 
   // Row heights are cached by AG-Grid; recompute them when the data changes
   // (e.g. editing a transaction so a nickname now wraps to a new line).
@@ -1477,8 +1502,18 @@ function TransactionTableInner({
         suppressMovable: true,
         cellRenderer: (params: ICellRendererParams<FlatTransactionRow>) => {
           if (!params.data?.isFirstRow || params.value == null) return "";
+          const priceAmount = Number(params.value);
+          const totalPaid = Number(params.data.totalPaid || 0);
           const balanceAmount = Number(params.data.balance || 0);
-          const showBalanceLine = balanceAmount > 0;
+          const carriedPreviousBalance = Number(
+            params.data.carriedPreviousBalance || 0,
+          );
+          const hasCarriedPreviousBalance = carriedPreviousBalance > 0;
+          const currentRemaining = Math.max(priceAmount - totalPaid, 0);
+          const totalRemainingWithPrevious =
+            currentRemaining + carriedPreviousBalance;
+          const showPartialBalanceLine =
+            !hasCarriedPreviousBalance && balanceAmount > 0;
           return (
             <Box
               sx={{
@@ -1492,8 +1527,13 @@ function TransactionTableInner({
                 lineHeight: 1.45,
               }}
             >
-              <span>₱{Number(params.value).toFixed(2)}</span>
-              {showBalanceLine ? (
+              <span>₱{priceAmount.toFixed(2)}</span>
+              {hasCarriedPreviousBalance ? (
+                <span style={{ color: "#f44336" }}>
+                  ₱{totalRemainingWithPrevious.toFixed(2)}
+                </span>
+              ) : null}
+              {showPartialBalanceLine ? (
                 <span style={{ color: "#f44336" }}>
                   (₱{balanceAmount.toFixed(2)})
                 </span>
@@ -1545,16 +1585,44 @@ function TransactionTableInner({
           const totalPaid = Number(params.data.totalPaid || 0);
           const balanceAmount = Number(params.data.balance || 0);
           const discountAmount = Number(params.data.discount || 0);
-          const notYetPaid = totalPrice > 0 && totalPaid === 0;
+          const carriedPreviousBalance = Number(
+            params.data.carriedPreviousBalance || 0,
+          );
+          const hasCarriedPreviousBalance = carriedPreviousBalance > 0;
+          const currentBalanceAmount = Math.max(totalPrice - totalPaid, 0);
+          const notYetPaid =
+            !hasCarriedPreviousBalance && totalPrice > 0 && totalPaid === 0;
           const hasPartialBalance =
-            totalPaid > 0 && totalPaid < totalPrice && totalPrice > 0;
+            !hasCarriedPreviousBalance &&
+            totalPaid > 0 &&
+            totalPaid < totalPrice &&
+            totalPrice > 0;
           const hasPaidOrOver = totalPaid >= totalPrice && totalPrice > 0;
           const overAmount = Math.max(totalPaid - totalPrice, 0);
           const showPaymentDate =
-            Boolean(params.value) && !notYetPaid && !hasPartialBalance;
-          const showWarningIcon = hasPartialBalance;
+            Boolean(params.value) &&
+            !notYetPaid &&
+            !hasPartialBalance &&
+            !hasCarriedPreviousBalance;
+          const showWarningIcon =
+            hasPartialBalance || hasCarriedPreviousBalance;
 
-          const tooltipTitle = (
+          const previousBalanceItems =
+            params.data.carriedPreviousBalanceItems ?? [];
+          const paymentHistoryLines = params.data.paymentHistory ?? [];
+
+          const paymentHistoryBlock =
+            paymentHistoryLines.length > 0 ? (
+              <>
+                {paymentHistoryLines.map((paymentLine, index) => (
+                  <span key={`${params.data?.transactionId}-payment-${index}`}>
+                    {paymentLine}
+                  </span>
+                ))}
+              </>
+            ) : null;
+
+          const previousBalanceTooltip = (
             <Box
               sx={{
                 display: "flex",
@@ -1563,11 +1631,50 @@ function TransactionTableInner({
                 fontSize: "0.95rem",
               }}
             >
-              {params.data.paymentHistory.map((paymentLine, index) => (
-                <span key={`${params.data?.transactionId}-payment-${index}`}>
-                  {paymentLine}
+              {paymentHistoryBlock}
+              <span
+                style={{
+                  color: currentBalanceAmount === 0 ? "#fff" : "#f44336",
+                  fontWeight: 600,
+                }}
+              >
+                Current balance ₱{currentBalanceAmount.toFixed(2)}
+              </span>
+              {previousBalanceItems.length > 0 ? (
+                previousBalanceItems.map((item) => (
+                  <span
+                    key={item.transactionId}
+                    style={{ color: "#f44336", fontWeight: 600 }}
+                  >
+                    Previous balance ₱{item.amount.toFixed(2)} from{" "}
+                    {formatPreviousBalanceDateTime(item.balanceDate)}
+                  </span>
+                ))
+              ) : (
+                <span style={{ color: "#f44336", fontWeight: 600 }}>
+                  Previous balance ₱{carriedPreviousBalance.toFixed(2)}
                 </span>
-              ))}
+              )}
+              {discountAmount > 0 ? (
+                <span style={{ color: "#f44336", fontWeight: 600 }}>
+                  Discount - {formatAmount(discountAmount)}
+                </span>
+              ) : null}
+            </Box>
+          );
+
+          const tooltipTitle = hasCarriedPreviousBalance ? (
+            previousBalanceTooltip
+          ) : (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 0.25,
+                fontSize: "0.95rem",
+              }}
+            >
+              {paymentHistoryBlock}
               {discountAmount > 0 ? (
                 <span style={{ color: "#f44336", fontWeight: 600 }}>
                   Discount - {formatAmount(discountAmount)}
@@ -1591,7 +1698,9 @@ function TransactionTableInner({
             </Box>
           );
 
-          const showIcons = showWarningIcon || hasPaidOrOver;
+          // With a balance warning icon, payment history lives in that tooltip.
+          const showHistoryIcon = hasPaidOrOver && !showWarningIcon;
+          const showIcons = showWarningIcon || showHistoryIcon;
 
           const iconCluster = showIcons ? (
             <Box
@@ -1628,7 +1737,7 @@ function TransactionTableInner({
                   </Box>
                 </Tooltip>
               ) : null}
-              {hasPaidOrOver ? (
+              {showHistoryIcon ? (
                 <Tooltip
                   title={tooltipTitle}
                   arrow
@@ -1656,11 +1765,13 @@ function TransactionTableInner({
             </Box>
           ) : null;
 
-          const statusLabel = notYetPaid
-            ? "UNPAID"
-            : hasPartialBalance
-              ? "BALANCE"
-              : null;
+          const statusLabel = hasCarriedPreviousBalance
+            ? "BALANCE"
+            : notYetPaid
+              ? "UNPAID"
+              : hasPartialBalance
+                ? "BALANCE"
+                : null;
 
           if (statusLabel) {
             return (
