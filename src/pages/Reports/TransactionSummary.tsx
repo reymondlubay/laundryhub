@@ -513,32 +513,37 @@ const TransactionSummary = () => {
     amountMax,
   ]);
 
-  React.useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const [customerData, transactionData, pricing] = await Promise.all([
-          customerService.getAll(),
-          transactionService.getAll({ includeDeleted: true }),
-          addonsPricingService.get(),
-        ]);
-        setCustomers(customerData);
-        setTransactions(transactionData);
-        setAddonsPricing(pricing);
-      } catch (err: unknown) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load transaction summary.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadData();
+  const loadData = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [customerData, transactionData, pricing] = await Promise.all([
+        customerService.getAll(),
+        transactionService.getAll({ includeDeleted: true }),
+        addonsPricingService.get(),
+      ]);
+      setCustomers(customerData);
+      setTransactions(transactionData);
+      setAddonsPricing(pricing);
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load transaction summary.",
+      );
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  React.useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  const handleRerunFilter = React.useCallback(() => {
+    setPage(0);
+    void loadData();
+  }, [loadData]);
 
   const filteredTransactions = React.useMemo(() => {
     let result = transactions;
@@ -920,7 +925,7 @@ const TransactionSummary = () => {
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={2}
-            alignItems={{ xs: "flex-start", sm: "center" }}
+            alignItems={{ xs: "stretch", sm: "center" }}
             flexWrap="wrap"
             useFlexGap
           >
@@ -998,6 +1003,15 @@ const TransactionSummary = () => {
                   : undefined
               }
             />
+
+            <Button
+              variant="contained"
+              onClick={handleRerunFilter}
+              disabled={loading}
+              sx={{ alignSelf: { xs: "stretch", sm: "center" } }}
+            >
+              Filter
+            </Button>
           </Stack>
         </Stack>
       </Paper>

@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Dialog,
   DialogContent,
@@ -66,7 +67,7 @@ import {
 } from "../../../../constants/payment";
 import { toTitleCaseWords } from "../../../../utils/stringUtils";
 import { ignoreBackdropClose } from "../../../../utils/muiDialogClose";
-import {
+import addonsPricingService, {
   DEFAULT_ADDONS_PRICING,
   type AddonsPricing,
 } from "../../../../services/addonsPricingService";
@@ -80,12 +81,18 @@ import {
 } from "../../../../utils/employeeOptions";
 import ConfirmDialog from "../../../../components/ConfirmDialog/ConfirmDialog.tsx";
 import {
+  formatPreviousBalanceAlertMessage,
+  getCustomerPreviousBalance,
+  type CustomerPreviousBalanceInfo,
+} from "../../../../utils/customerPreviousBalance";
+import {
   clampPickupLoadsValue,
   getLoadsPickedUp,
   getRemainingLoads,
   getTotalLoads,
 } from "../../../../utils/transactionPickup";
 import type { TransactionPickup } from "../../../../services/transactionService";
+import { toPascalCase } from "../../../../utils/stringUtils";
 
 type TransactionModalProps = {
   isOpen: boolean;
@@ -288,6 +295,15 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const [deletePickupId, setDeletePickupId] = React.useState<string | null>(
     null,
   );
+  const [addonsPricing, setAddonsPricing] = React.useState<AddonsPricing>(
+    DEFAULT_ADDONS_PRICING,
+  );
+  const [previousBalanceInfo, setPreviousBalanceInfo] =
+    React.useState<CustomerPreviousBalanceInfo | null>(null);
+  const [previousBalanceCustomerName, setPreviousBalanceCustomerName] =
+    React.useState("");
+  const [selectedCustomerIdForBalance, setSelectedCustomerIdForBalance] =
+    React.useState("");
 
   const activeTransaction = syncedTransaction ?? transaction ?? null;
   const isEditing = !!activeTransaction;
@@ -301,6 +317,72 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       );
     }
   }, [transaction?.id]);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      setPreviousBalanceInfo(null);
+      setPreviousBalanceCustomerName("");
+      setSelectedCustomerIdForBalance("");
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const pricing = await addonsPricingService.get();
+        if (!cancelled) setAddonsPricing(pricing);
+      } catch {
+        if (!cancelled) setAddonsPricing(DEFAULT_ADDONS_PRICING);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen || isEditing || !selectedCustomerIdForBalance) {
+      setPreviousBalanceCustomerName("");
+      return;
+    }
+    setPreviousBalanceCustomerName(
+      toPascalCase(
+        customers.find((c) => c.id === selectedCustomerIdForBalance)?.name ||
+          "Customer",
+      ),
+    );
+  }, [isOpen, isEditing, selectedCustomerIdForBalance, customers]);
+
+  React.useEffect(() => {
+    if (!isOpen || isEditing || !selectedCustomerIdForBalance) {
+      setPreviousBalanceInfo(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const customerTxs = await transactionService.getAll({
+          customerId: selectedCustomerIdForBalance,
+        });
+        if (cancelled) return;
+        setPreviousBalanceInfo(
+          getCustomerPreviousBalance(
+            customerTxs,
+            selectedCustomerIdForBalance,
+            addonsPricing,
+          ),
+        );
+      } catch {
+        if (!cancelled) setPreviousBalanceInfo(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, isEditing, selectedCustomerIdForBalance, addonsPricing]);
 
   const resolveEmployeeLabel = React.useCallback(
     (id: string): string => {
@@ -768,6 +850,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
       await fetchCustomers();
       await Promise.resolve(setFieldValue("customer", created.id, false));
+      setSelectedCustomerIdForBalance(created.id);
       setAddCustomerOpen(false);
       resetNewCustomerForm();
     } catch (error: unknown) {
@@ -806,6 +889,24 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       <DialogTitle>
         {isEditing ? "Edit Transaction" : "Transaction"}
       </DialogTitle>
+      {!isEditing && previousBalanceInfo ? (
+        <Alert
+          severity="error"
+          variant="filled"
+          sx={{
+            mx: 2,
+            mb: 0,
+            borderRadius: 1,
+            alignItems: "flex-start",
+            whiteSpace: "pre-line",
+          }}
+        >
+          {formatPreviousBalanceAlertMessage(
+            previousBalanceCustomerName,
+            previousBalanceInfo,
+          )}
+        </Alert>
+      ) : null}
       <Formik
         enableReinitialize
         validateOnChange={false}
@@ -1090,6 +1191,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                               onChange={(_, selectedCustomer) => {
                                 setFieldValue(
                                   "customer",
+                                  selectedCustomer?.id || "",
+                                );
+                                setSelectedCustomerIdForBalance(
                                   selectedCustomer?.id || "",
                                 );
                                 setCustomerInputValue(selectedCustomer?.name || "");
