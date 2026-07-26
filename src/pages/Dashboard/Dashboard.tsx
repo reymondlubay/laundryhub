@@ -830,7 +830,15 @@ const Dashboard = () => {
                   ? getLoadsThresholdColor(secondaryVal)
                   : card.key === "todays-loaded"
                     ? getLoadsThresholdColor(card.value)
-                    : undefined;
+                    : card.key === "total-available-loads" &&
+                        typeof secondaryVal === "number"
+                      ? getLoadsThresholdColor(secondaryVal)
+                      : undefined;
+
+              const primaryValueColor =
+                card.key === "total-available-loads"
+                  ? getLoadsThresholdColor(card.value)
+                  : undefined;
 
               const valueTypographySx = {
                 fontWeight: 700,
@@ -906,7 +914,7 @@ const Dashboard = () => {
                           {" ("}
                           <Box
                             component="span"
-                            sx={{
+                            style={{
                               color: titleCountColor ?? titleColor,
                               fontWeight: 700,
                             }}
@@ -934,7 +942,15 @@ const Dashboard = () => {
                             pr: { xs: 1, sm: 1.25 },
                           }}
                         >
-                          <Typography variant="h4" sx={valueTypographySx}>
+                          <Typography
+                            variant="h4"
+                            sx={{
+                              ...valueTypographySx,
+                              ...(primaryValueColor
+                                ? { color: primaryValueColor }
+                                : {}),
+                            }}
+                          >
                             <AnimatedCount value={card.value} />
                           </Typography>
                           <Typography variant="caption" sx={metricCaptionSx}>
