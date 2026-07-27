@@ -18,7 +18,6 @@ import {
   Typography,
   Skeleton,
 } from "@mui/material";
-import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
@@ -59,7 +58,11 @@ type DashboardCard = {
   value: number;
   secondaryValue?: number;
   secondaryLabel?: string;
-  /** Shown after the title as (N), using loads threshold color. */
+  /** Shown after value as loads | transactions. */
+  valueParenCount?: number;
+  /** Shown after secondaryValue as loads | transactions. */
+  secondaryParenCount?: number;
+  /** Shown after the title as | N, using loads threshold color. */
   titleCount?: number;
   icon: React.ReactNode;
   iconBg: string;
@@ -499,49 +502,46 @@ const Dashboard = () => {
 
   // Loads received before today that were not loaded before today
   // (still pending, or loaded today — count does not drop when loaded today).
-  const availableOlderLoads = React.useMemo(
+  const availableOlderTransactions = React.useMemo(
     () =>
-      activeTransactions
-        .filter((transaction) => {
-          const received = getTransactionDate(transaction, "dateReceived");
-          if (received) {
-            const date = dayjs(received);
-            if (date.isValid() && date.isSame(dayjs(), "day")) return false;
-          }
-          const loaded = getTransactionDate(transaction, "dateLoaded");
-          return !loaded || isSameDay(loaded);
-        })
-        .reduce(
-          (sum, transaction) => sum + getTransactionLoads(transaction),
-          0,
-        ),
+      activeTransactions.filter((transaction) => {
+        const received = getTransactionDate(transaction, "dateReceived");
+        if (received) {
+          const date = dayjs(received);
+          if (date.isValid() && date.isSame(dayjs(), "day")) return false;
+        }
+        const loaded = getTransactionDate(transaction, "dateLoaded");
+        return !loaded || isSameDay(loaded);
+      }),
     [activeTransactions],
   );
 
+  const availableOlderLoads = React.useMemo(
+    () =>
+      availableOlderTransactions.reduce(
+        (sum, transaction) => sum + getTransactionLoads(transaction),
+        0,
+      ),
+    [availableOlderTransactions],
+  );
+
   const availableTodayLoads = metrics.todaysLoad;
+  const availableTodayTransactions = metrics.todaysTransactions;
   const totalAvailableLoads = availableOlderLoads + availableTodayLoads;
 
   const cards: DashboardCard[] = [
     {
       key: "total-available-loads",
-      title: "Total Available Loads",
+      title: "Available Loads",
       titleCount: totalAvailableLoads,
       value: availableOlderLoads,
+      valueParenCount: availableOlderTransactions.length,
       secondaryValue: availableTodayLoads,
+      secondaryParenCount: availableTodayTransactions,
       secondaryLabel: "Older | Today",
       icon: <HistoryIcon />,
       iconBg: "#e8f0fe",
       iconColor: "#1976d2",
-    },
-    {
-      key: "todays-transaction",
-      title: "Transaction",
-      value: metrics.todaysTransactions,
-      secondaryValue: metrics.todaysLoad,
-      secondaryLabel: "Transactions | Loads",
-      icon: <ShoppingBagOutlinedIcon />,
-      iconBg: "#ffe7df",
-      iconColor: "#ff5a2d",
     },
     {
       key: "todays-loaded",
@@ -825,15 +825,12 @@ const Dashboard = () => {
                   : undefined;
 
               const loadsThresholdColor =
-                card.key === "todays-transaction" &&
-                typeof secondaryVal === "number"
-                  ? getLoadsThresholdColor(secondaryVal)
-                  : card.key === "todays-loaded"
-                    ? getLoadsThresholdColor(card.value)
-                    : card.key === "total-available-loads" &&
-                        typeof secondaryVal === "number"
-                      ? getLoadsThresholdColor(secondaryVal)
-                      : undefined;
+                card.key === "todays-loaded"
+                  ? getLoadsThresholdColor(card.value)
+                  : card.key === "total-available-loads" &&
+                      typeof secondaryVal === "number"
+                    ? getLoadsThresholdColor(secondaryVal)
+                    : undefined;
 
               const primaryValueColor =
                 card.key === "total-available-loads"
@@ -911,7 +908,7 @@ const Dashboard = () => {
                       {card.title}
                       {typeof card.titleCount === "number" ? (
                         <>
-                          {" ("}
+                          {" | "}
                           <Box
                             component="span"
                             style={{
@@ -921,7 +918,6 @@ const Dashboard = () => {
                           >
                             <AnimatedCount value={card.titleCount} />
                           </Box>
-                          {")"}
                         </>
                       ) : null}
                     </Typography>
@@ -949,9 +945,38 @@ const Dashboard = () => {
                               ...(primaryValueColor
                                 ? { color: primaryValueColor }
                                 : {}),
+                              display: "inline-flex",
+                              alignItems: "center",
                             }}
                           >
                             <AnimatedCount value={card.value} />
+                            {typeof card.valueParenCount === "number" ? (
+                              <>
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    mx: { xs: 0.45, sm: 0.6 },
+                                    color: titleColor,
+                                    fontWeight: 500,
+                                    fontSize: { xs: "1rem", sm: "1.15rem" },
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  |
+                                </Box>
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    fontWeight: 700,
+                                    color: valueColor,
+                                    fontSize: { xs: "1rem", sm: "1.15rem" },
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  {formatCount(card.valueParenCount)}
+                                </Box>
+                              </>
+                            ) : null}
                           </Typography>
                           <Typography variant="caption" sx={metricCaptionSx}>
                             {pairedLabels[0]}
@@ -984,9 +1009,38 @@ const Dashboard = () => {
                               ...(loadsThresholdColor
                                 ? { color: loadsThresholdColor }
                                 : {}),
+                              display: "inline-flex",
+                              alignItems: "center",
                             }}
                           >
                             <AnimatedCount value={secondaryVal} />
+                            {typeof card.secondaryParenCount === "number" ? (
+                              <>
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    mx: { xs: 0.45, sm: 0.6 },
+                                    color: titleColor,
+                                    fontWeight: 500,
+                                    fontSize: { xs: "1rem", sm: "1.15rem" },
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  |
+                                </Box>
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    fontWeight: 700,
+                                    color: valueColor,
+                                    fontSize: { xs: "1rem", sm: "1.15rem" },
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  {formatCount(card.secondaryParenCount)}
+                                </Box>
+                              </>
+                            ) : null}
                           </Typography>
                           <Typography variant="caption" sx={metricCaptionSx}>
                             {pairedLabels[1]}
