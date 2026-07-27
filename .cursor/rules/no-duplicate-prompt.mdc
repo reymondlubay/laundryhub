@@ -1,0 +1,12 @@
+---
+description: Ignore duplicate pasted prompts; notify instead of coding
+alwaysApply: true
+---
+
+# Duplicate prompt handling
+
+If the user sends the same prompt twice in a row (identical or clearly a duplicate paste of the previous user message):
+
+1. Do **not** write, edit, or run any code.
+2. Do **not** re-execute the previous task.
+3. Reply briefly that the prompt looks like a duplicate paste and ask whether they meant to send something new.
