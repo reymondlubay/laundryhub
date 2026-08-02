@@ -456,6 +456,7 @@ const TransactionSummary = () => {
     React.useState<RecordTypeFilter>("all");
   const [filterPaid, setFilterPaid] = React.useState(false);
   const [filterUnpaid, setFilterUnpaid] = React.useState(false);
+  const [filterNotPending, setFilterNotPending] = React.useState(false);
   const [amountMin, setAmountMin] = React.useState("");
   const [amountMax, setAmountMax] = React.useState("");
   const [page, setPage] = React.useState(0);
@@ -509,6 +510,7 @@ const TransactionSummary = () => {
     recordTypeFilter,
     filterPaid,
     filterUnpaid,
+    filterNotPending,
     amountMin,
     amountMax,
   ]);
@@ -622,6 +624,15 @@ const TransactionSummary = () => {
         return false;
       }
 
+      // Ignored when Record type is Pending (checkbox is also disabled).
+      if (
+        filterNotPending &&
+        recordTypeFilter !== "pending" &&
+        isPending(transaction)
+      ) {
+        return false;
+      }
+
       if (!amountRangeValid) return true;
       return matchesAmountRange(
         transaction,
@@ -641,6 +652,7 @@ const TransactionSummary = () => {
     recordTypeFilter,
     filterPaid,
     filterUnpaid,
+    filterNotPending,
     parsedAmountMin,
     parsedAmountMax,
     addonsPricing,
@@ -970,6 +982,17 @@ const TransactionSummary = () => {
                   />
                 }
                 label="Unpaid"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={filterNotPending}
+                    disabled={recordTypeFilter === "pending"}
+                    onChange={(e) => setFilterNotPending(e.target.checked)}
+                  />
+                }
+                label="Not Pending"
               />
             </FormGroup>
 
