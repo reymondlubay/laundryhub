@@ -25,6 +25,8 @@ export const API_ROUTES = {
   ACTIVITY_LOGS: "/activity-logs",
   ACTIVITY_LOG_SETTINGS: "/activity-logs/settings",
   ACTIVITY_LOG_CLEANUP: "/activity-logs/cleanup",
+  HOSTING_STATUS: "/hosting/status",
+  HOSTING_START: "/hosting/start",
 } as const;
 
 export default API_ROUTES;

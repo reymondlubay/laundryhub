@@ -2,6 +2,9 @@ import React, { startTransition } from "react";
 import {
   Alert,
   Box,
+  Button,
+  Chip,
+  CircularProgress,
   FormControlLabel,
   Grid,
   Paper,
@@ -38,6 +41,9 @@ import transactionService, {
   type PaymentDetail,
   type Transaction,
 } from "../../services/transactionService";
+import hostingService, {
+  type HostingStatus,
+} from "../../services/hostingService";
 import { toPascalCase } from "../../utils/stringUtils";
 import { getLoadsThresholdColor } from "../../utils/loadsThresholdColor";
 import { getTransactionNoteDetailLines } from "../../utils/transactionNoteDetails";
@@ -51,6 +57,7 @@ import {
 
 const DASHBOARD_AUTO_REFRESH_KEY = "laundryhub.dashboard.autoRefresh";
 const DASHBOARD_REFRESH_INTERVAL_MS = 30_000;
+const HOSTING_STATUS_POLL_MS = 30_000;
 
 type DashboardCard = {
   key: string;
@@ -199,8 +206,17 @@ const Dashboard = () => {
       return false;
     }
   });
+  const [hostingStatus, setHostingStatus] =
+    React.useState<HostingStatus | null>(null);
+  const [hostingLoading, setHostingLoading] = React.useState(true);
+  const [hostingStarting, setHostingStarting] = React.useState(false);
+  const [hostingSnackbar, setHostingSnackbar] = React.useState<{
+    severity: "success" | "warning" | "error";
+    message: string;
+  } | null>(null);
 
   const fetchSeqRef = React.useRef(0);
+  const hostingSeqRef = React.useRef(0);
 
   const loadTransactions = React.useCallback(async (options?: { silent?: boolean }) => {
     const silent = Boolean(options?.silent);
@@ -265,6 +281,81 @@ const Dashboard = () => {
     return () => window.clearInterval(id);
   }, [autoRefreshEnabled, loadTransactions, loading]);
 
+  const loadHostingStatus = React.useCallback(async () => {
+    const seq = ++hostingSeqRef.current;
+    try {
+      const status = await hostingService.getStatus();
+      if (hostingSeqRef.current !== seq) return;
+      setHostingStatus(status);
+    } catch {
+      if (hostingSeqRef.current !== seq) return;
+      setHostingStatus({
+        status: "error",
+        taskName: "",
+        processRunning: false,
+        taskRunning: false,
+        autoStartEnabled: false,
+        enabled: true,
+        message: "Unable to check hosting status.",
+      });
+    } finally {
+      if (hostingSeqRef.current === seq) {
+        setHostingLoading(false);
+      }
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadHostingStatus();
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      void loadHostingStatus();
+    }, HOSTING_STATUS_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [loadHostingStatus]);
+
+  const handleStartHosting = React.useCallback(async () => {
+    setHostingStarting(true);
+    try {
+      const result = await hostingService.start();
+      setHostingStatus(result);
+      if (result.status === "running") {
+        setHostingSnackbar({
+          severity: "success",
+          message: result.alreadyRunning
+            ? "Hosting is already online."
+            : "Hosting started successfully.",
+        });
+      } else if (result.status === "starting") {
+        setHostingSnackbar({
+          severity: "warning",
+          message:
+            result.message ||
+            "Start requested. Waiting for the tunnel to come online.",
+        });
+        window.setTimeout(() => {
+          void loadHostingStatus();
+        }, 2_000);
+      } else if (result.status === "unsupported") {
+        setHostingSnackbar({
+          severity: "warning",
+          message: result.message || "Hosting controls are unavailable.",
+        });
+      } else {
+        setHostingSnackbar({
+          severity: "error",
+          message: result.message || "Failed to start hosting.",
+        });
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to start hosting.";
+      setHostingSnackbar({ severity: "error", message });
+    } finally {
+      setHostingStarting(false);
+    }
+  }, [loadHostingStatus]);
+
   const persistAutoRefresh = React.useCallback((enabled: boolean) => {
     setAutoRefreshEnabled(enabled);
     try {
@@ -273,6 +364,35 @@ const Dashboard = () => {
       /* ignore quota / private mode */
     }
   }, []);
+
+  const showHostingControls =
+    hostingLoading ||
+    (hostingStatus != null && hostingStatus.status !== "unsupported");
+
+  const hostingChipLabel = hostingLoading
+    ? "Checking hosting…"
+    : hostingStarting || hostingStatus?.status === "starting"
+      ? "Hosting starting…"
+      : hostingStatus?.status === "running"
+        ? "Hosting Online"
+        : hostingStatus?.status === "error"
+          ? "Hosting Error"
+          : "Hosting Offline";
+
+  const hostingChipColor: "default" | "success" | "error" | "warning" =
+    hostingLoading
+      ? "default"
+      : hostingStarting || hostingStatus?.status === "starting"
+        ? "warning"
+        : hostingStatus?.status === "running"
+          ? "success"
+          : "error";
+
+  const canStartHosting =
+    !hostingLoading &&
+    !hostingStarting &&
+    hostingStatus != null &&
+    (hostingStatus.status === "stopped" || hostingStatus.status === "error");
 
   const activeTransactions = React.useMemo(() => {
     return transactions.filter((t) => {
@@ -642,7 +762,45 @@ const Dashboard = () => {
           direction={{ xs: "column", sm: "row" }}
           spacing={1.5}
           alignItems={{ xs: "flex-start", sm: "center" }}
+          flexWrap="wrap"
+          useFlexGap
         >
+          {showHostingControls ? (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Tooltip
+                title={
+                  hostingStatus?.message ||
+                  (hostingStatus?.autoStartEnabled
+                    ? "Backend auto-starts the Cloudflare tunnel if it stops."
+                    : "Cloudflare tunnel hosting status")
+                }
+              >
+                <Chip
+                  size="small"
+                  color={hostingChipColor}
+                  label={hostingChipLabel}
+                  variant={
+                    hostingStatus?.status === "running" ? "filled" : "outlined"
+                  }
+                  icon={
+                    hostingLoading || hostingStarting ? (
+                      <CircularProgress size={14} color="inherit" />
+                    ) : undefined
+                  }
+                />
+              </Tooltip>
+              <Button
+                size="small"
+                variant="contained"
+                onClick={() => {
+                  void handleStartHosting();
+                }}
+                disabled={!canStartHosting}
+              >
+                Start Hosting
+              </Button>
+            </Stack>
+          ) : null}
           <FormControlLabel
             control={
               <Switch
@@ -690,6 +848,22 @@ const Dashboard = () => {
           sx={{ width: "100%" }}
         >
           {refreshError}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={Boolean(hostingSnackbar)}
+        autoHideDuration={6000}
+        onClose={() => setHostingSnackbar(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setHostingSnackbar(null)}
+          severity={hostingSnackbar?.severity ?? "info"}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {hostingSnackbar?.message}
         </Alert>
       </Snackbar>
 
