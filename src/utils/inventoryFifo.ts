@@ -30,6 +30,14 @@ export type LotConsumptionInfo = {
   remainingPieces: number;
 };
 
+export type FifoExpenseLotLine = {
+  inventoryRecordId: string;
+  dateOfPrice: string;
+  pricePerPiece: number;
+  piecesTaken: number;
+  total: number;
+};
+
 export const FIFO_PREVIEW_EXPENSE_ID = "__fifo-preview__";
 
 const toTime = (value?: string | null): number => {
@@ -59,6 +67,7 @@ export function computeFifoUsageCosts(params: {
   consumptionRecords: InventoryConsumptionRecord[];
 }): {
   usageCostsById: Map<string, UsageCostResult>;
+  usageLotLinesById: Map<string, FifoExpenseLotLine[]>;
   remainingLotsByItemId: Map<string, FifoLot[]>;
 } {
   const lotsByItemId = new Map<string, FifoLot[]>();
@@ -88,11 +97,13 @@ export function computeFifoUsageCosts(params: {
   });
 
   const usageCostsById = new Map<string, UsageCostResult>();
+  const usageLotLinesById = new Map<string, FifoExpenseLotLine[]>();
 
   usages.forEach((u) => {
     const itemId = u.itemId;
     let remainingToConsume = Math.max(0, Number(u.pieces) || 0);
     let cost = 0;
+    const lines: FifoExpenseLotLine[] = [];
 
     const lots = lotsByItemId.get(itemId) || [];
 
@@ -103,7 +114,17 @@ export function computeFifoUsageCosts(params: {
       const take = Math.min(lot.remainingPieces, remainingToConsume);
       lot.remainingPieces -= take;
       remainingToConsume -= take;
-      cost += take * (Number(lot.pricePerPiece) || 0);
+      const pricePerPiece = Number(lot.pricePerPiece) || 0;
+      cost += take * pricePerPiece;
+      if (take > 0) {
+        lines.push({
+          inventoryRecordId: lot.inventoryRecordId,
+          dateOfPrice: lot.dateOfPrice,
+          pricePerPiece,
+          piecesTaken: take,
+          total: Number((take * pricePerPiece).toFixed(2)),
+        });
+      }
     }
 
     usageCostsById.set(u.id, {
@@ -112,6 +133,7 @@ export function computeFifoUsageCosts(params: {
       pieces: Math.max(0, Number(u.pieces) || 0),
       totalPrice: cost,
     });
+    usageLotLinesById.set(u.id, lines);
   });
 
   const remainingLotsByItemId = new Map<string, FifoLot[]>();
@@ -122,7 +144,7 @@ export function computeFifoUsageCosts(params: {
     );
   });
 
-  return { usageCostsById, remainingLotsByItemId };
+  return { usageCostsById, usageLotLinesById, remainingLotsByItemId };
 }
 
 export function inventoryConsumptionFromExpenses(
@@ -184,7 +206,7 @@ export function getLotConsumptionByRecordId(params: {
   return result;
 }
 
-export function computeInventoryExpenseAmount(params: {
+export function computeInventoryExpenseLotAllocation(params: {
   inventoryRecords: InventoryRecord[];
   consumptionRecords: InventoryConsumptionRecord[];
   inventoryItemId: string;
@@ -192,16 +214,21 @@ export function computeInventoryExpenseAmount(params: {
   expenseDate: string;
   expenseId?: string;
   excludeExpenseId?: string;
-}): number | null {
+}): {
+  lines: FifoExpenseLotLine[];
+  totalAmount: number | null;
+} {
   const pieces = Math.floor(Number(params.pieces));
-  if (!Number.isFinite(pieces) || pieces < 1) return null;
+  if (!Number.isFinite(pieces) || pieces < 1) {
+    return { lines: [], totalAmount: null };
+  }
 
   const filtered = params.consumptionRecords.filter(
     (r) => r.id !== params.excludeExpenseId,
   );
   const targetId = params.expenseId ?? FIFO_PREVIEW_EXPENSE_ID;
 
-  const { usageCostsById } = computeFifoUsageCosts({
+  const { usageCostsById, usageLotLinesById } = computeFifoUsageCosts({
     inventoryRecords: params.inventoryRecords,
     consumptionRecords: [
       ...filtered,
@@ -216,6 +243,21 @@ export function computeInventoryExpenseAmount(params: {
   });
 
   const result = usageCostsById.get(targetId);
-  if (!result) return null;
-  return Number(result.totalPrice.toFixed(2));
+  if (!result) return { lines: [], totalAmount: null };
+  return {
+    lines: usageLotLinesById.get(targetId) ?? [],
+    totalAmount: Number(result.totalPrice.toFixed(2)),
+  };
+}
+
+export function computeInventoryExpenseAmount(params: {
+  inventoryRecords: InventoryRecord[];
+  consumptionRecords: InventoryConsumptionRecord[];
+  inventoryItemId: string;
+  pieces: number;
+  expenseDate: string;
+  expenseId?: string;
+  excludeExpenseId?: string;
+}): number | null {
+  return computeInventoryExpenseLotAllocation(params).totalAmount;
 }

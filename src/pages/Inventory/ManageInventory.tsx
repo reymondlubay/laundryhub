@@ -8,9 +8,13 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
   Grid,
   IconButton,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -63,6 +67,14 @@ type FormState = {
   dateOfPrice: Dayjs;
 };
 
+type UsageFilter = "all" | "used" | "unused";
+
+const USAGE_FILTER_OPTIONS: Array<{ value: UsageFilter; label: string }> = [
+  { value: "all", label: "All entries" },
+  { value: "used", label: "Already used" },
+  { value: "unused", label: "Not yet used" },
+];
+
 const emptyForm = (): FormState => ({
   item: null,
   date: dayjs(),
@@ -96,6 +108,7 @@ const ManageInventoryPage: React.FC = () => {
   const [filterItem, setFilterItem] = useState<InventoryItem | null>(null);
   const [filterFrom, setFilterFrom] = useState<Dayjs | null>(null);
   const [filterTo, setFilterTo] = useState<Dayjs | null>(null);
+  const [filterUsage, setFilterUsage] = useState<UsageFilter>("all");
 
   const itemById = useMemo(() => {
     const map = new Map<string, InventoryItem>();
@@ -118,8 +131,6 @@ const ManageInventoryPage: React.FC = () => {
     [lotConsumptionByRecordId],
   );
 
-  const editingIsLocked = editing ? isRecordLockedByUsage(editing.id) : false;
-
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
       if (filterItem && record.itemId !== filterItem.id) return false;
@@ -141,9 +152,24 @@ const ManageInventoryPage: React.FC = () => {
           return false;
         }
       }
+
+      if (filterUsage !== "all") {
+        const used =
+          (lotConsumptionByRecordId.get(record.id)?.consumedPieces ?? 0) >= 1;
+        if (filterUsage === "used" && !used) return false;
+        if (filterUsage === "unused" && used) return false;
+      }
+
       return true;
     });
-  }, [records, filterItem, filterFrom, filterTo]);
+  }, [
+    records,
+    filterItem,
+    filterFrom,
+    filterTo,
+    filterUsage,
+    lotConsumptionByRecordId,
+  ]);
 
   const load = useCallback(async () => {
     try {
@@ -178,7 +204,7 @@ const ManageInventoryPage: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [filterItem, filterFrom, filterTo]);
+  }, [filterItem, filterFrom, filterTo, filterUsage]);
 
   const paged = useMemo(() => {
     return filteredRecords.slice(
@@ -195,6 +221,7 @@ const ManageInventoryPage: React.FC = () => {
   };
 
   const openEdit = (record: InventoryRecord) => {
+    if (isRecordLockedByUsage(record.id)) return;
     setEditing(record);
     setForm({
       item: itemById.get(record.itemId) || null,
@@ -240,12 +267,10 @@ const ManageInventoryPage: React.FC = () => {
         const payload: UpdateInventoryRecordPayload = {
           itemId: form.item?.id,
           date: form.date.toISOString(),
+          pieces: Number(form.pieces),
+          pricePerPiece: Number(form.pricePerPiece),
           dateOfPrice: form.dateOfPrice.toISOString(),
         };
-        if (!editingIsLocked) {
-          payload.pieces = Number(form.pieces);
-          payload.pricePerPiece = Number(form.pricePerPiece);
-        }
         await inventoryRecordService.update(editing.id, payload);
       } else {
         const payload: CreateInventoryRecordPayload = {
@@ -326,6 +351,21 @@ const ManageInventoryPage: React.FC = () => {
                 />
               )}
             />
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel id="usage-filter-label">Usage</InputLabel>
+              <Select
+                labelId="usage-filter-label"
+                label="Usage"
+                value={filterUsage}
+                onChange={(e) => setFilterUsage(e.target.value as UsageFilter)}
+              >
+                {USAGE_FILTER_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <DatePicker
               label="From Date"
               value={filterFrom}
@@ -345,7 +385,7 @@ const ManageInventoryPage: React.FC = () => {
                 field: { clearable: true, onClear: () => setFilterTo(null) },
               }}
             />
-            {filterItem || filterFrom || filterTo ? (
+            {filterItem || filterFrom || filterTo || filterUsage !== "all" ? (
               <Button
                 variant="text"
                 size="small"
@@ -353,6 +393,7 @@ const ManageInventoryPage: React.FC = () => {
                   setFilterItem(null);
                   setFilterFrom(null);
                   setFilterTo(null);
+                  setFilterUsage("all");
                 }}
               >
                 {UI_TEXT.CLEAR}
@@ -385,6 +426,7 @@ const ManageInventoryPage: React.FC = () => {
                     <TableCell>Item</TableCell>
                     <TableCell>Date</TableCell>
                     <TableCell align="right">Pieces</TableCell>
+                    <TableCell align="right">Remaining pcs</TableCell>
                     <TableCell align="right">Price / piece</TableCell>
                     <TableCell align="right">Total Price</TableCell>
                     <TableCell>Date of Price</TableCell>
@@ -394,7 +436,7 @@ const ManageInventoryPage: React.FC = () => {
                 <TableBody>
                   {paged.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center">
+                      <TableCell colSpan={8} align="center">
                         No inventory records.
                       </TableCell>
                     </TableRow>
@@ -410,6 +452,10 @@ const ManageInventoryPage: React.FC = () => {
                             : "-"}
                         </TableCell>
                         <TableCell align="right">{record.pieces}</TableCell>
+                        <TableCell align="right">
+                          {lotConsumptionByRecordId.get(record.id)
+                            ?.remainingPieces ?? record.pieces}
+                        </TableCell>
                         <TableCell align="right">
                           {new Intl.NumberFormat("en-PH", {
                             style: "currency",
@@ -434,6 +480,7 @@ const ManageInventoryPage: React.FC = () => {
                           <IconButton
                             color="success"
                             onClick={() => openEdit(record)}
+                            disabled={isRecordLockedByUsage(record.id)}
                           >
                             <EditIcon fontSize="small" />
                           </IconButton>
@@ -524,14 +571,8 @@ const ManageInventoryPage: React.FC = () => {
                   size="small"
                   label="Pieces"
                   value={form.pieces}
-                  disabled={editingIsLocked}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, pieces: e.target.value }))
-                  }
-                  helperText={
-                    editingIsLocked
-                      ? "Pieces cannot be changed because this entry has been used in recorded expenses."
-                      : undefined
                   }
                 />
               </Grid>
@@ -542,17 +583,11 @@ const ManageInventoryPage: React.FC = () => {
                   size="small"
                   label="Price per piece"
                   value={form.pricePerPiece}
-                  disabled={editingIsLocked}
                   onChange={(e) =>
                     setForm((prev) => ({
                       ...prev,
                       pricePerPiece: e.target.value,
                     }))
-                  }
-                  helperText={
-                    editingIsLocked
-                      ? "Price per piece cannot be changed because this entry has been used in recorded expenses."
-                      : undefined
                   }
                 />
               </Grid>
