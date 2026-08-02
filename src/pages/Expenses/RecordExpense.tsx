@@ -27,6 +27,7 @@ import {
   TablePagination,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
@@ -63,8 +64,10 @@ import expenseRecordService, {
 import { isAdmin } from "../../utils/roleAccess";
 import { ignoreBackdropClose } from "../../utils/muiDialogClose";
 import {
-  computeInventoryExpenseAmount,
+  computeInventoryExpenseLotAllocation,
+  getLotConsumptionByRecordId,
   inventoryConsumptionFromExpenses,
+  type FifoExpenseLotLine,
 } from "../../utils/inventoryFifo";
 
 type ExpenseOption = {
@@ -337,11 +340,67 @@ const RecordExpensePage: React.FC = () => {
     return Math.max(0, purchased - expensed);
   }, [editing, form.option, inventoryRecords, records]);
 
-  const computedAmountPreview = useMemo<number | null>(() => {
-    if (form.option?.type !== "inventory") return null;
+  const selectedInventoryHistory = useMemo(() => {
+    if (form.option?.type !== "inventory") return [];
+    const itemId = form.option.id;
+    const lotUsage = getLotConsumptionByRecordId({
+      inventoryRecords,
+      consumptionRecords: inventoryConsumptionRecords.filter(
+        (r) => r.id !== editing?.id,
+      ),
+    });
+
+    const toTime = (value?: string | null): number => {
+      if (!value) return 0;
+      const d = dayjs(value);
+      return d.isValid() ? d.valueOf() : 0;
+    };
+
+    // FIFO order: oldest / next-to-be-used first
+    return inventoryRecords
+      .filter((row) => row.itemId === itemId)
+      .sort((a, b) => {
+        const byPriceDate = toTime(a.dateOfPrice) - toTime(b.dateOfPrice);
+        if (byPriceDate !== 0) return byPriceDate;
+        const byDate = toTime(a.date) - toTime(b.date);
+        if (byDate !== 0) return byDate;
+        const byCreated = toTime(a.createdAt) - toTime(b.createdAt);
+        if (byCreated !== 0) return byCreated;
+        return a.id.localeCompare(b.id);
+      })
+      .map((row) => {
+        const quantity = Number(row.pieces) || 0;
+        const left =
+          lotUsage.get(row.id)?.remainingPieces ?? quantity;
+        return {
+          id: row.id,
+          date: row.date,
+          quantity,
+          left,
+          pricePerPiece: Number(row.pricePerPiece) || 0,
+        };
+      })
+      .filter((row) => row.left > 0)
+      .slice(0, 10);
+  }, [
+    editing?.id,
+    form.option,
+    inventoryConsumptionRecords,
+    inventoryRecords,
+  ]);
+
+  const computedLotAllocation = useMemo<{
+    lines: FifoExpenseLotLine[];
+    totalAmount: number | null;
+  }>(() => {
+    if (form.option?.type !== "inventory") {
+      return { lines: [], totalAmount: null };
+    }
     const pieces = Number(form.pieces);
-    if (!Number.isFinite(pieces) || pieces <= 0) return null;
-    return computeInventoryExpenseAmount({
+    if (!Number.isFinite(pieces) || pieces <= 0) {
+      return { lines: [], totalAmount: null };
+    }
+    return computeInventoryExpenseLotAllocation({
       inventoryRecords,
       consumptionRecords: inventoryConsumptionRecords,
       inventoryItemId: form.option.id,
@@ -358,6 +417,8 @@ const RecordExpensePage: React.FC = () => {
     inventoryConsumptionRecords,
     inventoryRecords,
   ]);
+
+  const computedAmountPreview = computedLotAllocation.totalAmount;
 
   const filteredRecords = useMemo(() => {
     const bySource =
@@ -811,35 +872,113 @@ const RecordExpensePage: React.FC = () => {
         >
           {editing ? "Edit Expense Record" : "Add Expense Record"}
           {isInventory && typeof selectedAvailablePieces === "number" ? (
-            <Chip
-              label={`Available: ${selectedAvailablePieces}`}
-              sx={(theme) => ({
-                height: 34,
-                px: 0.75,
-                borderRadius: 0,
-                fontWeight: 700,
-                fontSize: "0.9rem",
-                letterSpacing: 0.05,
-                borderWidth: 1,
-                borderStyle: "solid",
-                borderColor:
-                  theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.35)"
-                    : theme.palette.primary.main,
-                bgcolor:
-                  theme.palette.mode === "dark"
-                    ? "#000"
-                    : "rgba(232, 238, 245, 0.95)",
-                color:
-                  theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.95)"
-                    : theme.palette.text.primary,
-                "& .MuiChip-label": {
-                  px: 1,
-                  py: 0,
-                },
-              })}
-            />
+            (() => {
+              const availableChip = (
+                <Chip
+                  label={`Available: ${selectedAvailablePieces}`}
+                  sx={(theme) => ({
+                    height: 34,
+                    px: 0.75,
+                    borderRadius: 0,
+                    fontWeight: 700,
+                    fontSize: "0.9rem",
+                    letterSpacing: 0.05,
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    borderColor:
+                      theme.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.35)"
+                        : theme.palette.primary.main,
+                    bgcolor:
+                      theme.palette.mode === "dark"
+                        ? "#000"
+                        : "rgba(232, 238, 245, 0.95)",
+                    color:
+                      theme.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.95)"
+                        : theme.palette.text.primary,
+                    "& .MuiChip-label": {
+                      px: 1,
+                      py: 0,
+                    },
+                  })}
+                />
+              );
+
+              if (!isCurrentUserAdmin) return availableChip;
+
+              return (
+                <Tooltip
+                  arrow
+                  placement="bottom-end"
+                  title={
+                    <Box sx={{ p: 0.5, minWidth: 220 }}>
+                      <Typography
+                        variant="caption"
+                        sx={{ fontWeight: 700, display: "block", mb: 0.75 }}
+                      >
+                        Inventory history
+                      </Typography>
+                      {selectedInventoryHistory.length === 0 ? (
+                        <Typography variant="caption">
+                          No inventory entries.
+                        </Typography>
+                      ) : (
+                        <Box
+                          component="table"
+                          sx={{
+                            borderCollapse: "collapse",
+                            width: "100%",
+                            border: "1px solid rgba(255,255,255,0.35)",
+                            "& th, & td": {
+                              textAlign: "left",
+                              py: 0.4,
+                              px: 0.75,
+                              fontSize: "0.75rem",
+                              whiteSpace: "nowrap",
+                              border: "1px solid rgba(255,255,255,0.35)",
+                            },
+                            "& th": { fontWeight: 700 },
+                            "& td:nth-of-type(n+2), & th:nth-of-type(n+2)": {
+                              textAlign: "right",
+                            },
+                          }}
+                        >
+                          <thead>
+                            <tr>
+                              <th>Date</th>
+                              <th>Quantity</th>
+                              <th>Left</th>
+                              <th>Price</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedInventoryHistory.map((row) => (
+                              <tr key={row.id}>
+                                <td>
+                                  {dayjs(row.date).isValid()
+                                    ? dayjs(row.date).format("MM-DD-YY h:mm A")
+                                    : "-"}
+                                </td>
+                                <td>{row.quantity}</td>
+                                <td>{row.left}</td>
+                                <td>
+                                  {phpFormatter.format(row.pricePerPiece)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </Box>
+                      )}
+                    </Box>
+                  }
+                >
+                  <Box component="span" sx={{ display: "inline-flex", cursor: "help" }}>
+                    {availableChip}
+                  </Box>
+                </Tooltip>
+              );
+            })()
           ) : null}
         </DialogTitle>
         <DialogContent>
@@ -954,19 +1093,60 @@ const RecordExpensePage: React.FC = () => {
                     typeof selectedAvailablePieces === "number" &&
                     Number(form.pieces || 0) > selectedAvailablePieces
                       ? `Cannot exceed available stocks (${selectedAvailablePieces}).`
-                      : isInventory &&
-                          computedAmountPreview != null &&
-                          isCurrentUserAdmin
-                        ? `Amount preview: ${phpFormatter.format(
-                            computedAmountPreview,
-                          )} (FIFO cost, auto-calculated on save)`
-                        : isInventory &&
-                            isCurrentUserAdmin &&
-                            computedAmountPreview == null
-                          ? "Amount is auto-calculated from oldest inventory stock (FIFO) on save."
-                          : ""
+                      : isInventory && isCurrentUserAdmin && !form.pieces
+                        ? "Amount is auto-calculated from oldest inventory stock (FIFO) on save."
+                        : ""
                   }
                 />
+                {isInventory &&
+                isCurrentUserAdmin &&
+                computedLotAllocation.lines.length > 0 ? (
+                  <Box sx={{ mt: 1.25 }}>
+                    {computedLotAllocation.lines.map((line, index) => (
+                      <Box
+                        key={line.inventoryRecordId}
+                        sx={{
+                          mb:
+                            index < computedLotAllocation.lines.length - 1
+                              ? 1
+                              : 0.5,
+                        }}
+                      >
+                        {computedLotAllocation.lines.length > 1 ? (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            display="block"
+                          >
+                            Stock {index + 1}
+                          </Typography>
+                        ) : null}
+                        <Typography variant="body2" color="text.secondary">
+                          Price date:{" "}
+                          {dayjs(line.dateOfPrice).isValid()
+                            ? dayjs(line.dateOfPrice).format("MM-DD-YY h:mm A")
+                            : "-"}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Price: {phpFormatter.format(line.pricePerPiece)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Total: {phpFormatter.format(line.total)} (
+                          {line.piecesTaken} pcs)
+                        </Typography>
+                      </Box>
+                    ))}
+                    {computedAmountPreview != null ? (
+                      <Typography
+                        variant="body2"
+                        sx={{ mt: 0.75, fontWeight: 600 }}
+                      >
+                        Amount preview: {phpFormatter.format(computedAmountPreview)}{" "}
+                        (FIFO cost, auto-calculated on save)
+                      </Typography>
+                    ) : null}
+                  </Box>
+                ) : null}
                 </Box>
               </Grid>
 
